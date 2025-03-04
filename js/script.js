@@ -31,9 +31,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize uptime counter
     initUptimeCounter();
     
-    // Initialize oscilloscope
-    initOscilloscope();
-    
     // Add radar blip
     initRadarBlip();
     
@@ -76,108 +73,7 @@ function initRadarBlip() {
     }, 3000);
 }
 
-// Initialize oscilloscope effect
-function initOscilloscope() {
-    const canvas = document.getElementById('oscilloscope');
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-    
-    const width = canvas.width;
-    const height = canvas.height;
-    
-    // Function to draw the oscilloscope wave
-    function drawWave() {
-        ctx.clearRect(0, 0, width, height);
-        
-        // Draw grid lines
-        ctx.strokeStyle = 'rgba(0, 255, 0, 0.1)';
-        ctx.lineWidth = 1;
-        
-        // Vertical grid lines
-        for (let x = 0; x < width; x += 20) {
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, height);
-            ctx.stroke();
-        }
-        
-        // Horizontal grid lines
-        for (let y = 0; y < height; y += 10) {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(width, y);
-            ctx.stroke();
-        }
-        
-        // Draw sine wave with message pattern
-        ctx.strokeStyle = 'rgba(0, 255, 0, 0.8)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        
-        const time = Date.now() * 0.001;
-        const frequency = 0.05;
-        const amplitude = height * 0.2;
-        
-        // Create the message pattern - spell "WELCOME VISITOR"
-        const messagePattern = [
-            1.0, 0.5, 1.0, 0.5, 1.0, 0.5, 1.0, 0.2, // W
-            0.5, 1.0, 0.5, 0.2, // E
-            0.5, 0.2, 1.0, 0.5, 0.5, 0.2, // L
-            0.5, 1.0, 0.5, 1.0, 0.5, 0.2, // C
-            0.5, 1.0, 0.5, 1.0, 0.5, 0.2, // O
-            0.5, 1.0, 0.5, 0.5, 0.5, 0.2, // M
-            0.5, 1.0, 0.5, 0.2, // E
-            0.2, 0.2, 0.2, // space
-            1.0, 0.5, 1.0, 0.5, 0.5, 0.2, // V
-            0.3, 1.0, 0.3, 0.2, // I
-            0.5, 0.5, 0.5, 0.5, 0.5, 0.2, // S
-            0.3, 1.0, 0.3, 0.2, // I
-            0.5, 0.5, 0.5, 0.5, 0.5, 0.2, // T
-            0.5, 1.0, 0.5, 1.0, 0.5, 0.2, // O
-            0.5, 0.5, 1.0, 0.2, // R
-        ];
-        
-        ctx.moveTo(0, height / 2);
-        
-        for (let x = 0; x < width; x++) {
-            // Base sine wave
-            let y = Math.sin((x * frequency) + time) * amplitude;
-            
-            // Apply message pattern
-            const patternIndex = Math.floor((x / width * messagePattern.length) % messagePattern.length);
-            y *= messagePattern[patternIndex];
-            
-            // Center the wave
-            y += height / 2;
-            
-            ctx.lineTo(x, y);
-        }
-        
-        ctx.stroke();
-        
-        // Add glow effect
-        ctx.shadowColor = 'rgba(0, 255, 0, 0.7)';
-        ctx.shadowBlur = 5;
-        ctx.stroke();
-        
-        // Reset shadow
-        ctx.shadowBlur = 0;
-        
-        requestAnimationFrame(drawWave);
-    }
-    
-    // Handle window resize
-    window.addEventListener('resize', () => {
-        canvas.width = canvas.offsetWidth;
-        canvas.height = canvas.offsetHeight;
-    });
-    
-    // Start animation
-    drawWave();
-}
+// Oscilloscope removed as requested
 
 // Initialize uptime counter
 function initUptimeCounter() {
@@ -198,16 +94,22 @@ function initUptimeCounter() {
 
 // Initialize audio functionality
 function initAudio() {
-    const greetingBtn = document.getElementById('audio-greeting');
     const greetingAudio = document.getElementById('greeting-audio');
     const clickSound = document.getElementById('click-sound');
     const successSound = document.getElementById('success-sound');
     
-    if (greetingBtn && greetingAudio) {
-        greetingBtn.addEventListener('click', () => {
-            greetingAudio.currentTime = 0;
-            greetingAudio.play();
-        });
+    // Auto-play greeting on page load
+    if (greetingAudio) {
+        greetingAudio.volume = 0.5;
+        
+        // Try to play audio - browsers may block autoplay
+        const playPromise = greetingAudio.play();
+        
+        if (playPromise !== undefined) {
+            playPromise.catch(error => {
+                console.log("Autoplay prevented by browser: ", error);
+            });
+        }
     }
     
     // Add click sounds to buttons and links
@@ -233,13 +135,13 @@ function initAudio() {
     }
 }
 
-// Initialize hover effects
+// Initialize hover effects and fix navigation
 function initHoverEffects() {
     // Project items hover
     const projectItems = document.querySelectorAll('.grid-item');
     projectItems.forEach(item => {
         item.addEventListener('mouseenter', function() {
-            this.style.transform = 'translateY(-5px)';
+            this.style.transform = 'translateY(-3px)';
             this.style.boxShadow = '0 0 15px var(--glow-color)';
         });
         
@@ -248,33 +150,18 @@ function initHoverEffects() {
             this.style.boxShadow = 'none';
         });
         
-        // Make sure inner links don't trigger parent link
+        // Make grid items clickable to match what's shown in the images
+        item.addEventListener('click', function() {
+            // You could add a link to project details here if needed
+            console.log('Project clicked');
+        });
+        
+        // Make sure inner links don't trigger parent click
         const innerLinks = item.querySelectorAll('.project-link');
         innerLinks.forEach(link => {
             link.addEventListener('click', (e) => {
                 e.stopPropagation();
             });
-        });
-    });
-    
-    // Nav links hover and active state
-    const navLinks = document.querySelectorAll('.nav-link');
-    navLinks.forEach(link => {
-        // Add active class when scrolled to section
-        window.addEventListener('scroll', () => {
-            const targetId = link.getAttribute('href').substring(1);
-            const targetSection = document.getElementById(targetId);
-            
-            if (targetSection) {
-                const rect = targetSection.getBoundingClientRect();
-                const offset = 200; // Adjust based on your layout
-                
-                if (rect.top <= offset && rect.bottom > offset) {
-                    link.classList.add('active');
-                } else {
-                    link.classList.remove('active');
-                }
-            }
         });
     });
     
@@ -291,6 +178,14 @@ function initHoverEffects() {
             this.style.boxShadow = 'none';
         });
     });
+}
+
+// Function to scroll to section (fixing navigation)
+function scrollToSection(sectionId) {
+    const section = document.getElementById(sectionId);
+    if (section) {
+        section.scrollIntoView({ behavior: 'smooth' });
+    }
 }
 
 // Initialize enhanced contact form with validation

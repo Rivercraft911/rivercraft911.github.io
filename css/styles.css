@@ -92,29 +92,7 @@ body::after {
     pointer-events: none;
 }
 
-/* Enhanced scan line effect */
-.scan-line {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 2px;
-    background-color: rgba(0, 255, 0, 0.5);
-    box-shadow: 0 0 5px var(--glow-color);
-    opacity: 0.7;
-    z-index: 1001;
-    pointer-events: none;
-    animation: scan-line 3s linear infinite;
-}
-
-@keyframes scan-line {
-    0% {
-        top: 0%;
-    }
-    100% {
-        top: 100%;
-    }
-}
+/* Scan line removed as requested */
 
 /* Background gradient */
 .gradient-bg {
@@ -265,30 +243,7 @@ header {
     }
 }
 
-/* Oscilloscope effect */
-.oscilloscope-container {
-    width: 80%;
-    height: 50px;
-    margin: 20px auto;
-    position: relative;
-    border: 1px solid var(--terminal-green-dark);
-    background-color: rgba(0, 10, 0, 0.3);
-    overflow: hidden;
-}
-
-.oscilloscope-container::before {
-    content: "WELCOME VISITOR";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    color: var(--terminal-green);
-    opacity: 0.2;
-    font-size: 1.2rem;
-    font-weight: bold;
-    pointer-events: none;
-    letter-spacing: 2px;
-}
+/* Oscilloscope removed as requested */
 
 /* Military button style */
 .military-button {
@@ -533,20 +488,18 @@ p {
 
 .grid-item {
     border: 1px solid var(--terminal-green-dark);
-    padding: 20px;
+    padding: 15px;
     background-color: rgba(0, 20, 0, 0.2);
     position: relative;
     overflow: hidden;
     transition: all 0.3s ease;
-    text-decoration: none;
     color: var(--terminal-green);
-    display: block;
+    cursor: pointer;
 }
 
-.grid-item:hover, .grid-item:focus {
+.grid-item:hover {
     box-shadow: 0 0 15px var(--glow-color);
-    transform: translateY(-5px);
-    outline: none;
+    transform: translateY(-3px);
 }
 
 .project-badge {
@@ -625,15 +578,20 @@ p {
     font-size: 0.9rem;
 }
 
-/* Enhanced Tesseract */
+/* Enhanced Tesseract - with condensed spacing */
 .tesseract-wrapper {
     position: relative;
     width: 100%;
-    padding: 40px 0;
+    padding: 20px 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin: 40px auto;
+    margin: 20px auto;
+}
+
+.tesseract-wrapper.condensed {
+    padding: 10px 0;
+    margin: 10px auto;
 }
 
 .tesseract-container {
