@@ -5,19 +5,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' https://cdnjs.cloudflare.com; object-src 'self'">
     <title>River Dowdy - Stanford Portfolio</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="css/styles.css">
     <!-- Load THREE.js first -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Load Howler.js for audio support -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
 </head>
 <body class="loaded">
     <!-- Background elements -->
     <div class="noise"></div>
     <div class="gradient-bg"></div>
+    <div class="scan-line"></div>
+    
+    <div class="system-status">
+        <div class="status-indicator online-status">
+            <span class="status-dot blink"></span>
+            <span class="status-text">SYSTEM ONLINE</span>
+        </div>
+        <div class="status-indicator secure-status">
+            <span class="status-dot"></span>
+            <span class="status-text">SECURE CONNECTION</span>
+        </div>
+        <div class="status-indicator data-status">
+            <span class="status-dot"></span>
+            <span class="status-text">DATA TRANSMISSION</span>
+        </div>
+    </div>
     
     <header>
         <div class="radar-container">
             <div class="radar-circle"></div>
             <div class="radar-line"></div>
+            <div class="radar-blip"></div>
         </div>
         
         <div class="classification">Top Secret // SCI // PARADIGM-SHIFT-PROTOCOL</div>
@@ -31,16 +50,25 @@
             <div class="terminal-line">$ now accepting internship and research applications <span class="blink">_</span></div>
         </div>
         
+        <div class="oscilloscope-container">
+            <canvas id="oscilloscope"></canvas>
+        </div>
+        
         <div class="coordinates">LAT: 37.4275° N • LONG: 122.1697° W</div>
+        
+        <button id="audio-greeting" class="military-button">
+            <span class="button-icon">🔊</span>
+            PLAY GREETING
+        </button>
     </header>
     
     <div class="nav-container">
         <nav>
-            <a href="#about">About</a>
-            <a href="#projects">Projects</a>
-            <a href="#skills">Skills</a>
-            <a href="#education">Education</a>
-            <a href="#contact">Contact</a>
+            <a href="#about" class="nav-link">About</a>
+            <a href="#projects" class="nav-link">Projects</a>
+            <a href="#skills" class="nav-link">Skills</a>
+            <a href="#education" class="nav-link">Education</a>
+            <a href="#contact" class="nav-link">Contact</a>
         </nav>
     </div>
     
@@ -68,65 +96,65 @@
         <section id="projects">
             <h3>Classified Operations</h3>
             <div class="grid-container">
-                <div class="grid-item">
+                <a href="projects/redstone-computer.html" class="grid-item">
                     <div class="project-badge red-badge">MC-RED</div>
                     <h4>REDSTONE COMPUTING ENGINE</h4>
                     <p>A fully functional computer built entirely within Minecraft using redstone circuits and logic gates. Currently implementing an ALU and memory management system.</p>
                     <div class="project-links">
-                        <a href="#" class="project-link"><span class="icon">&#x1F517;</span>GitHub</a>
-                        <a href="#" class="project-link"><span class="icon">▶</span>Demo</a>
+                        <a href="https://github.com/riverdowdy/redstone-computer" class="project-link" target="_blank"><span class="icon">&#x1F517;</span>GitHub</a>
+                        <a href="projects/redstone-computer.html#demo" class="project-link"><span class="icon">▶</span>Demo</a>
                     </div>
-                </div>
+                </a>
                 
-                <div class="grid-item">
+                <a href="projects/biocomputing.html" class="grid-item">
                     <div class="project-badge blue-badge">BIO-X</div>
                     <h4>BIOCOMPUTING INTERFACE</h4>
                     <p>Experimental project exploring the intersection of biological systems and computational principles. Initial prototypes show promise for neural-inspired processing.</p>
                     <div class="project-links">
-                        <a href="#" class="project-link"><span class="icon">📄</span>Lab Notes</a>
-                        <a href="#" class="project-link"><span class="icon">🔬</span>Research</a>
+                        <a href="https://github.com/riverdowdy/biocomputing" class="project-link" target="_blank"><span class="icon">&#x1F517;</span>GitHub</a>
+                        <a href="projects/biocomputing.html#research" class="project-link"><span class="icon">🔬</span>Research</a>
                     </div>
                 </div>
                 
-                <div class="grid-item">
+                <a href="projects/racing-physics.html" class="grid-item">
                     <div class="project-badge orange-badge">PHYS</div>
                     <h4>RACING PHYSICS ENGINE</h4>
                     <p>Custom physics simulation for racing games that provides more realistic vehicle dynamics and environmental interactions than standard game engines.</p>
                     <div class="project-links">
-                        <a href="#" class="project-link"><span class="icon">&#x1F517;</span>GitHub</a>
-                        <a href="#" class="project-link"><span class="icon">▶</span>Demo</a>
+                        <a href="https://github.com/riverdowdy/racing-physics" class="project-link" target="_blank"><span class="icon">&#x1F517;</span>GitHub</a>
+                        <a href="projects/racing-physics.html#demo" class="project-link"><span class="icon">▶</span>Demo</a>
                     </div>
-                </div>
+                </a>
                 
-                <div class="grid-item">
+                <a href="projects/ic-designs.html" class="grid-item">
                     <div class="project-badge purple-badge">IC-DSN</div>
                     <h4>INTEGRATED CIRCUIT DESIGNS</h4>
                     <p>Collection of custom IC designs focusing on power efficiency and novel architectural approaches for specialized computing applications.</p>
                     <div class="project-links">
-                        <a href="#" class="project-link"><span class="icon">📐</span>Schematics</a>
-                        <a href="#" class="project-link"><span class="icon">📄</span>Documentation</a>
+                        <a href="https://github.com/riverdowdy/ic-designs" class="project-link" target="_blank"><span class="icon">&#x1F517;</span>GitHub</a>
+                        <a href="projects/ic-designs.html#schematics" class="project-link"><span class="icon">📐</span>Schematics</a>
                     </div>
-                </div>
+                </a>
                 
-                <div class="grid-item">
+                <a href="projects/didgeridoo.html" class="grid-item">
                     <div class="project-badge teal-badge">AUDIO</div>
                     <h4>DIDGERIDOO FREQUENCY ANALYZER</h4>
                     <p>Custom-built system to analyze the harmonic structures and resonance patterns produced by didgeridoo playing, with real-time visualization.</p>
                     <div class="project-links">
-                        <a href="#" class="project-link"><span class="icon">&#x1F517;</span>GitHub</a>
-                        <a href="#" class="project-link"><span class="icon">▶</span>Demo</a>
+                        <a href="https://github.com/riverdowdy/didgeridoo-analyzer" class="project-link" target="_blank"><span class="icon">&#x1F517;</span>GitHub</a>
+                        <a href="projects/didgeridoo.html#demo" class="project-link"><span class="icon">▶</span>Demo</a>
                     </div>
-                </div>
+                </a>
                 
-                <div class="grid-item">
+                <a href="projects/climbing-assistant.html" class="grid-item">
                     <div class="project-badge green-badge">AI-CV</div>
                     <h4>AUTONOMOUS CLIMBING ASSISTANT</h4>
                     <p>Wearable device that uses computer vision and machine learning to analyze climbing routes and suggest optimal movement patterns in real-time.</p>
                     <div class="project-links">
-                        <a href="#" class="project-link"><span class="icon">&#x1F517;</span>GitHub</a>
-                        <a href="#" class="project-link"><span class="icon">🔧</span>Prototype</a>
+                        <a href="https://github.com/riverdowdy/climbing-assistant" class="project-link" target="_blank"><span class="icon">&#x1F517;</span>GitHub</a>
+                        <a href="projects/climbing-assistant.html#prototype" class="project-link"><span class="icon">🔧</span>Prototype</a>
                     </div>
-                </div>
+                </a>
             </div>
         </section>
         
@@ -443,7 +471,7 @@
                     <div class="contact-icon email-icon">[<span class="icon-pulse">@</span>]</div>
                     <div class="contact-content">
                         <h4>SECURE TRANSMISSION</h4>
-                        <a href="mailto:your-email@stanford.edu" class="contact-link">your-email@stanford.edu</a>
+                        <a href="mailto:youremail@stanford.edu" class="contact-link">youremail@stanford.edu</a>
                         <p class="contact-desc">Encrypted communication channel</p>
                     </div>
                 </div>
@@ -452,7 +480,7 @@
                     <div class="contact-icon github-icon">[<span class="icon-pulse">G</span>]</div>
                     <div class="contact-content">
                         <h4>CODE REPOSITORY</h4>
-                        <a href="https://github.com/yourusername" target="_blank" class="contact-link">github.com/yourusername</a>
+                        <a href="https://github.com/riverdowdy" target="_blank" class="contact-link">github.com/riverdowdy</a>
                         <p class="contact-desc">Access secure code archives</p>
                     </div>
                 </div>
@@ -461,7 +489,7 @@
                     <div class="contact-icon linkedin-icon">[<span class="icon-pulse">in</span>]</div>
                     <div class="contact-content">
                         <h4>PROFESSIONAL NETWORK</h4>
-                        <a href="https://linkedin.com/in/yourusername" target="_blank" class="contact-link">linkedin.com/in/yourusername</a>
+                        <a href="https://linkedin.com/in/riverdowdy" target="_blank" class="contact-link">linkedin.com/in/riverdowdy</a>
                         <p class="contact-desc">Connect to professional grid</p>
                     </div>
                 </div>
@@ -476,30 +504,40 @@
                         <div class="form-group">
                             <label for="name">IDENTIFY YOURSELF:</label>
                             <input type="text" id="name" name="name" required>
+                            <div class="validation-message" id="name-validation"></div>
                         </div>
                         
                         <div class="form-group">
                             <label for="email">SECURE COMMUNICATION CHANNEL:</label>
                             <input type="email" id="email" name="email" required>
+                            <div class="validation-message" id="email-validation"></div>
                         </div>
                         
                         <div class="form-group">
                             <label for="subject">SUBJECT CLASSIFICATION:</label>
                             <input type="text" id="subject" name="subject" required>
+                            <div class="validation-message" id="subject-validation"></div>
                         </div>
                         
                         <div class="form-group">
                             <label for="message">TRANSMISSION CONTENT:</label>
                             <textarea id="message" name="message" rows="6" required></textarea>
+                            <div class="validation-message" id="message-validation"></div>
                         </div>
                         
                         <button type="submit" class="submit-btn">TRANSMIT</button>
                     </form>
                     
                     <div class="form-success">
+                        <div class="success-icon">✓</div>
                         <p>TRANSMISSION RECEIVED</p>
                         <p>Your message has been encrypted and stored.</p>
                         <p>Expect response within 24hrs.</p>
+                        <div class="system-confirmation">
+                            <div class="confirmation-line">STATUS: ACCEPTED</div>
+                            <div class="confirmation-line">ENCRYPTION: AES-256</div>
+                            <div class="confirmation-line">PRIORITY: HIGH</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -507,12 +545,51 @@
     </main>
     
     <footer>
-        <p>PARADIGM-SHIFT-PROTOCOL // CLEARANCE LEVEL: BEYOND TOP SECRET</p>
-        <p>© 2025 | All systems operational | Coordinates: 37.4275° N, 122.1697° W</p>
-        <p>Last system update: <span id="last-update"></span></p>
+        <div class="footer-grid">
+            <div class="footer-section">
+                <p class="footer-header">PARADIGM-SHIFT-PROTOCOL</p>
+                <p>CLEARANCE LEVEL: BEYOND TOP SECRET</p>
+                <p>© 2025 | All systems operational</p>
+            </div>
+            <div class="footer-section">
+                <p class="footer-header">MISSION STATUS</p>
+                <div class="status-container">
+                    <div class="status-item">
+                        <span class="status-label">Server:</span>
+                        <span class="status-value online">Online</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Uptime:</span>
+                        <span class="status-value" id="uptime-counter">00:00:00</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Last Update:</span>
+                        <span class="status-value" id="last-update"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-section">
+                <p class="footer-header">GEOLOCATION</p>
+                <p>Coordinates: <span id="footer-coordinates">37.4275° N, 122.1697° W</span></p>
+                <p>Elevation: <span id="elevation">23m ASL</span></p>
+            </div>
+        </div>
     </footer>
     
+    <!-- Audio Elements -->
+    <audio id="greeting-audio" preload="none">
+        <source src="assets/audio/welcome.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="click-sound" preload="auto">
+        <source src="assets/audio/click.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="success-sound" preload="auto">
+        <source src="assets/audio/success.mp3" type="audio/mpeg">
+    </audio>
+    
     <!-- Scripts at the end of body -->
-    <script src="script.js"></script>
+    <script src="js/script.js"></script>
+    <script src="js/tesseract.js"></script>
+    <script src="js/military-effects.js"></script>
 </body>
 </html>

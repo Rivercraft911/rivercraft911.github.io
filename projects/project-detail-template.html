@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' https://cdnjs.cloudflare.com; object-src 'self'">
+    <title>Project Name - River Dowdy Portfolio</title>
+    <link rel="stylesheet" href="../css/styles.css">
+    <link rel="stylesheet" href="../css/project-detail.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.3/howler.min.js"></script>
+</head>
+<body class="loaded project-detail-page">
+    <!-- Background elements -->
+    <div class="noise"></div>
+    <div class="gradient-bg"></div>
+    <div class="scan-line"></div>
+    
+    <div class="system-status">
+        <div class="status-indicator online-status">
+            <span class="status-dot blink"></span>
+            <span class="status-text">SYSTEM ONLINE</span>
+        </div>
+        <div class="status-indicator secure-status">
+            <span class="status-dot"></span>
+            <span class="status-text">SECURE CONNECTION</span>
+        </div>
+        <div class="status-indicator data-status">
+            <span class="status-dot"></span>
+            <span class="status-text">DATA TRANSMISSION</span>
+        </div>
+    </div>
+    
+    <header class="project-header">
+        <div class="radar-container small-radar">
+            <div class="radar-circle"></div>
+            <div class="radar-line"></div>
+        </div>
+        
+        <div class="project-title-container">
+            <a href="../index.html" class="back-button">← RETURN TO MAIN TERMINAL</a>
+            <div class="project-detail-badge red-badge">PROJECT-CLASSIFICATION</div>
+            <h1>PROJECT TITLE</h1>
+            <div class="project-subtitle">Project subtitle or brief description</div>
+        </div>
+        
+        <div class="coordinates">LAT: 37.4275° N • LONG: 122.1697° W</div>
+    </header>
+    
+    <div class="nav-container">
+        <nav>
+            <a href="#overview" class="nav-link">Overview</a>
+            <a href="#gallery" class="nav-link">Gallery</a>
+            <a href="#technical" class="nav-link">Technical Details</a>
+            <a href="#demo" class="nav-link">Demo</a>
+            <a href="#resources" class="nav-link">Resources</a>
+        </nav>
+    </div>
+    
+    <main>
+        <section id="overview">
+            <h3>Project Overview</h3>
+            
+            <div class="project-metadata">
+                <div class="metadata-item">
+                    <div class="metadata-label">STATUS</div>
+                    <div class="metadata-value">In Development</div>
+                </div>
+                <div class="metadata-item">
+                    <div class="metadata-label">START DATE</div>
+                    <div class="metadata-value">2024-02-15</div>
+                </div>
+                <div class="metadata-item">
+                    <div class="metadata-label">CATEGORY</div>
+                    <div class="metadata-value">Category Name</div>
+                </div>
+                <div class="metadata-item">
+                    <div class="metadata-label">CLEARANCE</div>
+                    <div class="metadata-value highlight-value">TOP SECRET</div>
+                </div>
+            </div>
+            
+            <div class="project-description">
+                <p>
+                    Detailed project description goes here. This should provide a comprehensive overview of what the project is, its purpose, and why it's significant.
+                </p>
+                <p>
+                    Include multiple paragraphs with details about the inspiration behind the project, key challenges that were overcome, and the most interesting aspects of the implementation.
+                </p>
+                <p>
+                    You can discuss the project's impact, what you learned from it, and any future plans for expansion or improvement.
+                </p>
+            </div>
+            
+            <div class="key-features">
+                <h4>Key Features</h4>
+                <ul class="feature-list">
+                    <li>
+                        <div class="feature-icon">▹</div>
+                        <div class="feature-text">Key feature one with detailed explanation of functionality and implementation.</div>
+                    </li>
+                    <li>
+                        <div class="feature-icon">▹</div>
+                        <div class="feature-text">Key feature two with explanation of technical challenges overcome.</div>
+                    </li>
+                    <li>
+                        <div class="feature-icon">▹</div>
+                        <div class="feature-text">Key feature three showing the innovative aspects of this implementation.</div>
+                    </li>
+                    <li>
+                        <div class="feature-icon">▹</div>
+                        <div class="feature-text">Key feature four highlighting the project's unique capabilities.</div>
+                    </li>
+                </ul>
+            </div>
+        </section>
+        
+        <section id="gallery">
+            <h3>Project Gallery</h3>
+            
+            <div class="gallery-grid">
+                <div class="gallery-item">
+                    <img src="../assets/images/project-placeholder-1.jpg" alt="Project image description" class="gallery-img">
+                    <div class="gallery-caption">Caption for the first gallery image</div>
+                </div>
+                <div class="gallery-item">
+                    <img src="../assets/images/project-placeholder-2.jpg" alt="Project image description" class="gallery-img">
+                    <div class="gallery-caption">Caption for the second gallery image</div>
+                </div>
+                <div class="gallery-item">
+                    <img src="../assets/images/project-placeholder-3.jpg" alt="Project image description" class="gallery-img">
+                    <div class="gallery-caption">Caption for the third gallery image</div>
+                </div>
+                <div class="gallery-item">
+                    <img src="../assets/images/project-placeholder-4.jpg" alt="Project image description" class="gallery-img">
+                    <div class="gallery-caption">Caption for the fourth gallery image</div>
+                </div>
+            </div>
+        </section>
+        
+        <section id="technical">
+            <h3>Technical Details</h3>
+            
+            <div class="tech-stack">
+                <h4>Technology Stack</h4>
+                <div class="tech-tags">
+                    <span class="tech-tag">JavaScript</span>
+                    <span class="tech-tag">Python</span>
+                    <span class="tech-tag">Framework Name</span>
+                    <span class="tech-tag">Library Name</span>
+                    <span class="tech-tag">Database</span>
+                    <span class="tech-tag">Other Tech</span>
+                </div>
+            </div>
+            
+            <div class="project-section">
+                <h4>Architecture Overview</h4>
+                <p>
+                    Detailed explanation of the project's architecture, including how different components interact and why specific technologies were chosen.
+                </p>
+                <p>
+                    Further discussion of technical decisions, optimizations, and lessons learned during development.
+                </p>
+            </div>
+            
+            <div class="project-section">
+                <h4>Key Implementation Challenges</h4>
+                <p>
+                    Discussion of the most challenging aspects of implementation and how they were overcome.
+                </p>
+                
+                <div class="code-snippet">
+                    <pre>
+// Sample code snippet demonstrating a key aspect of the project
+function sampleFunction() {
+    const data = processInput();
+    const result = complexAlgorithm(data);
+    return optimizeOutput(result);
+}
+
+// Further explanation through code
+class ProjectComponent {
+    constructor() {
+        this.state = initialState;
+        this.configure();
+    }
+    
+    process() {
+        // Implementation details
+    }
+}</pre>
+                </div>
+            </div>
+            
+            <div class="project-section">
+                <h4>Performance Considerations</h4>
+                <p>
+                    Analysis of performance optimizations, benchmarks, and future improvements.
+                </p>
+            </div>
+        </section>
+        
+        <section id="demo">
+            <h3>Live Demo</h3>
+            
+            <div class="demo-container">
+                <div class="demo-frame">
+                    <!-- Placeholder for actual demo content -->
+                    <div class="demo-placeholder">
+                        <div class="placeholder-text">
+                            <div class="placeholder-title">Interactive Demo</div>
+                            <div class="placeholder-subtitle">Demo content would be embedded here</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="demo-controls">
+                    <button class="demo-button">Start Demo</button>
+                    <button class="demo-button">Reset</button>
+                    <div class="demo-options">
+                        <label for="demo-option-1">Option 1:</label>
+                        <select id="demo-option-1">
+                            <option value="1">Setting 1</option>
+                            <option value="2">Setting 2</option>
+                            <option value="3">Setting 3</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="project-section">
+                <h4>How to Use the Demo</h4>
+                <p>
+                    Instructions for how to interact with the demo, what features to try, and what to look for.
+                </p>
+                <p>
+                    Additional details about limitations of the demo version compared to the full implementation.
+                </p>
+            </div>
+        </section>
+        
+        <section id="resources">
+            <h3>Resources & Links</h3>
+            
+            <div class="resources-grid">
+                <a href="https://github.com/username/repository" target="_blank" class="resource-item">
+                    <div class="resource-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    </div>
+                    <div class="resource-content">
+                        <div class="resource-title">GitHub Repository</div>
+                        <div class="resource-url">github.com/username/repository</div>
+                    </div>
+                </a>
+                
+                <a href="#" class="resource-item">
+                    <div class="resource-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                    </div>
+                    <div class="resource-content">
+                        <div class="resource-title">Technical Documentation</div>
+                        <div class="resource-url">Link to documentation</div>
+                    </div>
+                </a>
+                
+                <a href="#" class="resource-item">
+                    <div class="resource-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M19 2H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h4l3 3 3-3h4c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 3.3c1.49 0 2.7 1.21 2.7 2.7 0 1.49-1.21 2.7-2.7 2.7-1.49 0-2.7-1.21-2.7-2.7 0-1.49 1.21-2.7 2.7-2.7zM18 16H6v-.9c0-2 4-3.1 6-3.1s6 1.1 6 3.1v.9z"/></svg>
+                    </div>
+                    <div class="resource-content">
+                        <div class="resource-title">Contact for Collaboration</div>
+                        <div class="resource-url">email@example.com</div>
+                    </div>
+                </a>
+                
+                <a href="#" class="resource-item">
+                    <div class="resource-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path fill="currentColor" d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h10v4h8v10z"/></svg>
+                    </div>
+                    <div class="resource-content">
+                        <div class="resource-title">Related Project</div>
+                        <div class="resource-url">Link to related work</div>
+                    </div>
+                </a>
+            </div>
+            
+            <div class="project-tags-section">
+                <h4>Project Tags</h4>
+                <div class="project-tags">
+                    <span class="project-tag">Tag 1</span>
+                    <span class="project-tag">Tag 2</span>
+                    <span class="project-tag">Tag 3</span>
+                    <span class="project-tag">Tag 4</span>
+                    <span class="project-tag">Tag 5</span>
+                </div>
+            </div>
+        </section>
+        
+        <a href="../index.html" class="back-button large-button">← RETURN TO MAIN TERMINAL</a>
+    </main>
+    
+    <footer>
+        <div class="footer-grid">
+            <div class="footer-section">
+                <p class="footer-header">PARADIGM-SHIFT-PROTOCOL</p>
+                <p>CLEARANCE LEVEL: BEYOND TOP SECRET</p>
+                <p>© 2025 | All systems operational</p>
+            </div>
+            <div class="footer-section">
+                <p class="footer-header">MISSION STATUS</p>
+                <div class="status-container">
+                    <div class="status-item">
+                        <span class="status-label">Server:</span>
+                        <span class="status-value online">Online</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Uptime:</span>
+                        <span class="status-value" id="uptime-counter">00:00:00</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">Last Update:</span>
+                        <span class="status-value" id="last-update"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-section">
+                <p class="footer-header">GEOLOCATION</p>
+                <p>Coordinates: <span id="footer-coordinates">37.4275° N, 122.1697° W</span></p>
+                <p>Elevation: <span id="elevation">23m ASL</span></p>
+            </div>
+        </div>
+    </footer>
+    
+    <!-- Audio Elements -->
+    <audio id="click-sound" preload="auto">
+        <source src="../assets/audio/click.mp3" type="audio/mpeg">
+    </audio>
+    <audio id="success-sound" preload="auto">
+        <source src="../assets/audio/success.mp3" type="audio/mpeg">
+    </audio>
+    
+    <!-- Scripts -->
+    <script src="../js/script.js"></script>
+    <script src="../js/military-effects.js"></script>
+</body>
+</html>
