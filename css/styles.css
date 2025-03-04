@@ -94,6 +94,24 @@ body::after {
 
 /* Scan line removed as requested */
 
+/* Make sure all fixed overlay elements don't block interactions */
+body::before, body::after {
+    pointer-events: none;
+}
+
+.noise {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADIAAAAyCAYAAAAeP4ixAAABhGlDQ1BJQ0MgcHJvZmlsZQAAKJF9kT1Iw1AUhU9TpSIVQTuIOGSoThZERRy1CkWoEGqFVh1MXvoHTRqSFBdHwbXg4M9i1cHFWVcHV0EQ/AFxc3NSdJES70sKLWK88x6+c99x7z1AqJeZanaMA6pmGalYVMzmVsXuVwQQQhBzmFGZyc+KKWl4jq97+Ph6F+dZ3uf+HB1K3mSATySeY7phEW8QT29aOud94jArSQrxOfGYQRckfuS67PIb54LDAs8MG+nUPHGYWCx0sNLBrGhqxFPEEVXTKV/INVnlvMVZrdRY6578hcG8vrLMdZpDiGERS5AgQkEN5VRgIUqrRoqJFO3HPPyDjj9JLplcpTByLKAKFZLjB/+D392axanJtyklFgUD7RfbfowB3S1g3bKt728fO0+A/xm40lr+St0Y+KS91tKiR0DvNnDx2lLyfg+E9oALN+eSJOcrpNBIAO9n9E05AEYW6N3aXHs9dvTESb8GhrZv3gAHh8BokbLXPd4d6Ozb/75a7e8Hw+tyrqtLnqYAAAAGYktHRAAAAAAAAPlDu38AAAAJcEhZcwAADdcAAA3XAUIom3gAAAAHdElNRQfmAwwVOhICvHjWAAABcUlEQVRo3u2asU7DMBRFT48ZkIIUM0MZmPgK+pWV/EOGLsy08AW082YxsJ44Q1OG2o7uXUCKdJy8nGfHD2aYTqdjDm6LUWAQBjGIQQxiEIMYxCAGMYhBDGIQgxjEIAb5QxCFn8JvQAq/ueSK3/sVr9+SvxRIlsJNBo8VXNRwVcPdCI8NrBsIBbglgAwea3ir4aaBz1e4yzE9Hn5bWAwi44f/PMFbPrUr4JShzSZ3EMlw6HO4CnBToRKkgPMWjpk8PgQRYAObAqZPE4Y3FawHOK3R7eW/WCNSvN1duIJFdwWsB1gFtLlKvYxFIEO76+6kVyHAslcm1YpIvJT6x/Gru0q1JiTDzPjjc4MknKDHw++YYlcLBaKqRtJV4hIw3UPEfLISiY4oK0j02uBLOHQPhPi9QJRXcKJXDT8EEh1Flo/GJDOIQQxiEIMYxCAGMYhBDGIQgxjEIAYxyA+Qgmm72QxJ2E7ZHSr3CdNi+Vg66H77AAAAAElFTkSuQmCC');
+    background-repeat: repeat;
+    opacity: 0.1;
+    z-index: 999;
+    pointer-events: none;
+}
+
 /* Background gradient */
 .gradient-bg {
     position: fixed;
@@ -108,9 +126,10 @@ body::after {
         rgba(0, 5, 15, 0.8) 100%
     );
     opacity: 0.4;
+    pointer-events: none;
 }
 
-/* System status indicators */
+/* System status indicators - FIX: Added pointer-events none to allow clicks to pass through */
 .system-status {
     position: fixed;
     top: 10px;
@@ -119,6 +138,7 @@ body::after {
     flex-direction: column;
     gap: 5px;
     z-index: 1001;
+    pointer-events: none; /* This allows clicks to pass through the container */
 }
 
 .status-indicator {
@@ -130,6 +150,7 @@ body::after {
     padding: 3px 8px;
     border-radius: 3px;
     font-size: 0.7rem;
+    pointer-events: auto; /* Individual indicators can still be clicked if needed */
 }
 
 .status-dot {
@@ -171,6 +192,7 @@ header {
     width: 200px;
     height: 200px;
     z-index: 10;
+    pointer-events: none; /* Allow clicks to pass through */
 }
 
 .radar-circle {
@@ -392,6 +414,8 @@ nav a {
     letter-spacing: 1px;
     position: relative;
     overflow: hidden;
+    display: inline-block; /* Ensure the element is properly clickable */
+    cursor: pointer; /* Show pointer cursor */
 }
 
 nav a::before {

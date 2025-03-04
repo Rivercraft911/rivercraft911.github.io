@@ -182,8 +182,10 @@ function initHoverEffects() {
 
 // Function to scroll to section (fixing navigation)
 function scrollToSection(sectionId) {
+    event.preventDefault(); // Prevent default anchor behavior
     const section = document.getElementById(sectionId);
     if (section) {
+        console.log("Scrolling to section:", sectionId);
         section.scrollIntoView({ behavior: 'smooth' });
     }
 }
