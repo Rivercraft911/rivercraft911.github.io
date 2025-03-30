@@ -10,12 +10,8 @@ A retro military/radar green aesthetic portfolio website designed for engineers,
 ## ⚡ Features
 
 - **Retro Military Terminal Aesthetic** - Green terminal-style design with scan lines, radar effects, and glitch animations
-- **Interactive 4D Tesseract** - Dynamic visualization with fold-in animations and particle effects
-- **Oscilloscope Waveforms** - Animated sine waves displaying "WELCOME VISITOR" message
-- **Project Gallery System** - Detailed project pages with galleries, technical details, and demos
-- **Skill Visualization** - Interactive skill indicators with visual feedback
-- **Military UI Elements** - Status indicators, blinking lights, coordinate tracking, and system messages
-- **Fully Responsive Design** - Optimized for all screen sizes
+- **4D Tesseract** - Dynamic visualization with fold-in animations and particle effects
+- **Project Gallery System(inprogress)** - Detailed project pages with galleries, technical details, and demos
 
 ## 🛠️ Technologies
 
@@ -45,8 +41,6 @@ rivercraft911.github.io/
 │   └── images/              # Project images
 └── projects/                # Project detail pages
     ├── redstone-computer.html
-    ├── biocomputing.html
-    ├── racing-physics.html
     └── [other project pages]
 ```
 
@@ -69,10 +63,8 @@ rivercraft911.github.io/
 
 This portfolio template is designed to showcase technical projects with a unique military/radar aesthetic. It's perfect for:
 
-- Software engineers
-- Hardware developers
-- Game developers
-- Cybersecurity specialists
+- Engineers
+- Cool people
 - Anyone who appreciates a retro terminal aesthetic
 
 ## 🎨 Customization
@@ -98,8 +90,7 @@ The primary color scheme is defined in CSS variables at the top of `styles.css`:
 
 ## 📝 License
 
-This project is free to use and modify. Feel free to make your own portfolio based on this template!
-
+This project is free to use and modify. Feel free to make your own portfolio based on this!
 
 ---
 
