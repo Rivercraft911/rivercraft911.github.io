@@ -1,6 +1,4 @@
-// Military Effects script - handles specialized military-themed visual effects
-// Includes scan lines, status indicators, coordinates, blinking lights, and more
-
+// Military Effects script 
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Initializing military effects...");
     
@@ -290,12 +288,11 @@ function initSystemMessages() {
         }, 4000);
     }
     
-    // Show initial message after page load
     setTimeout(() => {
         showSystemMessage('info', 'SYSTEM INITIALIZED');
     }, 2000);
     
-    // Show random messages periodically
+
     setInterval(() => {
         // 30% chance to show a message
         if (Math.random() > 0.7) {
@@ -304,7 +301,6 @@ function initSystemMessages() {
         }
     }, 8000);
     
-    // Show messages in response to user interaction
     document.addEventListener('click', () => {
         // 20% chance to show a message on click
         if (Math.random() > 0.8) {

@@ -1,4 +1,3 @@
-// Main script file for River Dowdy's portfolio
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log("DOM loaded, initializing scripts...");

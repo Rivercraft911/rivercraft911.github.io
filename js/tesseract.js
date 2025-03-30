@@ -121,7 +121,7 @@ function initTesseract() {
             linesGroup.remove(linesGroup.children[0]);
         }
 
-        // Define rotation angles (feel free to tweak these)
+        // Define rotation angles 
         const angleXY = time * 0.5;
         const angleXW = time * 0.3;
         const angleYZ = time * 0.2;
@@ -138,7 +138,6 @@ function initTesseract() {
         });
 
         // Project each 4D vertex into 3D space.
-        // Using a larger 'distance' (here 4) produces a nicer perspective.
         const projected3D = rotatedVertices.map(v => project4Dto3D(v, 4));
 
         // Draw edges based on the projected vertices.
