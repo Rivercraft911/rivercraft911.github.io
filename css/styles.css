@@ -184,7 +184,6 @@ header {
     overflow: hidden;
 }
 
-/* Enhanced radar effect */
 .radar-container {
     position: absolute;
     top: 20px;
@@ -192,7 +191,7 @@ header {
     width: 200px;
     height: 200px;
     z-index: 10;
-    pointer-events: none; /* Allow clicks to pass through */
+    pointer-events: none;
 }
 
 .radar-circle {
@@ -228,17 +227,6 @@ header {
     animation: radar-sweep 5s infinite linear;
 }
 
-.radar-blip {
-    position: absolute;
-    width: 8px;
-    height: 8px;
-    background-color: var(--terminal-green);
-    border-radius: 50%;
-    box-shadow: 0 0 10px var(--glow-color);
-    opacity: 0;
-    animation: radar-blip 10s infinite;
-}
-
 @keyframes radar-sweep {
     from {
         transform: rotate(0deg);
@@ -247,25 +235,6 @@ header {
         transform: rotate(360deg);
     }
 }
-
-@keyframes radar-blip {
-    0%, 20%, 40%, 60%, 80%, 100% {
-        opacity: 0;
-    }
-    10%, 30%, 50%, 70%, 90% {
-        opacity: 1;
-    }
-    9%, 29%, 49%, 69%, 89% {
-        top: 30%;
-        left: 70%;
-    }
-    11%, 31%, 51%, 71%, 91% {
-        top: 60%;
-        left: 40%;
-    }
-}
-
-/* Oscilloscope removed as requested */
 
 /* Military button style */
 .military-button {
@@ -502,7 +471,6 @@ p {
     margin-bottom: 20px;
 }
 
-/* Enhanced Projects - Now grid items are links */
 .grid-container {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -602,7 +570,6 @@ p {
     font-size: 0.9rem;
 }
 
-/* Enhanced Tesseract - with condensed spacing */
 .tesseract-wrapper {
     position: relative;
     width: 100%;
@@ -659,10 +626,9 @@ p {
     }
 }
 
-/* Enhanced Skills Section - Fixed color issues */
 .skills-container {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(500px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
     gap: 30px;
 }
 
@@ -677,15 +643,6 @@ p {
 .skill-group:hover {
     transform: translateY(-5px);
     box-shadow: 0 5px 15px rgba(0, 40, 0, 0.4);
-}
-
-.special-group {
-    border-color: rgba(0, 255, 255, 0.3);
-    background-color: rgba(0, 15, 25, 0.3);
-}
-
-.special-group .skill-header h4 {
-    color: var(--biocomputing-blue);
 }
 
 .skill-header {
@@ -708,10 +665,6 @@ p {
     margin-top: 5px;
 }
 
-.special-group .skill-header-line {
-    background-color: rgba(0, 255, 255, 0.3);
-}
-
 .skill-header-line::after {
     content: "";
     position: absolute;
@@ -721,11 +674,6 @@ p {
     height: 3px;
     background-color: var(--terminal-green);
     box-shadow: 0 0 5px var(--glow-color);
-}
-
-.special-group .skill-header-line::after {
-    background-color: var(--biocomputing-blue);
-    box-shadow: 0 0 5px rgba(0, 255, 255, 0.7);
 }
 
 .skill-items {
@@ -740,11 +688,12 @@ p {
 }
 
 .skill-name {
-    width: 150px;
+    width: 170px; /* Increased width to prevent cutoff */
     font-size: 0.9rem;
     color: var(--terminal-green-light);
     position: relative;
     padding-left: 15px;
+    white-space: nowrap; /* Prevent text wrapping */
 }
 
 .skill-name::before {
@@ -752,11 +701,6 @@ p {
     position: absolute;
     left: 0;
     color: var(--terminal-green);
-}
-
-.highlight-skill .skill-name {
-    color: var(--kicad-teal);
-    text-shadow: 0 0 5px rgba(32, 201, 151, 0.5);
 }
 
 .skill-level {
@@ -785,244 +729,143 @@ p {
     opacity: 0.2;
 }
 
+/* Animated skill level styles */
+.level-high .skill-indicator:nth-child(1)::before {
+    opacity: 1;
+    background-color: var(--terminal-green);
+    box-shadow: 0 0 5px var(--glow-color);
+    animation: pulse-glow 2s infinite alternate;
+    animation-delay: 0.1s;
+}
+
+.level-high .skill-indicator:nth-child(2)::before {
+    opacity: 1;
+    background-color: var(--terminal-green);
+    box-shadow: 0 0 5px var(--glow-color);
+    animation: pulse-glow 2s infinite alternate;
+    animation-delay: 0.2s;
+}
+
+.level-high .skill-indicator:nth-child(3)::before {
+    opacity: 1;
+    background-color: var(--terminal-green);
+    box-shadow: 0 0 5px var(--glow-color);
+    animation: pulse-glow 2s infinite alternate;
+    animation-delay: 0.3s;
+}
+
+.level-high .skill-indicator:nth-child(4)::before {
+    opacity: 1;
+    background-color: var(--terminal-green);
+    box-shadow: 0 0 5px var(--glow-color);
+    animation: pulse-glow 2s infinite alternate;
+    animation-delay: 0.4s;
+}
+
+.level-high .skill-indicator:nth-child(5)::before {
+    opacity: 1;
+    background-color: var(--terminal-green);
+    box-shadow: 0 0 5px var(--glow-color);
+    animation: pulse-glow 2s infinite alternate;
+    animation-delay: 0.5s;
+}
+
+.level-medium .skill-indicator:nth-child(1)::before,
+.level-medium .skill-indicator:nth-child(2)::before,
+.level-medium .skill-indicator:nth-child(3)::before {
+    opacity: 1;
+    background-color: var(--terminal-green);
+    box-shadow: 0 0 5px var(--glow-color);
+    animation: pulse-glow 2s infinite alternate;
+    animation-delay: 0.1s;
+}
+
+.level-medium .skill-indicator:nth-child(4)::before {
+    opacity: 0.6;
+    background-color: var(--terminal-green);
+    animation: pulse-dim 2s infinite alternate;
+    animation-delay: 0.4s;
+}
+
+.level-medium .skill-indicator:nth-child(5)::before {
+    opacity: 0.3;
+    background-color: var(--terminal-green);
+}
+
+.level-low .skill-indicator:nth-child(1)::before,
+.level-low .skill-indicator:nth-child(2)::before {
+    opacity: 1;
+    background-color: var(--terminal-green);
+    box-shadow: 0 0 5px var(--glow-color);
+    animation: pulse-glow 2s infinite alternate;
+}
+
+.level-low .skill-indicator:nth-child(3)::before {
+    opacity: 0.6;
+    background-color: var(--terminal-green);
+    animation: pulse-dim 2s infinite alternate;
+}
+
+/* Skill bar animation - scanning effect */
 .skill-indicator::after {
     content: "";
     position: absolute;
     top: 0;
     left: -100%;
-    width: 100%;
+    width: 40%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    animation: skill-shine 2s linear infinite;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(0, 255, 0, 0.1) 50%, 
+        transparent 100%
+    );
+    animation: skill-scan 3s infinite;
 }
 
-@keyframes skill-shine {
-    0% { left: -100%; }
-    100% { left: 100%; }
+@keyframes pulse-glow {
+    0% {
+        box-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+    }
+    100% {
+        box-shadow: 0 0 8px rgba(0, 255, 0, 0.8);
+    }
 }
 
-.level-99 .skill-indicator:nth-child(-n+5)::before {
-    opacity: 1;
-    background-color: var(--terminal-green);
-    box-shadow: 0 0 5px var(--glow-color);
+@keyframes pulse-dim {
+    0% {
+        opacity: 0.4;
+    }
+    100% {
+        opacity: 0.7;
+    }
 }
 
-.level-98 .skill-indicator:nth-child(-n+5)::before {
-    opacity: 1;
-    background-color: var(--terminal-green);
-    box-shadow: 0 0 5px var(--glow-color);
+@keyframes skill-scan {
+    0% {
+        left: -40%;
+    }
+    100% {
+        left: 100%;
+    }
 }
 
-.level-98 .skill-indicator:nth-child(5)::before {
-    opacity: 0.9;
+/* Hover effect on skill item */
+.skill-item:hover .skill-name {
+    color: var(--terminal-green);
+    text-shadow: 0 0 3px var(--glow-color);
 }
 
-.level-95 .skill-indicator:nth-child(-n+5)::before {
-    opacity: 1;
-    background-color: var(--terminal-green);
-    box-shadow: 0 0 5px var(--glow-color);
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .skills-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .skill-name {
+        width: 140px;
+    }
 }
 
-.level-95 .skill-indicator:nth-child(5)::before {
-    opacity: 0.9;
-}
-
-.level-92 .skill-indicator:nth-child(-n+4)::before,
-.level-92 .skill-indicator:nth-child(5)::before {
-    opacity: 1;
-    background-color: var(--terminal-green);
-    box-shadow: 0 0 5px var(--glow-color);
-}
-
-.level-92 .skill-indicator:nth-child(5)::before {
-    opacity: 0.8;
-}
-
-.level-90 .skill-indicator:nth-child(-n+4)::before,
-.level-90 .skill-indicator:nth-child(5)::before {
-    opacity: 1;
-    background-color: var(--terminal-green);
-    box-shadow: 0 0 5px var(--glow-color);
-}
-
-.level-90 .skill-indicator:nth-child(5)::before {
-    opacity: 0.7;
-}
-
-.level-88 .skill-indicator:nth-child(-n+4)::before,
-.level-88 .skill-indicator:nth-child(5)::before {
-    opacity: 1;
-    background-color: var(--terminal-green);
-    box-shadow: 0 0 5px var(--glow-color);
-}
-
-.level-88 .skill-indicator:nth-child(5)::before {
-    opacity: 0.6;
-}
-
-.level-85 .skill-indicator:nth-child(-n+4)::before,
-.level-85 .skill-indicator:nth-child(5)::before {
-    opacity: 1;
-    background-color: var(--terminal-green);
-    box-shadow: 0 0 5px var(--glow-color);
-}
-
-.level-85 .skill-indicator:nth-child(5)::before {
-    opacity: 0.5;
-}
-
-.level-82 .skill-indicator:nth-child(-n+4)::before {
-    opacity: 1;
-    background-color: var(--terminal-green);
-    box-shadow: 0 0 5px var(--glow-color);
-}
-
-.level-82 .skill-indicator:nth-child(5)::before {
-    opacity: 0.3;
-}
-
-.level-80 .skill-indicator:nth-child(-n+4)::before {
-    opacity: 1;
-    background-color: var(--terminal-green);
-    box-shadow: 0 0 5px var(--glow-color);
-}
-
-.level-75 .skill-indicator:nth-child(-n+3)::before,
-.level-75 .skill-indicator:nth-child(4)::before {
-    opacity: 1;
-    background-color: var(--terminal-green);
-    box-shadow: 0 0 5px var(--glow-color);
-}
-
-.level-75 .skill-indicator:nth-child(4)::before {
-    opacity: 0.7;
-}
-
-/* Fixed custom colored skill levels */
-.kicad-level .skill-indicator:nth-child(-n+4)::before,
-.kicad-level .skill-indicator:nth-child(5)::before {
-    background-color: var(--kicad-teal);
-    box-shadow: 0 0 5px rgba(32, 201, 151, 0.7);
-}
-
-.kicad-level .skill-indicator:nth-child(5)::before {
-    opacity: 0.6;
-}
-
-.micro-level .skill-indicator:nth-child(-n+4)::before,
-.micro-level .skill-indicator:nth-child(5)::before {
-    background-color: var(--micro-blue);
-    box-shadow: 0 0 5px rgba(77, 136, 255, 0.7);
-}
-
-.micro-level .skill-indicator:nth-child(5)::before {
-    opacity: 0.7;
-}
-
-.pi-level .skill-indicator:nth-child(-n+4)::before,
-.pi-level .skill-indicator:nth-child(5)::before {
-    background-color: var(--raspberry-red);
-    box-shadow: 0 0 5px rgba(197, 17, 98, 0.7);
-}
-
-.pi-level .skill-indicator:nth-child(5)::before {
-    opacity: 0.5;
-}
-
-.printer-level .skill-indicator:nth-child(-n+4)::before,
-.printer-level .skill-indicator:nth-child(5)::before {
-    background-color: var(--printer-blue);
-    box-shadow: 0 0 5px rgba(23, 162, 184, 0.7);
-}
-
-.printer-level .skill-indicator:nth-child(5)::before {
-    opacity: 0.7;
-}
-
-.laser-level .skill-indicator:nth-child(-n+4)::before,
-.laser-level .skill-indicator:nth-child(5)::before {
-    background-color: var(--laser-orange);
-    box-shadow: 0 0 5px rgba(253, 126, 20, 0.7);
-}
-
-.laser-level .skill-indicator:nth-child(5)::before {
-    opacity: 0.6;
-}
-
-/* Special skills */
-.special-skill {
-    position: relative;
-}
-
-.special-skill .skill-name {
-    color: var(--biocomputing-blue);
-}
-
-.special-skill .skill-indicator::before {
-    background-color: var(--biocomputing-blue);
-    box-shadow: 0 0 5px rgba(0, 255, 255, 0.7);
-}
-
-.special-skill.minecraft .skill-name {
-    color: var(--minecraft-red);
-}
-
-.special-skill.minecraft .skill-indicator::before {
-    background-color: var(--minecraft-red);
-    box-shadow: 0 0 5px rgba(255, 107, 107, 0.7);
-}
-
-.special-skill.audio .skill-name {
-    color: var(--audio-purple);
-}
-
-.special-skill.audio .skill-indicator::before {
-    background-color: var(--audio-purple);
-    box-shadow: 0 0 5px rgba(177, 156, 217, 0.7);
-}
-
-.special-skill.climbing .skill-name {
-    color: var(--climbing-cyan);
-}
-
-.special-skill.climbing .skill-indicator::before {
-    background-color: var(--climbing-cyan);
-    box-shadow: 0 0 5px rgba(0, 229, 229, 0.7);
-}
-
-.special-skill.paradigm .skill-name {
-    color: var(--paradigm-gold);
-}
-
-.special-skill.paradigm .skill-indicator::before {
-    background-color: var(--paradigm-gold);
-    box-shadow: 0 0 5px rgba(255, 215, 0, 0.7);
-}
-
-.skill-tooltip {
-    position: absolute;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    background-color: rgba(0, 0, 0, 0.8);
-    border: 1px solid var(--terminal-green-dark);
-    padding: 5px 10px;
-    border-radius: 4px;
-    font-size: 0.8rem;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease, transform 0.3s ease;
-    z-index: 10;
-    width: 200px;
-    text-align: right;
-}
-
-.special-skill:hover .skill-tooltip {
-    opacity: 1;
-    transform: translateY(-50%) translateX(-5px);
-}
-
-/* Enhanced Education Section */
 .education-item {
     margin-bottom: 30px;
     position: relative;
@@ -1771,4 +1614,108 @@ footer {
         width: 270px;
         height: 270px;
     }
+}
+/* Project instruction and status notice styles */
+.instruction-text {
+    text-align: center;
+    color: var(--terminal-green-light);
+    margin-bottom: 20px;
+    font-size: 0.9rem;
+    background-color: rgba(0, 20, 0, 0.3);
+    padding: 10px;
+    border-left: 3px solid var(--terminal-green);
+}
+
+
+.status-notice {
+    margin-top: 30px;
+    display: flex;
+    align-items: center;
+    background-color: rgba(0, 20, 0, 0.3);
+    border: 1px solid var(--warning-orange);
+    padding: 12px;
+}
+
+.status-notice-icon {
+    color: var(--warning-orange);
+    font-weight: bold;
+    margin-right: 15px;
+    font-size: 1.2rem;
+    animation: pulse 2s infinite;
+}
+
+.status-notice-text {
+    color: var(--terminal-green-light);
+    font-size: 0.9rem;
+}
+
+@keyframes pulse {
+    0% {
+        opacity: 0.7;
+    }
+    50% {
+        opacity: 1;
+        text-shadow: 0 0 5px var(--warning-orange);
+    }
+    100% {
+        opacity: 0.7;
+    }
+}
+
+/* Make the entire grid item clickable */
+.grid-item {
+    cursor: pointer;
+    position: relative;
+}
+
+.grid-item::after {
+    content: "";
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    width: 15px;
+    height: 15px;
+    border-right: 2px solid var(--terminal-green);
+    border-bottom: 2px solid var(--terminal-green);
+    opacity: 0.7;
+    transition: all 0.3s ease;
+}
+
+.grid-item:hover::after {
+    transform: translate(3px, 3px);
+    opacity: 1;
+}
+/* warning notice styles */
+.inline-warning {
+    font-size: 0.7rem;
+    color: var(--warning-orange);
+    margin-left: 10px;
+    font-weight: normal;
+    vertical-align: middle;
+    animation: pulse-subtle 2s infinite;
+}
+
+@keyframes pulse-subtle {
+    0% {
+        opacity: 0.7;
+    }
+    50% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0.7;
+    }
+}
+
+.disabled-btn {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.form-note {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    color: var(--warning-orange);
+    text-align: right;
+    opacity: 0.8;
 }

@@ -57,9 +57,9 @@
     <div class="nav-container">
         <nav>
             <a href="#about" class="nav-link" onclick="scrollToSection('about'); return false;">About</a>
+            <a href="#education" class="nav-link" onclick="scrollToSection('education'); return false;">Education</a>
             <a href="#projects" class="nav-link" onclick="scrollToSection('projects'); return false;">Projects</a>
             <a href="#skills" class="nav-link" onclick="scrollToSection('skills'); return false;">Skills</a>
-            <a href="#education" class="nav-link" onclick="scrollToSection('education'); return false;">Education</a>
             <a href="#contact" class="nav-link" onclick="scrollToSection('contact'); return false;">Contact</a>
         </nav>
     </div>
@@ -68,13 +68,12 @@
         <section id="about">
             <h3>Mission Brief</h3>
             <p>
-                Hello, I'm River Dowdy. I am a freshman at Stanford who wants to change the very paradigm of how we think about the world. I want to design and create things that have never been seen before or thought of.
+                Hi, I’m River Dowdy, a Stanford freshman who loves diving deep into how things work, and then how to make them work better.             </p>
+            <p>
+                I’m passionate about pretty much anything engineering! I love exploring everything from IC design to beamforming radar, with my current obsession (at the time of writing) being neuromorphic computing!
             </p>
             <p>
-                I am passionate about pretty much anything engineering, from IC design to biocomputing!! My mission is to explore the boundaries of what's possible and push beyond conventional thinking.
-            </p>
-            <p>
-                You will often find me working on my sadly still-not-finished Redstone computer, climbing, working on silly projects, playing racing games, and playing my mini didgeridoo.
+                When I’m not locked in on schoolwork, you’ll often find me working on my (sadly still unfinished) Redstone computer and other fun projects, reading peak, climbing, playing racing games and Diep.io, or trying my hardest to improv music.
             </p>
             
             <div class="tesseract-wrapper condensed">
@@ -85,67 +84,99 @@
             </div>
         </section>
         
+        <section id="education">
+            <h3>Training & Education</h3>
+            
+            <div class="education-item">
+                <h4>Stanford University</h4>
+                <p>Freshman Engineer</p>
+                <p>Exploring engineering pathways from IC design to biocomputing</p>
+                <p>Expected Graduation: 2028</p>
+                <p>GPA: <span class="classified">Classified</span></p>
+            </div>
+            
+            <div class="education-item glitch-effect">
+                <h4>Future Objectives</h4>
+                <div class="objective-list">
+                    <div class="objective-item">
+                        <div class="objective-icon">↯</div>
+                        <div class="objective-text">Design and create things never seen before</div>
+                    </div>
+                    <div class="objective-item">
+                        <div class="objective-icon">↯</div>
+                        <div class="objective-text">Solve AGI in an afternoon</div>
+                    </div>
+                    <div class="objective-item">
+                        <div class="objective-icon">↯</div>
+                        <div class="objective-text">Prove the Riemann Hypothesis with the AGI in order to fund my startup"(no better way to make a million with AGI trust me)"</div>
+                    </div>
+                    <div class="objective-item">
+                        <div class="objective-icon">↯</div>
+                        <div class="objective-text">Use Busy Beaver Σ(7919) to prove Goldbach's Conjecture, then realize that the number is so large the proof won’t fit in the observable universe and spend the weekend inventing "compressed proofs."</div>
+                    </div>
+                    <div class="objective-item">
+                        <div class="objective-icon">↯</div>
+                        <div class="objective-text">Finally finish the Redstone computer on a realm, only to to try and mine Bitcoin and then realize that Microsoft has banned my account for "crypto farming using their server resources"</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <section id="projects">
-            <h3>Classified Operations</h3>
+            <h3>Classified Projects</h3>
+            <p class="instruction-text"><span class="info-icon">[i]</span> Click on any project box to access detailed project information.</p>
+            
             <div class="grid-container condensed">
                 <div class="grid-item">
                     <div class="project-badge red-badge">MC-RED</div>
                     <h4>REDSTONE COMPUTING ENGINE</h4>
                     <p>A fully functional computer built entirely within Minecraft using redstone circuits and logic gates. Currently implementing an ALU and memory management system.</p>
                     <div class="project-links">
-                        <a href="https://github.com/riverdowdy/redstone-computer" class="project-link" target="_blank" onclick="event.stopPropagation();"><span class="icon">&#x1F517;</span>GitHub</a>
+                        <a href="#" class="project-link" onclick="event.stopPropagation();"><span class="icon">▶</span>Demo Coming Soon(I hope)</a>
+                    </div>
+                </div>
+                
+                <div class="grid-item">
+                    <div class="project-badge blue-badge">PCB & x∗</div>
+                    <h4>MAGNETORQUER OPTIMIZATION TOOL</h4>
+                    <p>Python tool for calculating the optimal trace width to maximize magnetic moment for PCB magnetorquer coils with various copper weights. Considers constraints like trace width, spacing, current density, and power limitations.</p>
+                    <div class="project-links">
+                        <a href="https://github.com/riverdowdy/magnetorquer-optimization" class="project-link" target="_blank" onclick="event.stopPropagation();"><span class="icon">&#x1F517;</span>GitHub</a>
+                    </div>
+                </div>
+                
+                <div class="grid-item">
+                    <div class="project-badge orange-badge">RF & EDGE AI</div>
+                    <h4>PROJECT SENTINAL ORIGINALLY PROJECT THEIA</h4>
+                    <p>RF-based human pose estimation system now based a custom MIMO array, custom PCBs, and custom NNW. Can find human poses through walls. Started as Project Theia winning TreeHacks 2025 OpenAI Prize winner.</p>
+                    <div class="project-links">
+                        <a href="https://github.com/riverdowdy/project-theia" class="project-link" target="_blank" onclick="event.stopPropagation();"><span class="icon">&#x1F517;</span>GitHub</a>
+                        <a href="#" class="project-link" onclick="event.stopPropagation();"><span class="icon">🔬</span>Research Paper(Also coming soon but this one is prob sooner)</a>
+                    </div>
+                </div>
+                
+                <div class="grid-item">
+                    <div class="project-badge purple-badge">SPYWARE</div>
+                    <h4>INFINITERECON</h4>
+                    <p>Real-time audio surveillance and analytics system using ESP32-S3, enabling speech-to-text, speaker identification, and SMS notifications via cloud-based AI with web dashboard for system management.</p>
+                    <div class="project-links">
+                        <a href="https://github.com/riverdowdy/infiniterecon" class="project-link" target="_blank" onclick="event.stopPropagation();"><span class="icon">&#x1F517;</span>GitHub</a>
                         <a href="#" class="project-link" onclick="event.stopPropagation();"><span class="icon">▶</span>Demo</a>
                     </div>
                 </div>
                 
                 <div class="grid-item">
-                    <div class="project-badge blue-badge">BIO-X</div>
-                    <h4>BIOCOMPUTING INTERFACE</h4>
-                    <p>Experimental project exploring the intersection of biological systems and computational principles. Initial prototypes show promise for neural-inspired processing.</p>
+                    <div class="project-badge teal-badge">ACTIVE AERO</div>
+                    <h4>GYRO WING</h4>
+                    <p>Actively-controlled aerodynamic wing system for motorcycles using embedded systems (ESP32, Raspberry Pi). Features mechanical modeling, aerodynamic simulations, and hardware/software integration with Fusion 360, Python, and C++.</p>
                     <div class="project-links">
-                        <a href="https://github.com/riverdowdy/biocomputing" class="project-link" target="_blank" onclick="event.stopPropagation();"><span class="icon">&#x1F517;</span>GitHub</a>
-                        <a href="#" class="project-link" onclick="event.stopPropagation();"><span class="icon">🔬</span>Research</a>
                     </div>
                 </div>
-                
-                <div class="grid-item">
-                    <div class="project-badge orange-badge">PHYS</div>
-                    <h4>RACING PHYSICS ENGINE</h4>
-                    <p>Custom physics simulation for racing games that provides more realistic vehicle dynamics and environmental interactions than standard game engines.</p>
-                    <div class="project-links">
-                        <a href="https://github.com/riverdowdy/racing-physics" class="project-link" target="_blank" onclick="event.stopPropagation();"><span class="icon">&#x1F517;</span>GitHub</a>
-                        <a href="#" class="project-link" onclick="event.stopPropagation();"><span class="icon">▶</span>Demo</a>
-                    </div>
-                </div>
-                
-                <div class="grid-item">
-                    <div class="project-badge purple-badge">IC-DSN</div>
-                    <h4>INTEGRATED CIRCUIT DESIGNS</h4>
-                    <p>Collection of custom IC designs focusing on power efficiency and novel architectural approaches for specialized computing applications.</p>
-                    <div class="project-links">
-                        <a href="https://github.com/riverdowdy/ic-designs" class="project-link" target="_blank" onclick="event.stopPropagation();"><span class="icon">&#x1F517;</span>GitHub</a>
-                        <a href="#" class="project-link" onclick="event.stopPropagation();"><span class="icon">📐</span>Schematics</a>
-                    </div>
-                </div>
-                
-                <div class="grid-item">
-                    <div class="project-badge teal-badge">AUDIO</div>
-                    <h4>DIDGERIDOO FREQUENCY ANALYZER</h4>
-                    <p>Custom-built system to analyze the harmonic structures and resonance patterns produced by didgeridoo playing, with real-time visualization.</p>
-                    <div class="project-links">
-                        <a href="https://github.com/riverdowdy/didgeridoo-analyzer" class="project-link" target="_blank" onclick="event.stopPropagation();"><span class="icon">&#x1F517;</span>GitHub</a>
-                        <a href="#" class="project-link" onclick="event.stopPropagation();"><span class="icon">▶</span>Demo</a>
-                    </div>
-                </div>
-                
-                <div class="grid-item">
-                    <div class="project-badge green-badge">AI-CV</div>
-                    <h4>AUTONOMOUS CLIMBING ASSISTANT</h4>
-                    <p>Wearable device that uses computer vision and machine learning to analyze climbing routes and suggest optimal movement patterns in real-time.</p>
-                    <div class="project-links">
-                        <a href="https://github.com/riverdowdy/climbing-assistant" class="project-link" target="_blank" onclick="event.stopPropagation();"><span class="icon">&#x1F517;</span>GitHub</a>
-                        <a href="#" class="project-link" onclick="event.stopPropagation();"><span class="icon">🔧</span>Prototype</a>
-                    </div>
+            </div>
+            <div class="status-notice">
+                <div class="status-notice-icon">[!]</div>
+                <div class="status-notice-text">
+                    SYSTEM STATUS: Development in progress. Project demos and detailed pages currently undergoing production.
                 </div>
             </div>
         </section>
@@ -156,13 +187,13 @@
             <div class="skills-container">
                 <div class="skill-group">
                     <div class="skill-header">
-                        <h4>Programming</h4>
+                        <h4>Programming Languages</h4>
                         <div class="skill-header-line"></div>
                     </div>
                     <div class="skill-items">
                         <div class="skill-item">
                             <div class="skill-name">C++</div>
-                            <div class="skill-level level-95">
+                            <div class="skill-level level-high">
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
@@ -172,7 +203,7 @@
                         </div>
                         <div class="skill-item">
                             <div class="skill-name">C</div>
-                            <div class="skill-level level-90">
+                            <div class="skill-level level-high">
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
@@ -182,7 +213,7 @@
                         </div>
                         <div class="skill-item">
                             <div class="skill-name">Python</div>
-                            <div class="skill-level level-85">
+                            <div class="skill-level level-medium">
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
@@ -191,8 +222,8 @@
                             </div>
                         </div>
                         <div class="skill-item">
-                            <div class="skill-name">HTML/CSS</div>
-                            <div class="skill-level level-75">
+                            <div class="skill-name">JavaScript</div>
+                            <div class="skill-level level-medium">
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
@@ -211,7 +242,7 @@
                     <div class="skill-items">
                         <div class="skill-item">
                             <div class="skill-name">Fusion 360</div>
-                            <div class="skill-level level-90">
+                            <div class="skill-level level-high">
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
@@ -221,7 +252,7 @@
                         </div>
                         <div class="skill-item">
                             <div class="skill-name">SolidWorks</div>
-                            <div class="skill-level level-85">
+                            <div class="skill-level level-medium">
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
@@ -230,8 +261,8 @@
                             </div>
                         </div>
                         <div class="skill-item">
-                            <div class="skill-name">CAD</div>
-                            <div class="skill-level level-80">
+                            <div class="skill-name">Unity</div>
+                            <div class="skill-level level-medium">
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
@@ -239,9 +270,9 @@
                                 <div class="skill-indicator"></div>
                             </div>
                         </div>
-                        <div class="skill-item highlight-skill">
+                        <div class="skill-item">
                             <div class="skill-name">KiCad</div>
-                            <div class="skill-level level-88 kicad-level">
+                            <div class="skill-level level-high">
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
@@ -260,7 +291,7 @@
                     <div class="skill-items">
                         <div class="skill-item">
                             <div class="skill-name">3D-Printing</div>
-                            <div class="skill-level level-90 printer-level">
+                            <div class="skill-level level-high">
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
@@ -270,7 +301,7 @@
                         </div>
                         <div class="skill-item">
                             <div class="skill-name">Laser Cutting</div>
-                            <div class="skill-level level-88 laser-level">
+                            <div class="skill-level level-high">
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
@@ -279,8 +310,8 @@
                             </div>
                         </div>
                         <div class="skill-item">
-                            <div class="skill-name">Water-Jetting</div>
-                            <div class="skill-level level-85">
+                            <div class="skill-name">PCB Assembly</div>
+                            <div class="skill-level level-medium">
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
@@ -289,8 +320,8 @@
                             </div>
                         </div>
                         <div class="skill-item">
-                            <div class="skill-name">CNC</div>
-                            <div class="skill-level level-82">
+                            <div class="skill-name">Soldering</div>
+                            <div class="skill-level level-high">
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
@@ -309,7 +340,7 @@
                     <div class="skill-items">
                         <div class="skill-item">
                             <div class="skill-name">Microcontrollers</div>
-                            <div class="skill-level level-92 micro-level">
+                            <div class="skill-level level-high">
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
@@ -319,7 +350,7 @@
                         </div>
                         <div class="skill-item">
                             <div class="skill-name">Sensor Integration</div>
-                            <div class="skill-level level-88">
+                            <div class="skill-level level-high">
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
@@ -328,8 +359,8 @@
                             </div>
                         </div>
                         <div class="skill-item">
-                            <div class="skill-name">Raspberry Pi</div>
-                            <div class="skill-level level-85 pi-level">
+                            <div class="skill-name">SBCs (Pi/Jetson)</div>
+                            <div class="skill-level level-medium">
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
@@ -338,203 +369,105 @@
                             </div>
                         </div>
                         <div class="skill-item">
-                            <div class="skill-name">Jetson Nano</div>
-                            <div class="skill-level level-80">
+                            <div class="skill-name">Embedded Systems</div>
+                            <div class="skill-level level-medium">
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                                 <div class="skill-indicator"></div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="skill-group special-group">
-                    <div class="skill-header">
-                        <h4>Specialized Skills</h4>
-                        <div class="skill-header-line"></div>
-                    </div>
-                    <div class="skill-items">
-                        <div class="skill-item special-skill minecraft">
-                            <div class="skill-name">Minecraft Redstone</div>
-                            <div class="skill-level level-95">
-                                <div class="skill-indicator"></div>
-                                <div class="skill-indicator"></div>
-                                <div class="skill-indicator"></div>
-                                <div class="skill-indicator"></div>
-                                <div class="skill-indicator"></div>
-                            </div>
-                            <div class="skill-tooltip">Circuit design & computational systems in Minecraft</div>
-                        </div>
-                        <div class="skill-item special-skill audio">
-                            <div class="skill-name">Mini Didgeridoo</div>
-                            <div class="skill-level level-98">
-                                <div class="skill-indicator"></div>
-                                <div class="skill-indicator"></div>
-                                <div class="skill-indicator"></div>
-                                <div class="skill-indicator"></div>
-                                <div class="skill-indicator"></div>
-                            </div>
-                            <div class="skill-tooltip">Circular breathing master & harmonic explorer</div>
-                        </div>
-                        <div class="skill-item special-skill climbing">
-                            <div class="skill-name">Climbing</div>
-                            <div class="skill-level level-90">
-                                <div class="skill-indicator"></div>
-                                <div class="skill-indicator"></div>
-                                <div class="skill-indicator"></div>
-                                <div class="skill-indicator"></div>
-                                <div class="skill-indicator"></div>
-                            </div>
-                            <div class="skill-tooltip">Problem solving while hanging from things</div>
-                        </div>
-                        <div class="skill-item special-skill paradigm">
-                            <div class="skill-name">Paradigm Shifting</div>
-                            <div class="skill-level level-99">
-                                <div class="skill-indicator"></div>
-                                <div class="skill-indicator"></div>
-                                <div class="skill-indicator"></div>
-                                <div class="skill-indicator"></div>
-                                <div class="skill-indicator"></div>
-                            </div>
-                            <div class="skill-tooltip">Completely reimagining how we think about the world</div>
                         </div>
                     </div>
                 </div>
             </div>
         </section>
         
-        <section id="education">
-            <h3>Training & Certification</h3>
-            
-            <div class="education-item">
-                <h4>Stanford University</h4>
-                <p>Freshman Engineer</p>
-                <p>Exploring engineering pathways from IC design to biocomputing</p>
-                <p>Expected Graduation: 2028</p>
-                <p>GPA: <span class="classified">Classified</span></p>
+       
+<section id="contact">
+    <h3>Establish Communication</h3>
+    
+    <div class="contact-grid">
+        <!-- Email contact method -->
+        <div class="contact-method">
+            <div class="contact-icon email-icon">[<span class="icon-pulse">@</span>]</div>
+            <div class="contact-content">
+                <h4>SECURE TRANSMISSION</h4>
+                <a href="mailto:rivdowdy@stanford.edu" class="contact-link">rivdowdy@stanford.edu</a>
+                <p class="contact-desc">Encrypted communication channel</p>
             </div>
-            
-            <div class="education-item">
-                <h4>Current Projects</h4>
-                <div class="project-tags">
-                    <span class="project-tag redstone-tag">Redstone Computer</span>
-                    <span class="project-tag bio-tag">Biocomputing</span>
-                    <span class="project-tag ic-tag">IC Design</span>
-                    <span class="project-tag paradigm-tag">Paradigm-Shifting</span>
-                    <span class="project-tag physics-tag">Racing Physics</span>
-                    <span class="project-tag audio-tag">Didgeridoo Analysis</span>
-                </div>
-            </div>
-            
-            <div class="education-item glitch-effect">
-                <h4>Future Objectives</h4>
-                <div class="objective-list">
-                    <div class="objective-item">
-                        <div class="objective-icon">↯</div>
-                        <div class="objective-text">Design and create things never seen before</div>
-                    </div>
-                    <div class="objective-item">
-                        <div class="objective-icon">↯</div>
-                        <div class="objective-text">Change how we think about the world</div>
-                    </div>
-                    <div class="objective-item">
-                        <div class="objective-icon">↯</div>
-                        <div class="objective-text">Bridge hardware and wetware computing paradigms</div>
-                    </div>
-                    <div class="objective-item">
-                        <div class="objective-icon">↯</div>
-                        <div class="objective-text">Complete Redstone computer before graduation</div>
-                    </div>
-                    <div class="objective-item">
-                        <div class="objective-icon">↯</div>
-                        <div class="objective-text">Master the art of climbing while contemplating engineering problems</div>
-                    </div>
-                </div>
-            </div>
-        </section>
+        </div>
         
-        <section id="contact">
-            <h3>Establish Communication</h3>
+        <!-- GitHub contact method -->
+        <div class="contact-method">
+            <div class="contact-icon github-icon">[<span class="icon-pulse">G</span>]</div>
+            <div class="contact-content">
+                <h4>CODE REPOSITORY</h4>
+                <a href="https://github.com/rivercraft911" target="_blank" class="contact-link">github.com/rivercraft911</a>
+                <p class="contact-desc">Access secure code archives</p>
+            </div>
+        </div>
+        
+        <!-- LinkedIn contact method -->
+        <div class="contact-method">
+            <div class="contact-icon linkedin-icon">[<span class="icon-pulse">in</span>]</div>
+            <div class="contact-content">
+                <h4>PROFESSIONAL NETWORK</h4>
+                <a href="https://linkedin.com/in/river-dowdy-5b597124a" target="_blank" class="contact-link">linkedin.com/in/river-dowdy-5b597124a</a>
+                <p class="contact-desc">Connect to professional grid</p>
+            </div>
+        </div>
+        
+        <!-- Contact form container -->
+        <div class="contact-form">
+            <div class="form-header">
+                <h4>DIRECT MESSAGE <span class="inline-warning">[OFFLINE]</span></h4>
+                <div class="form-header-line"></div>
+            </div>
             
-            <div class="contact-grid">
-                <div class="contact-method">
-                    <div class="contact-icon email-icon">[<span class="icon-pulse">@</span>]</div>
-                    <div class="contact-content">
-                        <h4>SECURE TRANSMISSION</h4>
-                        <a href="mailto:rivdowdy@stanford.edu" class="contact-link">rivdowdy@stanford.edu</a>
-                        <p class="contact-desc">Encrypted communication channel</p>
-                    </div>
+            <form id="contact-form">
+                <div class="form-group">
+                    <label for="name">IDENTIFY YOURSELF:</label>
+                    <input type="text" id="name" name="name" required>
+                    <div class="validation-message" id="name-validation"></div>
                 </div>
                 
-                <div class="contact-method">
-                    <div class="contact-icon github-icon">[<span class="icon-pulse">G</span>]</div>
-                    <div class="contact-content">
-                        <h4>CODE REPOSITORY</h4>
-                        <a href="https://github.com/rivercraft911" target="_blank" class="contact-link">github.com/rivercraft911</a>
-                        <p class="contact-desc">Access secure code archives</p>
-                    </div>
+                <div class="form-group">
+                    <label for="email">SECURE COMMUNICATION CHANNEL:</label>
+                    <input type="email" id="email" name="email" required>
+                    <div class="validation-message" id="email-validation"></div>
                 </div>
                 
-                <div class="contact-method">
-                    <div class="contact-icon linkedin-icon">[<span class="icon-pulse">in</span>]</div>
-                    <div class="contact-content">
-                        <h4>PROFESSIONAL NETWORK</h4>
-                        <a href="https://linkedin.com/in/river-dowdy-5b597124a" target="_blank" class="contact-link">linkedin.com/in/river-dowdy-5b597124a</a>
-                        <p class="contact-desc">Connect to professional grid</p>
-                    </div>
+                <div class="form-group">
+                    <label for="subject">SUBJECT CLASSIFICATION:</label>
+                    <input type="text" id="subject" name="subject" required>
+                    <div class="validation-message" id="subject-validation"></div>
                 </div>
                 
-                <div class="contact-form">
-                    <div class="form-header">
-                        <h4>DIRECT MESSAGE</h4>
-                        <div class="form-header-line"></div>
-                    </div>
-                    
-                    <form id="contact-form">
-                        <div class="form-group">
-                            <label for="name">IDENTIFY YOURSELF:</label>
-                            <input type="text" id="name" name="name" required>
-                            <div class="validation-message" id="name-validation"></div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="email">SECURE COMMUNICATION CHANNEL:</label>
-                            <input type="email" id="email" name="email" required>
-                            <div class="validation-message" id="email-validation"></div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="subject">SUBJECT CLASSIFICATION:</label>
-                            <input type="text" id="subject" name="subject" required>
-                            <div class="validation-message" id="subject-validation"></div>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="message">TRANSMISSION CONTENT:</label>
-                            <textarea id="message" name="message" rows="6" required></textarea>
-                            <div class="validation-message" id="message-validation"></div>
-                        </div>
-                        
-                        <button type="submit" class="submit-btn">TRANSMIT</button>
-                    </form>
-                    
-                    <div class="form-success">
-                        <div class="success-icon">✓</div>
-                        <p>TRANSMISSION RECEIVED</p>
-                        <p>Your message has been encrypted and stored.</p>
-                        <p>Expect response within 24hrs.</p>
-                        <div class="system-confirmation">
-                            <div class="confirmation-line">STATUS: ACCEPTED</div>
-                            <div class="confirmation-line">ENCRYPTION: AES-256</div>
-                            <div class="confirmation-line">PRIORITY: HIGH</div>
-                        </div>
-                    </div>
+                <div class="form-group">
+                    <label for="message">TRANSMISSION CONTENT:</label>
+                    <textarea id="message" name="message" rows="6" required></textarea>
+                    <div class="validation-message" id="message-validation"></div>
+                </div>
+                
+                <button type="submit" class="submit-btn disabled-btn" disabled>TRANSMIT</button>
+                <div class="form-note">Domain authentication required. Use channels above.(I will make it work and get a domain soon do not fret but please just email me for now)!!</div>
+            </form>
+            
+            <div class="form-success">
+                <div class="success-icon">✓</div>
+                <p>TRANSMISSION RECEIVED</p>
+                <p>Your message has been encrypted and stored.</p>
+                <p>Expect response within 24hrs.</p>
+                <div class="system-confirmation">
+                    <div class="confirmation-line">STATUS: ACCEPTED</div>
+                    <div class="confirmation-line">ENCRYPTION: AES-256</div>
+                    <div class="confirmation-line">PRIORITY: HIGH</div>
                 </div>
             </div>
-        </section>
-    </main>
+        </div>
+    </div>
+</section>
     
     <footer>
         <div class="footer-grid">

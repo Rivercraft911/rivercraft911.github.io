@@ -31,9 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize uptime counter
     initUptimeCounter();
     
-    // Add radar blip
-    initRadarBlip();
-    
+  
     // Check and initialize Tesseract if THREE.js is available
     if (typeof THREE !== 'undefined') {
         console.log("THREE.js found, initializing tesseract...");
@@ -43,37 +41,6 @@ document.addEventListener('DOMContentLoaded', function() {
         console.warn("THREE.js not loaded. Tesseract animation unavailable.");
     }
 });
-
-// Initialize radar blip functionality
-function initRadarBlip() {
-    const radar = document.querySelector('.radar-container');
-    const blip = document.querySelector('.radar-blip');
-    
-    if (!radar || !blip) return;
-    
-    // Add random blips periodically
-    setInterval(() => {
-        // Random position within the radar
-        const angle = Math.random() * Math.PI * 2;
-        const distance = Math.random() * 0.8; // Keep within 80% of radius
-        
-        const x = Math.cos(angle) * distance * 50 + 50;
-        const y = Math.sin(angle) * distance * 50 + 50;
-        
-        blip.style.top = `${y}%`;
-        blip.style.left = `${x}%`;
-        
-        // Show blip
-        blip.style.opacity = '1';
-        
-        // Hide after a short time
-        setTimeout(() => {
-            blip.style.opacity = '0';
-        }, 1000);
-    }, 3000);
-}
-
-// Oscilloscope removed as requested
 
 // Initialize uptime counter
 function initUptimeCounter() {
