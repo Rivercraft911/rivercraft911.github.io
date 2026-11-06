@@ -32,7 +32,13 @@ export function measure(s: string, size: number, f = font.face) {
 export function glyph(p: Path, ch: string, x: number, y: number, size: number, f = font.face) {
   if (ch === '·') return p.dot(x + SPACE * size * 0.5, y + size * 0.45, 0.25 * size), SPACE * size
   const g = f.g[ch]
-  if (g) for (const st of g[1]) p.poly(st, false, x, y, size)
+  if (g)
+    for (const st of g[1]) {
+      // a stroke too short to carry light is a dot: the beam parks there instead (., :, the i's tittle)
+      if (Math.hypot(st[st.length - 2] - st[0], st[st.length - 1] - st[1]) < 0.06 && st.length <= 6)
+        p.dot(x + 0.5 * (st[0] + st[st.length - 2]) * size, y + 0.5 * (st[1] + st[st.length - 1]) * size, 0.25 * size)
+      else p.poly(st, false, x, y, size)
+    }
   return (g?.[0] ?? SPACE) * size
 }
 
