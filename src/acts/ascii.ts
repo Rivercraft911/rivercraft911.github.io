@@ -61,7 +61,7 @@ function crush(T: number, o: Stereo) {
     held.k = k
     tmp.s.fill(0)
     sing(k / HOLD, tmp)
-    for (let i = 0; i < 6; i++) held.s[i] = Math.round(tmp.s[i] * 16) / 16
+    for (let i = 0; i < 6; i++) held.s[i] = Math.round(tmp.s[i] * 64) / 64 // 32 levels over ±0.25, the choir's swing
   }
   for (let i = 0; i < 6; i++) o.s[i] += held.s[i]
 }
@@ -78,7 +78,8 @@ export const ascii: Scene = {
     fld.ink = ink
     fld.lift = 0.5
     fld.read = row
-    f.look = { exposure: t < 1 / 30 ? 24 : 1.6 } // a frame of overexposure as the reality splices
+    // A frame of overexposure as the reality splices, burning the last one out of the phosphor.
+    if (t < 1 / 30) f.look = { exposure: 24, tau: 0.004 }
     place(T + LEAD)
     return (tt, o) => {
       if (tt < 0.025) return void (o.l = o.r = 0.5 * hash(tt * 48000) * Math.exp(-tt / 0.006)) // the splice

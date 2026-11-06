@@ -191,7 +191,7 @@ export class Phosphor {
   // The character generator: the beam draws each glyph of the face once into the raster's atlas, and the
   // ink in each block of a glyph's 3 × 5 grid is read back as its shape.
   async glyphs(face: Face, chars: string) {
-    const d = this.device, { cols } = this.raster.makeAtlas(chars.length), atlas = this.raster.atlas
+    const d = this.device, cols = this.raster.makeAtlas(chars.length), atlas = this.raster.atlas
     const W = atlas.width, H = atlas.height, sigma = 1.3, cap = 0.56 * TILE[1], base = 0.74 * TILE[1]
     const v: number[] = []
     const put = (X: number, Y: number, z: number) => v.push(((X / W) * 2 - 1) * (W / H), 1 - (Y / H) * 2, z, 0, 1, 1, 1, 0)

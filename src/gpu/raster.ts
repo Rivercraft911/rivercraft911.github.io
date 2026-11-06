@@ -36,6 +36,7 @@ export class Raster {
   private tex?: GPUTexture // the field's frame
   private cells?: GPUTexture
   private groups: GPUBindGroup[] = []
+  private views: GPUTextureView[] = [] // the field's frame, the cells
   private on = false
   private mode = 0 // 0 light, 1 text
   private back: GPUBuffer // the centre row, read back
@@ -88,13 +89,12 @@ export class Raster {
   }
 
   makeAtlas(n: number) {
-    const rows = Math.ceil(n / ATLAS_COLS)
     this.atlas = this.device.createTexture({
-      size: [ATLAS_COLS * TILE[0], rows * TILE[1]],
+      size: [ATLAS_COLS * TILE[0], Math.ceil(n / ATLAS_COLS) * TILE[1]],
       format: FLOAT,
       usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC,
     })
-    return { cols: ATLAS_COLS, rows }
+    return ATLAS_COLS
   }
 
   // Renders the field (and its text) for this frame, ahead of the phosphor's pass.
@@ -114,12 +114,13 @@ export class Raster {
       this.cells = tex(Math.max(1, cols), Math.max(1, rows), 'rg32float')
       const group = (p: GPURenderPipeline, e: [number, GPUBindingResource][]) =>
         d.createBindGroup({ layout: p.getBindGroupLayout(0), entries: e.map(([binding, resource]) => ({ binding, resource })) })
-      const u = { buffer: this.u }, s = this.smp, v = this.tex.createView()
+      const u = { buffer: this.u }, s = this.smp, v = (this.views[0] = this.tex.createView())
+      this.views[1] = this.cells.createView()
       this.groups = [group(this.light, [[0, u], [1, s], [2, v]])]
       if (text)
         this.groups.push(
           group(this.cell, [[0, u], [1, s], [2, v], [5, { buffer: this.glyph }]]),
-          group(this.text, [[0, u], [1, s], [3, this.cells.createView()], [4, this.atlas.createView()]]),
+          group(this.text, [[0, u], [1, s], [3, this.views[1]], [4, this.atlas.createView()]]),
         )
       this.mode = +text
     }
@@ -145,9 +146,9 @@ export class Raster {
       const r = enc.beginRenderPass({ colorAttachments: [{ view, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }] })
       r.setPipeline(p), r.setBindGroup(0, g), r.draw(3), r.end()
     }
-    pass(this.tex!.createView(), F.pipe, F.group)
+    pass(this.views[0], F.pipe, F.group)
     if (!text) return
-    pass(this.cells!.createView(), this.cell, this.groups[1])
+    pass(this.views[1], this.cell, this.groups[1])
     if (f.read && !this.reading) {
       enc.copyTextureToBuffer({ texture: this.cells!, origin: [0, rows >> 1] }, { buffer: this.back, bytesPerRow: 4096 }, [Math.min(cols, 512), 1])
       this.reading = f.read
