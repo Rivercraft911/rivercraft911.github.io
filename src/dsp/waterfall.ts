@@ -2,22 +2,22 @@
 // log-frequency axis from A0 up nine octaves, printed as rows of bytes for the GPU. It is reassigned
 // (Kodera, Gendrin & de Villedary 1976; Auger & Flandrin 1995): each FFT bin's energy is moved to the
 // bin's own instantaneous frequency, ω − Im(X_h′ / X_h), so a partial is a line, not a window's lobe.
-// A row is printed at any moment asked for, between two STFT frames a hop apart (Hann, 2048 points).
+// A row is printed at any moment asked for, between two STFT frames a hop apart (Hann, 4096 points).
 import { heard } from '../audio/audio'
 import { fft, hann } from './fft'
 
 export const OCTAVES = 9, PER = 256, BINS = OCTAVES * PER // the axis: 256 bins an octave, 4.7 cents each
 export const F0 = 27.5 // A0: octave boundaries fall on A
 export const FLOOR = -72, RANGE = 56 // dBFS shown, black to white
-const N = 2048, HOP = 1 / 960 // a hop shorter than a row takes to print at any speed we fall
+const N = 4096, HOP = 1 / 480 // 11.7 Hz bins part a chord's close tones above the bass; a hop of 2 ms
 const win = Float64Array.from({ length: N }, (_, i) => hann(i, N))
 const dwin = Float64Array.from({ length: N }, (_, i) => (Math.PI / N) * Math.sin((2 * Math.PI * i) / N)) // h′, per sample
 const re = new Float64Array(N), im = new Float64Array(N)
 const acc = new Float64Array(BINS)
-// A line is a Gaussian of σ = 1 bin: the estimate's own jitter. It is a parabola in dB, which the
-// shader's cubic reconstructs exactly, out to where it meets the floor.
-const SIGMA = 1, REACH = 4
-const SPREAD = Float64Array.from({ length: 16 * 2 * REACH + 1 }, (_, i) => Math.exp(-0.5 * ((i / 16 - REACH) / SIGMA) ** 2) / (SIGMA * Math.sqrt(2 * Math.PI)))
+// Each bin's energy lands as a Gaussian as wide as the estimate is sure: a fraction of the FFT's own bin
+// spacing, which on a log axis is wide in the low octaves and narrow in the high, but never under a bin.
+// A line is then a parabola in dB, which the shader's cubic reconstructs exactly.
+const G = Float64Array.from({ length: 16 * 6 + 1 }, (_, i) => Math.exp(-0.5 * (i / 16 - 3) ** 2) / Math.sqrt(2 * Math.PI))
 
 export class Waterfall {
   readonly last = new Float32Array(BINS) // the newest row, 0..1
@@ -47,16 +47,17 @@ export class Waterfall {
       if (p < 1e-14) continue
       const w = (2 * Math.PI * k) / N - (di * hr - dr * hi) / p // reassigned, rad per sample
       if (w <= 0) continue
-      const m = k0 + PER * Math.log2(w) - 0.5, i = Math.round(m)
-      for (let j = Math.max(0, i - REACH); j <= Math.min(BINS - 1, i + REACH); j++) acc[j] += p * norm * SPREAD[Math.round((j - m + REACH) * 16)]
+      const m = k0 + PER * Math.log2(w) - 0.5, sig = Math.max(1, (0.25 * PER * 2 * Math.PI) / (N * w * Math.LN2)), e = (p * norm) / sig
+      for (let j = Math.max(0, Math.ceil(m - 3 * sig)); j <= Math.min(BINS - 1, m + 3 * sig); j++) acc[j] += e * G[Math.round(((j - m) / sig + 3) * 16)]
     }
     for (let m = 0; m < BINS; m++) out[m] = Math.min(1, Math.max(0, (10 * Math.log10(acc[m] + 1e-20) - FLOOR) / RANGE))
     return out
   }
 
   // Prints the spectrum at timeline time t as one row of bytes into out at offset o.
+  // A moment the speakers have not played a half window past yet reads as the newest frame there is.
   row(t: number, out: Uint8Array, o: number) {
-    const x = t / HOP, j = Math.floor(x), k = x - j, a = this.frame(j), b = this.frame(j + 1), l = this.last
+    const x = Math.min(t, heard.end - N / 2 / heard.sr - HOP) / HOP, j = Math.floor(x), k = x - j, a = this.frame(j), b = this.frame(j + 1), l = this.last
     for (let m = 0; m < BINS; m++) (l[m] = a[m] + (b[m] - a[m]) * k), (out[o + m] = l[m] * 255 + 0.5)
   }
 }

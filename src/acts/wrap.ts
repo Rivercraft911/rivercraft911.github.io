@@ -17,8 +17,8 @@ const W = TAU // an octave's width on the sheet: once around a tube of radius 1
 const DY = 0.01 // sheet per printed row
 const MAX = 512 // most rows printed in a frame
 
-// The valley's falls end flat as a plot: 80 Hz to 8 kHz across 2.3 half-widths, the lip at y = 0.5 and
-// 3.4 s of history in the 1.6 below it. The sheet opens as the same plot: how far away it is, where its
+// The valley's falls end flat as a plot: 80 Hz to 8 kHz across 2.3 half-widths, the lip at y = 0.42 and
+// 3.4 s of history in the 1.55 below it. The sheet opens as the same plot: how far away it is, where its
 // head prints and how fast it scrolls are set to match, through a lens 0.9 rad wide, 800 Hz centred.
 const S0 = 1 / Math.tan(0.45), MID = (Math.log2(800 / F0) - OCTAVES / 2) * W
 let d0 = 1, v0 = 1, h0 = 1, aspect = 0
@@ -32,8 +32,8 @@ function chart() {
   if (view.a === aspect) return
   aspect = view.a
   d0 = (W * S0 * Math.log2(100)) / (2.3 * aspect)
-  h0 = (0.5 * d0) / S0
-  v0 = ((1.6 / 3.4) * d0) / S0
+  h0 = (0.42 * d0) / S0
+  v0 = ((1.55 / 3.4) * d0) / S0
   for (let i = 1; i < Y.length; i++) Y[i] = Y[i - 1] + speed(i * DT) * DT
   for (let i = 0; i < Y.length; i++) H[i] = Y[i] + ahead(i * DT)
 }
@@ -90,7 +90,7 @@ function print(T: number, now: number, f: Field) {
 const TAU_RASTER = 0.006
 
 // The tube at fall time T into the frame: the raster's field and its new rows.
-const field: Field = { shader: SHADER, k: 1, p: new Float32Array(24) }
+const field: Field = { shader: SHADER, k: 1, p: new Float32Array(24), res: 1.5 } // its lines are drawn a pixel wide
 export function tube(T: number, now: number, f: Frame, kick = 0, gain = 1) {
   look(T, kick)
   const top = print(T, now, field), v = cam, p = field.p

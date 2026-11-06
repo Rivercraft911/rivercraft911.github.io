@@ -10,6 +10,7 @@ export type Field = {
   shader: number // index into FIELDS
   k: number // brightness
   p: Float32Array // the shader's parameters, up to 60 floats
+  res?: number // the light's resolution against the raster's usual
   cell?: number // read out as text, in cells this many CSS px tall (3:5)
   ink?: readonly number[] // the glyphs' colour, linear
   lift?: number // how much light makes a cell full
@@ -104,8 +105,8 @@ export class Raster {
     const d = this.device, F = this.fields[f.shader], uf = this.uf
     const text = !!f.cell && this.chars.length > 0
     const ch = Math.round((f.cell ?? 20) * dpr), cw = Math.round(ch * 0.6)
-    const cols = Math.floor(w / cw), rows = Math.floor(h / ch)
-    const fw = text ? cols * 6 : Math.max(1, Math.round(w * this.scale)), fh = text ? rows * 10 : Math.max(1, Math.round(h * this.scale))
+    const cols = Math.floor(w / cw), rows = Math.floor(h / ch), sc = Math.min(1, this.scale * (f.res ?? 1))
+    const fw = text ? cols * 6 : Math.max(1, Math.round(w * sc)), fh = text ? rows * 10 : Math.max(1, Math.round(h * sc))
     if (this.tex?.width !== fw || this.tex.height !== fh || this.mode !== +text || (text && this.cells?.width !== cols)) {
       this.tex?.destroy(), this.cells?.destroy()
       const tex = (w: number, h: number, format: GPUTextureFormat) =>
