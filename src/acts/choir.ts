@@ -8,7 +8,7 @@ import { room, type Stereo } from '../audio/audio'
 import { Shepard, type Part } from '../dsp/shepard'
 import { clamp, smooth } from './scene'
 
-export const END = 71 // the singularity on the choir's clock: ophanim's AT + DUR
+export const END = 83.5 // the collapse into one point on the choir's clock: singularity's AT (ophanim's AT + DUR) + FALL
 const GAIN = 1.1 // about the old choirs' swing, which the realities' bends expect
 
 // The swell toward the singularity, ∈ [0, 1], steepest at the end.

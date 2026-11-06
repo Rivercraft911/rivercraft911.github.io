@@ -19,7 +19,7 @@ export const AT = R3 + R3DUR
 const SR = 48000
 
 // When each cut lands, and which world it opens on.
-const LENGTHS = [1.1, 0.95, 0.85, 0.78, 0.72, 0.68, 0.64, 0.6, 0.6, 0.6, 0.5, 0.46, 0.42, 0.4, 0.38, 0.36, 0.35, 0.34, 0.34, 0.34, 0.34, 0.34]
+const LENGTHS = [1.01, 0.95, 0.85, 0.78, 0.72, 0.68, 0.64, 0.6, 0.6, 0.6, 0.5, 0.46, 0.42, 0.4, 0.38, 0.36, 0.35, 0.34, 0.34, 0.34, 0.34, 0.34]
 const STARTS = LENGTHS.map((_, i) => LENGTHS.slice(0, i).reduce((a, b) => a + b, 0))
 export const DUR = STARTS[STARTS.length - 1] + LENGTHS[LENGTHS.length - 1]
 const PIN = Number(new URLSearchParams(location.search).get('w') ?? -1)

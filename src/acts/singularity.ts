@@ -15,7 +15,7 @@ import { aim, equation, jump, splice } from './reality'
 import { INKS } from './stutter'
 import { TAU, clamp, hash, mix, smooth, type Scene } from './scene'
 
-export const AT = R5 + R5DUR
+export const AT = R5 + R5DUR // 76 on the choir's clock; the collapse, AT + FALL, is choir.END
 const TC = 10 // merger
 const FALL = 7.5 // the picture starts to collapse
 const F0 = 24 // Hz at the start of the inspiral
@@ -34,6 +34,7 @@ const amp = (t: number) => (t < TC ? 0.06 * (freq(t) / F0) ** (2 / 3) : 0.06 * (
 const field: Field = { shader: HOLE, k: 1, p: new Float32Array(28) }
 const eye = [0, 0, 0], fwd = [0, 0, 0], up = [0, 1, 0]
 const look = { tau: 0.08 }
+const DREAD = { dread: 1 }
 
 export const singularity: Scene = {
   dur: 13,
@@ -83,7 +84,7 @@ export const singularity: Scene = {
     return (tt, o) => {
       const p = phase(tt), A = clamp(amp(tt), 0, 0.85)
       if (splice(tt, o)) return
-      sing(tt + AT, o, 1 - smooth(FALL, TC, tt), { dread: 1 })
+      sing(tt + AT, o, 1, DREAD) // the choir cuts off itself at the collapse, choir.END
       o.l = A * Math.cos(p), o.r = A * Math.sin(p)
     }
   },
