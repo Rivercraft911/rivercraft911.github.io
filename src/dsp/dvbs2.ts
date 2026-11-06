@@ -3,7 +3,7 @@
 export type Constellation = { name: string; rate: string; modcod: number; radii: number[]; pts: Float64Array; bits: number }
 
 // Rings of [count, radius, first angle]; the outer ring has unit radius.
-function rings(name: string, rate: string, modcod: number, spec: [number, number, number][]): Constellation {
+export function rings(name: string, rate: string, modcod: number, spec: [number, number, number][]): Constellation {
   const pts: number[] = []
   for (const [n, r, a0] of spec) for (let k = 0; k < n; k++) pts.push(r * Math.cos(a0 + (2 * Math.PI * k) / n), r * Math.sin(a0 + (2 * Math.PI * k) / n))
   return { name, rate, modcod, radii: spec.map((s) => s[1]), pts: new Float64Array(pts), bits: Math.log2(pts.length / 2) }

@@ -14,21 +14,25 @@ import { falling } from './acts/fall'
 import { LEAD, wrap } from './acts/wrap'
 import { ascii, CHARS } from './acts/ascii'
 import { load } from './beam/font'
+import { band, direct } from './band/band'
 
 const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
 const beam = new Beam()
 const audio = new Audio()
-// ?fall plays only the fall, from the waterfall on; ?ident and ?end the last stretch.
+// ?fall plays only the fall, from the waterfall on; ?ident and ?end the last stretch. ?band and deep
+// links (/<project>, /qsl) skip the intro and land in the band.
 const scenes = q.has('specimen')
   ? [specimen]
-  : q.has('fall')
-    ? [wrap, ascii, falling(wrap.dur + ascii.dur + LEAD, 5)]
-    : q.has('ident')
-      ? [ident]
-      : q.has('end')
-        ? [singularity, ident]
-        : [hook, meander, valley, wrap, ascii, singularity, ident]
+  : direct()
+    ? [band]
+    : q.has('fall')
+      ? [wrap, ascii, falling(wrap.dur + ascii.dur + LEAD, 5)]
+      : q.has('ident')
+        ? [ident]
+        : q.has('end')
+          ? [singularity, ident, band]
+          : [hook, meander, valley, wrap, ascii, singularity, ident, band]
 const timeline = new Timeline(scenes)
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }
@@ -40,14 +44,15 @@ const gpu = await Phosphor.create(canvas, beam.max).catch(() => {
 
 load('tech').then((face) => gpu.glyphs(face, CHARS)) // the raster's character generator
 
-let on = q.has('auto')
+let on = q.has('auto') || direct()
 let t = Number(q.get('t') ?? 0)
 let speed = q.has('pause') ? 0 : 1
 let last = performance.now()
+let heard = q.has('auto') || q.has('rec') //the speakers wait for a gesture; the band starts without one
 
 function power() {
-  if (on) return
-  on = true
+  if (heard) return
+  on = heard = true
   audio.start().catch(() => {})
 }
 
