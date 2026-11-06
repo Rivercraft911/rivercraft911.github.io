@@ -9,12 +9,14 @@ import { hook } from './acts/hook'
 import { meander } from './acts/meander'
 import { receive } from './acts/receive'
 import { fall } from './acts/fall'
+import { band, direct } from './band/band'
 
 const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
 const beam = new Beam()
 const audio = new Audio()
-const timeline = new Timeline(q.has('specimen') ? [specimen] : [hook, meander, receive, fall])
+// ?band and deep links (/<project>, /qsl) skip the intro and land in the band
+const timeline = new Timeline(q.has('specimen') ? [specimen] : direct() ? [band] : [hook, meander, receive, fall, band])
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }
 
@@ -23,14 +25,15 @@ const gpu = await Phosphor.create(canvas, beam.max).catch(() => {
   throw new Error('WebGPU unavailable')
 })
 
-let on = q.has('auto')
+let on = q.has('auto') || direct()
 let t = Number(q.get('t') ?? 0)
 let speed = q.has('pause') ? 0 : 1
 let last = performance.now()
+let heard = q.has('auto') || q.has('rec') //the speakers wait for a gesture; the band starts without one
 
 function power() {
-  if (on) return
-  on = true
+  if (heard) return
+  on = heard = true
   audio.start().catch(() => {})
 }
 
