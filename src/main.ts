@@ -16,7 +16,7 @@ const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
 const beam = new Beam()
 const audio = new Audio()
-const timeline = new Timeline(q.has('specimen') ? [specimen] : q.has('ident') ? [ident] : q.has('end') ? [singularity, ident] : [hook, meander, valley, fall])
+const timeline = new Timeline(q.has('specimen') ? [specimen] : q.has('ident') ? [ident] : q.has('end') ? [singularity, ident] : [hook, meander, valley, fall, singularity, ident])
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }
 
