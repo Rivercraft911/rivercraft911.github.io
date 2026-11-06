@@ -28,30 +28,22 @@ fn palette(s: f32) -> vec3f {
   return mix(c[i], c[i + 1u], x - f32(i));
 }
 
-// Across the bins by Catmull-Rom on dB, at sheet height v. A reassigned line is a Gaussian, a parabola in
-// dB, and the cubic reproduces parabolas exactly: magnified, a partial stays the curve it was, not a string
-// of tents. The two inner taps share one bilinear fetch, and the rows between are linear.
-fn across(x: f32, v: f32, w: f32) -> f32 {
-  let c = floor(x - 0.5) + 0.5;
-  let f = x - c;
-  let k0 = f * (-0.5 + f * (1.0 - 0.5 * f));
-  let k1 = 1.0 + f * f * (-2.5 + 1.5 * f);
-  let k2 = f * (0.5 + f * (2.0 - 1.5 * f));
-  let k3 = f * f * (-0.5 + 0.5 * f);
-  return k0 * at(vec2f((c - 1.0) / w, v)) + (k1 + k2) * at(vec2f((c + k2 / (k1 + k2)) / w, v)) + k3 * at(vec2f((c + 2.0) / w, v));
-}
-
-// Magnified, a line is drawn as the beam draws one: a spot sized in pixels. Each local peak among the four
-// bins around x is fitted with its parabola, which gives where the partial truly is, how loud, and how wide
-// the estimate made it; it is drawn there at that width, but never wider than the spot (p[5].w raster
-// pixels), and as bright as its energy, narrowed, makes it (up to 8 times). Crests wider than 8 bins are
-// too flat to place; they stay the glow they are.
+// Magnified, the four bins around x at sheet height v (rows between are linear) are read twice over.
+// As a glow: Catmull-Rom on dB. A reassigned line is a Gaussian, a parabola in dB, and the cubic
+// reproduces parabolas exactly, so a partial stays the curve it was, not a string of tents. As lines,
+// drawn as the beam draws one, with a spot sized in pixels: each local peak is fitted with its parabola,
+// which gives where the partial truly is, how loud, and how wide the estimate made it, and it is drawn
+// there at that width, but never wider than the spot (p[5].w raster pixels), and as bright as its energy,
+// narrowed, makes it (up to 8 times). Crests wider than 8 bins are too flat to place; they stay glow.
 const NEPER = 0.07755; // a Gaussian's curvature in row units: 10 log10(e) / 56 dB
 fn ridge(x: f32, v: f32, w: f32, fx: f32) -> f32 {
   let c = floor(x - 0.5);
   var s: array<f32, 4>;
   for (var j = 0; j < 4; j++) { s[j] = at(vec2f((c + f32(j) - 0.5) / w, v)); }
-  var p = 0.0;
+  let f = x - 0.5 - c;
+  let cubic = s[0] * f * (-0.5 + f * (1.0 - 0.5 * f)) + s[1] * (1.0 + f * f * (-2.5 + 1.5 * f))
+            + s[2] * f * (0.5 + f * (2.0 - 1.5 * f)) + s[3] * f * f * (-0.5 + 0.5 * f);
+  var p = power(cubic) * fx;
   for (var j = 1; j < 3; j++) {
     let a = s[j - 1];
     let b = s[j];
@@ -73,12 +65,12 @@ fn ridge(x: f32, v: f32, w: f32, fx: f32) -> f32 {
 // The taps along the rows start at e, a per-pixel dither, so a few of them read as grain, not as copies.
 fn sheet(x: f32, r: f32, fx: f32, fy: f32, e: f32) -> f32 {
   let size = vec2f(textureDimensions(data));
-  let ny = i32(clamp(ceil(fy * 0.5), 1.0, 8.0));
+  let ny = i32(clamp(ceil(fy * 0.25), 1.0, 4.0));
   let nx = i32(clamp(ceil(fx), 1.0, 3.0));
   var p = 0.0;
   for (var j = 0; j < ny; j++) {
     let v = (r + 0.5 + ((f32(j) + e) / f32(ny) - 0.5) * fy) / size.y;
-    if (fx < 1.0) { p += max(ridge(x, v, size.x, fx), power(across(x, v, size.x)) * fx); continue; }
+    if (fx < 1.0) { p += ridge(x, v, size.x, fx); continue; }
     for (var i = 0; i < nx; i++) {
       p += power(at(vec2f((x + ((f32(i) + 0.5) / f32(nx) - 0.5) * fx) / size.x, v)));
     }
