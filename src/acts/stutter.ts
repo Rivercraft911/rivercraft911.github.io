@@ -2,8 +2,8 @@
 // with its own light and its own corruption of the choir, each still running while we are elsewhere: a
 // kaleidoscopic IFS (ring-modulated), the Amazing Surface (through a comb), the Kaliset (granulated), a
 // Lyapunov fractal on the DVB-S2 start-of-frame word (through the logistic map), Newton's method on 32APSK
-// (every sample pair hard-decided to the constellation), and the {4,3,5} honeycomb (the choir run
-// backwards, its fall reflected into a rise). The cuts accelerate from 1.9 s to a third of a second; only
+// (every sample pair hard-decided to the constellation), and the {4,3,5} honeycomb (the choir's
+// descent reflected, its fall run back up). The cuts accelerate from 1.9 s to a third of a second; only
 // the slow ones flash, so there are never more than three flashes a second.
 import type { Stereo } from '../audio/audio'
 import { Path } from '../beam/path'
