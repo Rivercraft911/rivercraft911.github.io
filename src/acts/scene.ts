@@ -1,6 +1,6 @@
 // A scene is a pure function of time that tells the beam what to draw and the speakers what to play.
 import type { Channel } from '../beam/beam'
-import type { Voice } from '../audio/audio'
+import { VOICES, type Voice } from '../audio/audio'
 import type { Look } from '../gpu/phosphor'
 import type { Path } from '../beam/path'
 import { measure, text } from '../beam/font'
@@ -11,6 +11,7 @@ export type Scene = { dur: number; fade?: number; build(t: number, f: Frame): Vo
 
 export const view = { a: 16 / 9 } // half-width of the screen in scope units; height spans [-1, 1]
 export const input = { x: 0, y: 0 } // the pointer, each axis in [-1, 1]
+export const space = new Float64Array(3 * VOICES) // where each spatial voice sings, metres around the listener
 
 export const TAU = Math.PI * 2
 export const clamp = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x))

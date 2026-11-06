@@ -33,25 +33,25 @@ function vowel(f: number, dark: number) {
 export class Shepard {
   readonly layers: number
   private ph: Float64Array // phase in cycles, two beating copies per tone
-  private inc: Float64Array // per-sample phase increments, set each block
+  private hz: Float64Array // each oscillator's frequency, set each block
   private amp: Float64Array // per-tone amplitude, set each block
   private crawl: Float64Array // each dread tone's detune in cents: where it is, where it is going
-  private s = 0 // descent in periods
+  s = 0 // descent in periods
   private last = 0
-  private n = 0 // samples until the next control step
+  private n = 0 // samples until the next control step (BLOCK samples at about 48 kHz)
   private seed = 1
 
-  constructor(readonly sr = 48_000, readonly period = 2) {
+  constructor(readonly period = 2) {
     this.layers = Math.ceil(Math.log(600) / Math.log(period)) // F0 up to about 16.5 kHz
     const k = this.layers * TONES
     this.ph = new Float64Array(2 * k)
-    this.inc = new Float64Array(2 * k)
+    this.hz = new Float64Array(2 * k)
     this.amp = new Float64Array(k)
     this.crawl = new Float64Array(2 * k)
   }
 
-  reset(t: number) {
-    this.ph.fill(0), this.crawl.fill(0), (this.s = 0), (this.last = t), (this.n = 0)
+  reset(t: number, s = 0) {
+    this.ph.fill(0), this.crawl.fill(0), (this.s = s), (this.last = t), (this.n = 0)
   }
 
   private rand() {
@@ -79,8 +79,8 @@ export class Shepard {
         }
         g *= bell * bell * vowel(fc, dark)
         this.amp[i] = g < 1e-4 ? 0 : g
-        this.inc[2 * i] = (fc + beat / 2) / this.sr
-        this.inc[2 * i + 1] = (fc - beat / 2) / this.sr
+        this.hz[2 * i] = fc + beat / 2
+        this.hz[2 * i + 1] = fc - beat / 2
       }
     }
   }
@@ -92,12 +92,12 @@ export class Shepard {
     this.last = t
     this.s += rate * dt
     if (this.n-- <= 0) this.control(dread), (this.n = BLOCK - 1)
-    const { ph, inc, amp } = this
+    const { ph, hz, amp } = this
     let out = 0
     for (let i = 0; i < amp.length; i++) {
       const a = 2 * i
-      ph[a] += inc[a]
-      ph[a + 1] += inc[a + 1]
+      ph[a] += hz[a] * dt
+      ph[a + 1] += hz[a + 1] * dt
       if (amp[i]) out += amp[i] * (sin(ph[a]) + sin(ph[a + 1]))
     }
     return 0.05 * out

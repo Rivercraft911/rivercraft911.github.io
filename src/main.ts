@@ -2,25 +2,18 @@ import { Beam } from './beam/beam'
 import { Audio } from './audio/audio'
 import { LOOK, Phosphor } from './gpu/phosphor'
 import { Timeline } from './acts/timeline'
-import { input, view, type Frame } from './acts/scene'
+import { input, space, view, type Frame } from './acts/scene'
 import { idle } from './acts/idle'
-import { wave } from './acts/wave'
-import { xy } from './acts/xy'
-import { knot } from './acts/knot'
-import { nameScene } from './acts/name'
-import { cwScene } from './acts/cw'
-import { iqScene } from './acts/iq'
-import { waterfall } from './acts/waterfall'
-import { ascii } from './acts/ascii'
 import { specimen } from './acts/specimen'
 import { tune } from './acts/tune'
 import { receive } from './acts/receive'
+import { fall } from './acts/fall'
 
 const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
 const beam = new Beam()
 const audio = new Audio()
-const timeline = new Timeline(q.has('specimen') ? [specimen] : [tune, receive, wave, xy, knot, nameScene, cwScene, iqScene, waterfall, ascii])
+const timeline = new Timeline(q.has('specimen') ? [specimen] : [tune, receive, fall])
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }
 
@@ -103,6 +96,7 @@ function tick(now: number) {
   beam.frame(frame.ch, t - dt, dt)
   gpu.draw(beam, view.a, dt, look)
 
+  if (on) for (let i = 0; i < space.length; i += 3) audio.place(i / 3, space[i], space[i + 1], space[i + 2])
   if (on) audio.feed(t, timeline.build(t + 0.05, frame) || undefined)
   requestAnimationFrame(tick)
 }

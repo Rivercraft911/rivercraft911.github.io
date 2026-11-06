@@ -57,7 +57,7 @@ function chase(t: number) {
 
 // Transmitted symbols by index, cached: I, Q and kind.
 const CK = new Float64Array(512).fill(NaN), CI = new Float64Array(512), CQ = new Float64Array(512), CT = new Uint8Array(512)
-const s = { i: 0, q: 0 }
+const s = { i: 0, q: 0 }, d = { i: 0, q: 0 }
 function sym(k: number) {
   const j = k & 511
   if (CK[j] !== k) (CK[j] = k), (CT[j] = tx.sym(k, s)), (CI[j] = s.i), (CQ[j] = s.q)
@@ -87,6 +87,16 @@ export function signal(t: number, slip = pll.err) {
   sig.i = I * c - Q * sn + n * gauss(x * 7, 1.3)
   sig.q = I * sn + Q * c + n * gauss(x * 7, 7.9)
 }
+
+// The decision for symbol k as the receiver saw it: the sent point plus its noise, under the residual
+// rotation at the time. Returns the symbol's kind.
+export function decision(k: number, slip: number, o: { i: number; q: number }) {
+  const j = sym(k), tk = k / RS, ph = drift(tk) + slip, c = Math.cos(ph), sn = Math.sin(ph), nk = sigma(tk)
+  const I = CI[j] + nk * gauss(k, 2.1), Q = CQ[j] + nk * gauss(k, 5.3)
+  o.i = I * c - Q * sn, o.q = I * sn + Q * c
+  return CT[j]
+}
+export const residual = () => pll.err
 
 const marks = new Path()
 const labels = new Path()
@@ -124,10 +134,9 @@ export const receive: Scene = {
         fn: (_, o, u) => {
           const a = Math.min(PERSIST - 1, Math.floor(u * PERSIST)), k = kNow - a
           if (k < 0 || k / RS < 1.7) return void (o.z = 0)
-          const j = sym(k), tk = k / RS, ph = drift(tk) + slip, c = Math.cos(ph), sn = Math.sin(ph), nk = sigma(tk)
-          const I = CI[j] + nk * gauss(k, 2.1), Q = CQ[j] + nk * gauss(k, 5.3)
-          o.x = R * (I * c - Q * sn), o.y = R * (I * sn + Q * c)
-          o.z = a === last ? (CT[j] === Kind.Data ? 1 : 1.8) * (1 - (0.75 * a) / PERSIST) * smooth(1.7, 2.4, tk) : 0
+          const kind = decision(k, slip, d)
+          o.x = R * d.i, o.y = R * d.q
+          o.z = a === last ? (kind === Kind.Data ? 1 : 1.8) * (1 - (0.75 * a) / PERSIST) * smooth(1.7, 2.4, k / RS) : 0
           last = a
         },
       })
