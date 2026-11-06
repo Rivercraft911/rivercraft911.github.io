@@ -2,8 +2,12 @@
 // under it the numbers it is running on, each on its odometer wheels. When the signal changes, the new
 // equation grows out of the old one term by term.
 import { Path } from '../beam/path'
-import { draw, eq, morphEq, roll, tex } from '../beam/math'
+import { draw, eq, mathFont, morphEq, roll, tex } from '../beam/math'
+import { load } from '../beam/font'
 import { clamp, lock, view, type Frame } from './scene'
+
+// Every equation in the piece is set in this face (?math=<face> to try another).
+mathFont.face = await load(new URLSearchParams(location.search).get('math') ?? 'mserif')
 
 export type Val = readonly [name: string, v: number, dec: number]
 const SIZE = 0.058, SUB = 0.042
@@ -23,8 +27,8 @@ export class Say {
     draw(p, k < 1.1 && t - this.at < 1.2 ? morphEq(tex(this.was), tex(src), k, this.out) : tex(src), x, y, SIZE, 0, i)
     let cx = x
     for (const [name, v, dec] of vals) {
-      cx += draw(p, tex(`${name} =`), cx, y - 2.1 * SIZE, SUB, 0, 0.75 * i) + 0.3 * SUB
-      cx += roll(p, v, cx, y - 2.1 * SIZE, SUB, dec, 0, 0.75 * i) + 1.4 * SUB
+      cx += draw(p, tex(`${name} =`), cx, y - 2.7 * SIZE, SUB, 0, 0.75 * i) + 0.3 * SUB
+      cx += roll(p, v, cx, y - 2.7 * SIZE, SUB, dec, 0, 0.75 * i) + 1.4 * SUB
     }
     f.ch.push({ w: 0.2, path: p })
   }

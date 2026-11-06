@@ -111,7 +111,10 @@ function layout(src: string, face: Face): Eq {
     }
     if (w < 0 && ch.length > 1 && !SYM[ch]) {
       w = 0.15 * s // \sin, \log: an operator name, upright, a little apart
-      for (const c of ch) w += put(id, c, x + w - 0.15 * s, y, s)
+      for (const c of ch) {
+        const up = String.fromCharCode(0xe000 + c.charCodeAt(0)) // a math face's upright letter
+        w += put(id, face.g[up] ? up : c, x + w - 0.15 * s, y, s)
+      }
     }
     if (w < 0) {
       if (ch === '-') ch = '−'
@@ -149,8 +152,10 @@ function layout(src: string, face: Face): Eq {
 // The math axis: the height of the minus sign, where fraction bars sit.
 const axis = (f: Face) => ext(f.g['−'])[1] || 0.4
 
+// The face equations are set in unless told otherwise: a math face once one is loaded.
+export const mathFont: { face?: Face } = {}
 const cache = new WeakMap<Face, Map<string, Eq>>()
-export function tex(src: string, f = font.face) {
+export function tex(src: string, f = mathFont.face ?? font.face) {
   let c = cache.get(f), e = c?.get(src)
   if (!c) cache.set(f, (c = new Map()))
   if (!e) c.set(src, (e = layout(src, f)))
@@ -212,12 +217,12 @@ export function morphEq(a: Eq, b: Eq, k: number, out: Eq) {
   out.face = b.face
   return out
 }
-export const eq = (): Eq => ({ g: [], n: 0, w: 0, face: font.face })
+export const eq = (): Eq => ({ g: [], n: 0, w: 0, face: mathFont.face ?? font.face })
 
 // v written with dec decimals, every digit on its own wheel: the lowest turns over as v crosses
 // each step, and each higher one turns with the carry. Tabular figures, so align = 1 keeps it still.
 const wheels = new Float64Array(24)
-export function roll(p: Path, v: number, x: number, y: number, size: number, dec = 0, align = 0, i = 1, f = font.face) {
+export function roll(p: Path, v: number, x: number, y: number, size: number, dec = 0, align = 0, i = 1, f = mathFont.face ?? font.face) {
   const adv = (f.g['0']?.[0] ?? 0.6) * size, dot = (f.g['.']?.[0] ?? 0.3) * size, u = Math.abs(v) * 10 ** dec
   const n = Math.min(20, Math.max(dec + 1, Math.floor(Math.log10(Math.max(1, u))) + 1))
   const sign = v < 0 && u >= 0.5 ? (f.g['−']?.[0] ?? 0.6) * size : 0
