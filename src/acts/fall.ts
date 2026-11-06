@@ -21,7 +21,7 @@ export const speed = (t: number) => Math.max(0, lock(SPEED, t, 2.2, 0.8))
 export const T0 = 11 // where the receiver's time stands when the fall begins
 
 const p3 = { x: 0, y: 0, z: 0 }, s = { i: 0, q: 0 }
-const walls = new Path()
+const wall = new Path()
 
 // A helix of pitch class c (in octaves) of a choir falling at k × the descent, drawn into the walls.
 function helix(p: Path, t: number, V: number, c: number, k: number, r: number, g: number, b: number, gain: (T: number) => number) {
@@ -41,13 +41,27 @@ function helix(p: Path, t: number, V: number, c: number, k: number, r: number, g
   }
 }
 
+// The falling camera at time t: swaying a little, its lens widening as we pick up speed.
+export function aim(t: number) {
+  const sway = 0.06 * smooth(2, 5, t), fov = mix(FOV, 1.55, smooth(1, 6, t))
+  const d = D * (Math.tan(FOV / 2) / Math.tan(fov / 2)) // keep the now-plane's scale as the lens widens
+  cam.aim(sway * Math.sin(0.7 * t), sway * Math.cos(0.9 * t), d, 0.3 * sway * Math.sin(1.3 * t), 0, 0, fov)
+}
+
+// The walls at time t: every choir's pitch helices, angels then dread then the rising choir.
+export function walls(p: Path, t: number) {
+  const V = speed(t), A = CHOIRS[0], X = CHOIRS[2]
+  ANGEL.forEach((r, i) => helix(p, t, V, Math.log2(r), A.k, 1, mix(0.85, 1, i / 4), mix(0.45, 0.95, i / 4), (T) => A.enter(T) * (1 - 0.5 * dread(T)) / (1 + 0.3 * i)))
+  DREAD.forEach((r) => helix(p, t, V, Math.log2(r), A.k, 1, 0.12, 0.25, (T) => A.enter(T) * dread(T)))
+  ANGEL.forEach((r) => helix(p, t, V, Math.log2(r), X.k, 0.6, 0.25, 1, (T) => X.enter(T)))
+  return p
+}
+
 export const fall: Scene = {
   dur: 10,
   build(t, f) {
-    const V = speed(t), slip = residual(), sway = 0.06 * smooth(2, 5, t)
-    const fov = mix(FOV, 1.55, smooth(1, 6, t))
-    const d = D * (Math.tan(FOV / 2) / Math.tan(fov / 2)) // keep the now-plane's scale as the lens widens
-    cam.aim(sway * Math.sin(0.7 * t), sway * Math.cos(0.9 * t), d, 0.3 * sway * Math.sin(1.3 * t), 0, 0, fov)
+    const V = speed(t), slip = residual()
+    aim(t)
     const kNow = Math.floor((T0 + t) * RS)
 
     // The symbols: the receiver's recent decisions, then the ones still to come stretching ahead.
@@ -67,13 +81,7 @@ export const fall: Scene = {
       },
     })
 
-    // The walls: the choirs' pitch helices.
-    walls.clear()
-    const A = CHOIRS[0], X = CHOIRS[2]
-    ANGEL.forEach((r, i) => helix(walls, t, V, Math.log2(r), A.k, 1, mix(0.85, 1, i / 4), mix(0.45, 0.95, i / 4), (T) => A.enter(T) * (1 - 0.5 * dread(T)) / (1 + 0.3 * i)))
-    DREAD.forEach((r) => helix(walls, t, V, Math.log2(r), A.k, 1, 0.12, 0.25, (T) => A.enter(T) * dread(T)))
-    ANGEL.forEach((r) => helix(walls, t, V, Math.log2(r), X.k, 0.6, 0.25, 1, (T) => X.enter(T)))
-    f.ch.push({ w: 0.9, gain: 0.9, path: walls })
+    f.ch.push({ w: 0.9, gain: 0.9, path: walls(wall.clear(), t) })
 
     place(t)
     f.rate = mix(1.2e6, 3e6, smooth(0, 2, t))
