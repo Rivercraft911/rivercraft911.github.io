@@ -1,105 +1,163 @@
 // The singularity · A Schwarzschild black hole (G = c = M = 1: the horizon at r = 2, the photon sphere at
-// r = 3) lensing what is left of the fall. Every ray is a null geodesic, traced back from the eye in flat
-// coordinates, where its orbit obeys x″ = −(3/2) h² x / r⁵, h = |x × x′| its angular momentum: Binet's
+// r = 3) with every world of the fall around it. Every ray is a null geodesic, traced back from the eye in
+// flat coordinates, where its orbit obeys x″ = −(3/2) h² x / r⁵, h = |x × x′| its angular momentum: Binet's
 // u″ + u = 3u², exactly. A ray that falls inside r = 2 never comes back; that is the shadow, √27 across. A
-// ray that grazes r = 3 winds round and comes back as the photon ring.
+// ray that grazes r = 3 winds round and comes back as the photon ring, where the images of everything pile
+// up, each turn e^−π thinner than the last.
 //
-// The disk lies in y = 0 from the innermost stable orbit, r = 6, out to r = 18: thin, Keplerian (Ω = r^−3/2),
-// its temperature Shakura–Sunyaev's, T ∝ r^−3/4 (1 − √(6/r))^1/4, and every radius glows at its own Wien
-// peak, λ = b/T: the disk is the spectrum, violet near its hottest ring, red at its rim and invisible
-// infrared at its inner edge. Each colour is shifted by gravity and by the disk's motion,
-// g = √(1 − 3/r) / (1 − Ω b) with b the photon's angular momentum about the disk's axis, so the side
-// coming toward us is bluer and far brighter: its flux goes as (g T)⁴. Its light is streaked by shear: gas at radius r has
-// turned Ω t.
+// The worlds orbit it as twelve rings, each in its own plane (an orbit here keeps its plane), each the
+// raster's own last frame of that world (raster.ts keeps them) round its rim eight times, mirrored so it
+// closes. Each turns at Kepler's Ω = r^−3/2, and its light is shifted by g = √(1 − 3/r) / (1 − Ω b), b the
+// photon's angular momentum about the ring's axis: I_ν/ν³ is conserved along a ray, so the side coming
+// toward us is brighter, as g³, and bluer, red, green and blue going as g², g³, g⁴. The sky is the twelve
+// worlds again, one in each face of a dodecahedron, seen gnomonically from its centre, edged in gold, with
+// stars. Every shot is read at the mip that a pixel's footprint covers: on a ring, the cone of the ray
+// times the length it has run; on the sky, how fast the escaping direction turns across the screen, which
+// is the lens's own magnification.
 //
-// Beyond is the sky: the last world, the tesseract and the 24-cell, met on a 2-sphere of S³ and still turning.
+// The horizon: inside the shadow the whole picture repeats, shrunk by K and turned by ψ, and inside that
+// one's shadow again, without end: z ↦ (K e^{iψ})ⁿ z, n the levels down, each in a moat of the shadow's
+// black. The zoom runs through it, so that one level later the picture is itself again.
 //
-// p[0..3] camera   p[4] L   p[5] R   p[6] time, collapse, gain
-
-fn qmul(a: vec4f, b: vec4f) -> vec4f {
-  return vec4f(a.x * b.x - dot(a.yzw, b.yzw), a.x * b.yzw + b.x * a.yzw + cross(a.yzw, b.yzw));
-}
+// p[0..3] camera   p[4] time, collapse, gain, horizon   p[5] zoom, ln K, ψ, shadow   p[6..8] ring radii
+// p[9..11] ring light   p[12] sky, edges
 
 fn hash3(p: vec3f) -> f32 { return fract(sin(dot(p, vec3f(127.1, 311.7, 74.7))) * 43758.5453); }
 
-// The CIE 1931 observer, as Wyman, Sloan and Shirley fit it with piecewise Gaussians, into linear sRGB.
-fn lobe(l: f32, m: f32, a: f32, b: f32) -> f32 {
-  let s = select(b, a, l < m);
-  let x = (l - m) / s;
-  return exp(-0.5 * x * x);
-}
-fn spectral(l: f32) -> vec3f {
-  let X = 1.056 * lobe(l, 599.8, 37.9, 31.0) + 0.362 * lobe(l, 442.0, 16.0, 26.7) - 0.065 * lobe(l, 501.1, 20.4, 26.2);
-  let Y = 0.821 * lobe(l, 568.8, 46.9, 40.5) + 0.286 * lobe(l, 530.9, 16.3, 31.1);
-  let Z = 1.217 * lobe(l, 437.0, 11.8, 36.0) + 0.681 * lobe(l, 459.0, 26.0, 13.8);
-  return max(vec3f(3.2406 * X - 1.5372 * Y - 0.4986 * Z, -0.9689 * X + 1.8758 * Y + 0.0415 * Z, 0.0557 * X - 0.2040 * Y + 1.0570 * Z), vec3f(0.0));
+// World i's shot, at uv across it and mip lod, its brightness evened out so no one world drowns the rest.
+fn world(i: i32, uv: vec2f, lod: f32) -> vec3f {
+  let l = clamp(lod, 0.0, 4.0);
+  let e = exp2(l) * vec2f(0.5 / 512.0, 0.5 / 320.0);
+  let c = textureSampleLevel(data, smp, (vec2f(f32(i % 4), f32(i / 4)) + clamp(uv, e, 1.0 - e)) / vec2f(4.0, 3.0), l).rgb;
+  return c / (0.25 + dot(c, vec3f(0.3, 0.6, 0.1))) * 0.6;
 }
 
-fn disk(P: vec3f, k: vec3f) -> vec3f {
-  let r = length(P.xz);
+// Ring i's axis: tipped from the pole by up to 80°, the nodes a golden angle apart. The axes are kept
+// as columns, so one point's side of all twelve planes is three dot products of vec4s.
+fn axis(i: i32) -> vec3f {
+  let th = 0.15 + 1.25 * fract(f32(i) * 0.618034);
+  let ph = f32(i) * 2.399963;
+  return vec3f(sin(th) * cos(ph), cos(th), sin(th) * sin(ph));
+}
+var<private> NX: array<vec4f, 3>;
+var<private> NY: array<vec4f, 3>;
+var<private> NZ: array<vec4f, 3>;
+fn sides(x: vec3f) -> array<vec4f, 3> {
+  return array<vec4f, 3>(x.x * NX[0] + x.y * NY[0] + x.z * NZ[0], x.x * NX[1] + x.y * NY[1] + x.z * NZ[1], x.x * NX[2] + x.y * NY[2] + x.z * NZ[2]);
+}
+
+// The light and opacity where a photon going k, after running len, crosses ring i's plane at P. The ring is
+// 0.24 r wide, a shot's height; a copy of the shot runs 2πr/8 round it.
+fn ring(i: i32, P: vec3f, k: vec3f, len: f32) -> vec4f {
+  let R = u.p[6 + i / 4][i % 4];
+  let A = u.p[9 + i / 4][i % 4];
+  let r = length(P);
+  let e = (r - R) / (0.12 * R);
+  if (A <= 0.0 || abs(e) >= 1.0) { return vec4f(0.0); }
+  let n = axis(i);
+  let e1 = normalize(cross(n, vec3f(0.36, 0.48, 0.8)));
   let om = pow(r, -1.5);
-  let b = cross(P, k).y;
-  let g = sqrt(1.0 - 3.0 / r) / (1.0 - om * b);
-  let T = pow(r, -0.75) * pow(1.0 - sqrt(6.0 / r), 0.25) / 0.1275; // 1 at the hottest ring
-  let lam = 420.0 / max(T * g, 1e-3);
-  let phi = atan2(P.z, P.x) + om * u.p[6].x;
-  let lr = log(r);
-  let shear = pow((0.6 + 0.4 * sin(7.0 * phi + 40.0 * lr)) * (0.55 + 0.45 * sin(19.0 * phi - 90.0 * lr + 1.7)) * (0.6 + 0.4 * sin(150.0 * lr + sin(3.0 * phi))), 2.0);
-  let edge = smoothstep(18.0, 11.0, r);
-  let c = spectral(lam);
-  return mix(c, vec3f(dot(c, vec3f(0.3, 0.5, 0.2))), 0.3) * pow(g * T, 4.0) * shear * edge * 5.0;
+  let m = (atan2(dot(P, cross(n, e1)), dot(P, e1)) - om * u.p[4].x) * 1.2732395;
+  let h = fract(0.5 * m) * 2.0;
+  let g = sqrt(max(1.0 - 3.0 / r, 0.0)) / (1.0 - om * dot(cross(P, k), n));
+  let s = 1.0 - e * e;
+  let lod = log2(spread * cone() * len / (0.00075 * R * max(abs(dot(n, k)), 0.125)));
+  let c = world(i, vec2f(min(h, 2.0 - h), 0.5 - 0.5 * e), lod) * vec3f(g * g, g * g * g, g * g * g * g);
+  return vec4f(c * A * s * s, 0.85 * A * s);
 }
 
-// The sky: S³'s 2-sphere w = 0.6, turned by (L, R) and folded into the tesseract's chamber (|s|, sorted).
-// Where it crosses the tesseract's cell walls the two largest coordinates are equal, and where it crosses
-// the 24-cell's the middle two are: curves on the sky, a lattice of cells for the lens to bend. Each cell
-// is faintly tinted by its axis, and there are stars.
-fn sky(d: vec3f) -> vec3f {
-  let v = qmul(qmul(u.p[4], vec4f(0.8 * d, 0.6)), u.p[5]);
-  let w = abs(v);
-  let a = max(w.xz, w.yw);
-  let b = min(w.xz, w.yw);
-  let s = vec4f(max(a.x, a.y), max(min(a.x, a.y), max(b.x, b.y)), min(min(a.x, a.y), max(b.x, b.y)), min(b.x, b.y));
-  let e1 = (s.x - s.y) * 0.7071;
-  let e2 = (s.y - s.z) * 0.7071;
-  var col = vec3f(1.5, 0.95, 0.3) * exp(-e1 * e1 / 4e-5) + vec3f(1.4, 0.12, 0.2) * exp(-e2 * e2 / 4e-5) * 0.7;
-  let big = select(select(select(v.w, v.z, w.z == s.x), v.y, w.y == s.x), v.x, w.x == s.x);
-  let axis = select(select(select(3.0, 2.0, w.z == s.x), 1.0, w.y == s.x), 0.0, w.x == s.x) + step(big, 0.0) * 4.0;
-  col += (0.5 + 0.5 * cos(vec3f(0.0, 2.1, 4.2) + axis * 0.785)) * 0.015;
+// The sky toward d: the dodecahedron's faces, each the world on the icosahedron's vertex it faces.
+var<private> AX: array<vec3f, 6> = array<vec3f, 6>(
+  vec3f(0.0, 0.5257, 0.8507), vec3f(0.0, 0.5257, -0.8507), vec3f(0.5257, 0.8507, 0.0),
+  vec3f(-0.5257, 0.8507, 0.0), vec3f(0.8507, 0.0, 0.5257), vec3f(0.8507, 0.0, -0.5257));
+fn sky(d: vec3f, lod: f32) -> vec3f {
+  var b = -1.0;
+  var b2 = -1.0;
+  var f = 0;
+  var n = vec3f(0.0);
+  for (var k = 0; k < 6; k++) {
+    let s = dot(d, AX[k]);
+    let m = abs(s);
+    if (m > b) { b2 = b; b = m; f = 2 * k + select(0, 1, s < 0.0); n = AX[k] * sign(s); }
+    else if (m > b2) { b2 = m; }
+  }
+  let g = d / b - n;
+  let e1 = normalize(cross(n, vec3f(0.36, 0.48, 0.8)));
+  let e = b - b2;
+  var col = world(f, vec2f(0.5 + dot(g, e1) / 2.24, 0.5 - dot(g, cross(n, e1)) / 1.4), lod) * u.p[12].x;
+  col += vec3f(1.2, 0.85, 0.5) * exp(-e * e / 1e-5) * u.p[12].y;
   let star = hash3(floor(d * 300.0));
-  col += vec3f(0.8, 0.85, 1.0) * step(0.996, star) * 4.0 * smoothstep(0.35, 0.0, length(fract(d * 300.0) - 0.5));
-  return col * 0.6;
+  return col + vec3f(0.8, 0.85, 1.0) * step(0.996, star) * 3.0 * smoothstep(0.35, 0.0, length(fract(d * 300.0) - 0.5));
 }
 
-fn field(q0: vec2f) -> vec3f {
-  let q = q0 * u.p[6].y;
-  let rim = smoothstep(1.7, 1.2, length(q));
-  if (rim <= 0.0) { return vec3f(0.0); }
+// What a ray collects on its way out: the rings' light, how much of the sky still shows through, and
+// where it goes.
+var<private> through: f32;
+var<private> gone: vec3f;
+var<private> spread: f32; // how much the collapse and the horizon have magnified a pixel
+fn trace(q: vec2f) -> vec3f {
   var x = eye();
   var v = ray(q);
   let h2 = dot(cross(x, v), cross(x, v));
   var col = vec3f(0.0);
-  var through = 1.0;
+  var len = 0.0;
   var a = -1.5 * h2 * x / pow(dot(x, x), 2.5);
+  var s0 = sides(x);
+  through = 1.0;
   for (var i = 0; i < 200; i++) {
     let r = length(x);
-    if (r < 2.0) { return col * rim * u.p[6].z; }
+    if (r < 2.0 || through < 0.02) { through = 0.0; break; }
     if (r > 60.0 && dot(x, v) > 0.0) { break; }
     let dt = clamp(0.05 * r * r / 3.0, 0.03, 3.0);
     v += 0.5 * dt * a;
     let xn = x + dt * v;
-    if (x.y * xn.y < 0.0) {
-      let P = mix(x, xn, x.y / (x.y - xn.y));
-      let rp = length(P.xz);
-      if (rp > 6.0 && rp < 18.0) {
-        col += through * disk(P, normalize(-v));
-        through *= 0.15;
+    let s1 = sides(xn);
+    len += dt;
+    for (var j = 0; j < 3; j++) {
+      let c = s0[j] * s1[j];
+      if (any(c < vec4f(0.0))) {
+        for (var l = 0; l < 4; l++) {
+          if (c[l] < 0.0) {
+            let w = ring(4 * j + l, mix(x, xn, s0[j][l] / (s0[j][l] - s1[j][l])), normalize(-v), len);
+            col += through * w.rgb;
+            through *= 1.0 - w.a;
+          }
+        }
       }
     }
+    s0 = s1;
     x = xn;
     a = -1.5 * h2 * x / pow(dot(x, x), 2.5);
     v += 0.5 * dt * a;
   }
-  col += through * sky(normalize(v));
-  return col * rim * u.p[6].z;
+  gone = normalize(v);
+  return col;
+}
+
+fn field(q0: vec2f) -> vec3f {
+  for (var i = 0; i < 12; i++) {
+    let n = axis(i);
+    NX[i / 4][i % 4] = n.x;
+    NY[i / 4][i % 4] = n.y;
+    NZ[i / 4][i % 4] = n.z;
+  }
+  let z = u.p[4].y;
+  var q = q0 * z;
+  let rim = smoothstep(1.7 + 1.0 / z, 1.2 + 1.0 / z, length(q)); // the collapse: the picture shrinks to a point
+  // the horizon: climb back out of the shadow a level at a time, the zoom already taken
+  var deep = 1.0;
+  if (u.p[4].w > 0.0) {
+    let H = u.p[5];
+    var lr = log(max(length(q), 1e-9)) - H.x * H.y;
+    var a = atan2(q.y, q.x) - H.x * H.z;
+    let n = clamp(ceil((log(H.w) - lr) / H.y), 0.0, 40.0);
+    lr += n * H.y;
+    a += n * H.z;
+    q = exp(lr) * vec2f(cos(a), sin(a));
+    deep = pow(u.p[4].w, n);
+  }
+  spread = length(q) / max(length(q0), 1e-9);
+  let col = trace(q);
+  let lod = log2(length(fwidth(gone)) / 0.0044); // a sky texel is 0.0044 rad
+  return (col + through * sky(gone, lod)) * rim * deep * u.p[4].z;
 }

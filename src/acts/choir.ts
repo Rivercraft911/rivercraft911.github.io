@@ -8,12 +8,13 @@ import { room, type Stereo } from '../audio/audio'
 import { Shepard, type Part } from '../dsp/shepard'
 import { clamp, smooth } from './scene'
 
-export const END = 65 // the collapse into one point on the choir's clock: singularity's AT (ophanim's AT + DUR) + 7.5
+export const END = 68 // the collapse into one point on the choir's clock: singularity's AT (ophanim's AT + DUR) + 10.5
 const GAIN = 1.1 // about the old choirs' swing, which the realities' bends expect
 const FALL = 13.5 // the falls flattening into the plot: the choir is silent before it, then fades in
 
 // The swell toward the singularity, ∈ [0, 1], steepest at the end.
-export const swell = (T: number) => clamp((T - (END - 27)) / 27) ** 2
+const SWELL = 38 // where it starts
+export const swell = (T: number) => clamp((T - SWELL) / (END - SWELL)) ** 2
 
 // Octaves per second of fall, and its integral, the descent: tabulated once.
 export const rate = (T: number) => 0.12 + 0.42 * smooth(0, 10, T) + 0.5 * smooth(END - 15, END, T)
