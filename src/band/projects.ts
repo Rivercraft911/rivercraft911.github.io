@@ -228,7 +228,7 @@ export const PROJECTS: Project[] = [
   {
     slug: 'autoprime',
     title: 'autoprime',
-    remarkable: 'An agent loop hunting primes: the biggest non-Mersenne prime it can prove in 60 s',
+    remarkable: 'An agent loop hunting primes: the biggest non-Mersenne prime it can find in 60 s',
     freq: 1.1e6,
     span: 2.8,
     signature: 'A line at every prime p < 1000, times 100 kHz: discrete at the bottom, a continuum at the top, as π(x) ~ x / ln x says.',
