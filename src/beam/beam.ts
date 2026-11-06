@@ -10,8 +10,11 @@ export type Channel = { w: number; gain?: number; off?: number } & ({ fn: Fn } |
 
 export const FLOATS = 8 // x, y, z, _, r, g, b, _
 export const GREEN = [0.35, 1, 0.55] as const
-const REF = 0.001 // path brightness reference: one sample per REF of arc at gain 1
+const REF = 0.001 // path brightness reference: one sample per REF of arc at gain 1, per 1/60 s
+const RATE_REF = 1.2e6 // fn brightness reference: z = 1 at this many samples per second
 
+// Brightness is energy per second. A faster beam draws more, a faster display refreshes more often;
+// neither makes the trace brighter.
 export class Beam {
   rate = 1_200_000
   n = 0
@@ -30,8 +33,8 @@ export class Beam {
       const n = Math.round((N * c.w) / W)
       if (n < 2) continue
       const a = this.n
-      if ('fn' in c) this.fn(c.fn, n, t0 + (c.off ?? 0), dt, c.gain ?? 1)
-      else this.trace(c.path, n, c.gain ?? 1)
+      if ('fn' in c) this.fn(c.fn, n, t0 + (c.off ?? 0), dt, ((c.gain ?? 1) * RATE_REF * dt) / N)
+      else this.trace(c.path, n, (c.gain ?? 1) * dt * 60)
       if (this.n > a) this.data[a * FLOATS + 2] = 0 // blank the hop in from the last channel
     }
   }
