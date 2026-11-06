@@ -166,11 +166,13 @@ const WORLDS: World[] = [
       aim(p, eye, set3(fwd, 1, 0.15 * Math.sin(0.3 * t), 0.12 * Math.cos(0.2 * t)), set3(up, 0, Math.cos(0.15 * t), Math.sin(0.15 * t)), 1.5 + kick)
       p[16] = 1.0618 * (fall % 1), p[17] = 1
     },
-    bend() {}, // the reflection is in when it sings, below
+    bend() {}, // the reflection is in how it sings, below
   },
 ]
 
 const field: Field = { shader: KIFS, k: 1, p: new Float32Array(28) }
+const GOLD = { gold: 1 }, mirrored = { gold: 1, mirror: 0 }
+const MIRROR = (at: number) => ((mirrored.mirror = at), mirrored)
 
 export const stutter: Scene = {
   dur: DUR,
@@ -191,7 +193,7 @@ export const stutter: Scene = {
       const j = cut(tt), from = STARTS[j], V = WORLDS[j % WORLDS.length]
       if (splice(tt - from, o)) return
       const TT = tt + AT
-      sing(V.shader === HONEYCOMB ? 2 * (from + AT) - TT : TT, o, smooth(0, 0.03, tt - from), { gold: 1 })
+      sing(TT, o, smooth(0, 0.03, tt - from), V.shader === HONEYCOMB ? MIRROR(from + AT) : GOLD)
       remember(o)
       V.bend(tt, o, from)
     }

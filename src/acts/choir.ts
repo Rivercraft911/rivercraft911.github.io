@@ -33,8 +33,8 @@ export const PHI = (1 + Math.sqrt(5)) / 2
 const golden = CHOIRS.map(() => new Shepard(PHI))
 
 // How a reality mutates the choirs: more dread, the ninth glided to the 11th harmonic, the period
-// crossfaded toward φ (gold ∈ [0, 1]).
-export type Mood = { dread?: number; prime?: number; gold?: number }
+// crossfaded toward φ (gold ∈ [0, 1]), the descent reflected about a moment so the fall runs back up.
+export type Mood = { dread?: number; prime?: number; gold?: number; mirror?: number }
 const CALM: Mood = {}
 
 // Where choir i is at time T, in metres around the listener (−z ahead).
@@ -58,7 +58,8 @@ export function sing(T: number, o: Stereo, gain = 1, m = CALM) {
   for (let i = 0; i < CHOIRS.length; i++) {
     const c = CHOIRS[i], e = c.enter(T) * gain
     if (e <= 0) continue
-    const tr = T - where(i, T) / C, d = Math.min(1, c.dread(tr) + (m.dread ?? 0)), s = c.k * descent(tr)
+    const tr = T - where(i, T) / C, td = m.mirror === undefined ? tr : 2 * m.mirror - tr
+    const d = Math.min(1, c.dread(td) + (m.dread ?? 0)), s = c.k * descent(td)
     if (g < 1) (voices[i].s = s), (o.s[i] += e * (1 - g) * voices[i].sample(tr, 0, d, pr))
     if (g > 0) (golden[i].s = s / Math.log2(PHI)), (o.s[i] += e * g * golden[i].sample(tr, 0, d, pr))
   }
