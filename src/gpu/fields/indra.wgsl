@@ -9,7 +9,7 @@
 //
 // p[0..3] camera    p[4] a, b, iterations, gain    p[5] film drift, fog
 
-fn kleinian(p: vec3f, a: f32, b: f32, n: i32) -> vec2f {
+fn kleinian(p: vec3f, a: f32, b: f32, n: i32) -> vec3f {
   var z = p;
   var df = 1.0;
   var trap = 1e9;
@@ -35,19 +35,21 @@ fn kleinian(p: vec3f, a: f32, b: f32, n: i32) -> vec2f {
   }
   let y = min(z.y, a - z.y);
   // the pearls only: the walls outside the band are cut away, so we see down the net between them
-  return vec2f(max(min(y, 0.3) / max(df, 2.0), -min(p.y, a - p.y)), trap);
+  return vec3f(max(min(y, 0.3) / max(df, 2.0), -min(p.y, a - p.y)), trap, df);
 }
 
 // The pearls at ζ: back through the map to z = z₋ + (z₋ − z₊)/(ζ − 1), extended to upper half-space, where
 // 1/ζ is (x, −y, h)/|ζ|²; distances shrink by the map's conformal factor |z₋ − z₊|/|ζ − 1|².
-fn pearls(p: vec3f, a: f32, b: f32, n: i32) -> vec2f {
+// .z is the pearl's size: a over the derivative the fold gathered, brought back through the map.
+fn pearls(p: vec3f, a: f32, b: f32, n: i32) -> vec3f {
   let v = p - vec3f(1.0, 0.0, 0.0);
   let r2 = dot(v, v);
   let w = vec3f(v.x, -v.y, v.z) / r2;
   let c = u.p[6].zw;
   let z = vec3f(c.x * w.x - c.y * w.y + u.p[6].x, c.x * w.y + c.y * w.x + u.p[6].y, length(c) * w.z);
   let k = kleinian(z, a, b, n);
-  return vec2f(k.x * r2 / length(c), k.y);
+  let back = r2 / length(c);
+  return vec3f(k.x * back, k.y, a / k.z * back);
 }
 
 fn field(q: vec2f) -> vec3f {
@@ -61,7 +63,7 @@ fn field(q: vec2f) -> vec3f {
   var t = 0.002 * H;
   var hit = false;
   var steps = 0.0;
-  for (var i = 0; i < 120; i++) {
+  for (var i = 0; i < 90; i++) {
     let d = pearls(ro + rd * t, a, b, n).x;
     if (d < px * t) { hit = true; break; }
     t += d * 0.9;
@@ -77,15 +79,17 @@ fn field(q: vec2f) -> vec3f {
     pearls(P + e.xyy, a, b, n).x - pearls(P - e.xyy, a, b, n).x,
     pearls(P + e.yxy, a, b, n).x - pearls(P - e.yxy, a, b, n).x,
     pearls(P + e.yyx, a, b, n).x - pearls(P - e.yyx, a, b, n).x));
-  let trap = pearls(P, a, b, n).y;
+  let pearl = pearls(P, a, b, n);
+  let trap = pearl.y;
+  let small = mix(0.3, 1.0, smoothstep(0.6, 0.12, pearl.z / H)); // the giants are dark glass
   let ci = abs(dot(nrm, rd));
   let ct = sqrt(1.0 - (1.0 - ci * ci) / (1.33 * 1.33));
   // a film drains: thinner toward the top of each pearl, and thinner with time
   let thick = 220.0 + 380.0 * (0.5 + 0.5 * sin(2.2 * trap + u.p[5].x)) - 140.0 * nrm.z;
-  let ao = 1.0 - steps / 120.0;
+  let ao = 1.0 - steps / 90.0;
   let key = normalize(vec3f(0.4, 0.3, 1.0));
   let spec = pow(max(dot(reflect(rd, nrm), key), 0.0), 300.0);
   let fres = 0.06 + 0.94 * pow(1.0 - ci, 2.5);
-  let col = (6.0 * film(thick, ct) * fres + 0.6 * spec + vec3f(0.003, 0.004, 0.01)) * ao * ao;
+  let col = (6.0 * film(thick, ct) * fres * small + 0.6 * spec + vec3f(0.003, 0.004, 0.01)) * ao * ao;
   return mix(sky, col, fog) * u.p[4].w;
 }
