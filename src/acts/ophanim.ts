@@ -117,9 +117,9 @@ export const ophanim: Scene = {
     const T = t + AT
     if (t < CUT) {
       const kick = jump(t, f, true, 0.5), p = julia.p
-      orbit(p, 2.2 * t, mix(1.8, 1.25, smooth(0, CUT, t)), 0.5, 1.1 + kick)
+      orbit(p, 2.2 * t, mix(1.9, 1.5, smooth(0, CUT, t)), 0.5, 1.1 + kick)
       p[16] = -0.291 + 0.06 * Math.sin(0.7 * t), p[17] = -0.399 + 0.06 * Math.cos(0.5 * t), p[18] = 0.339, p[19] = 0.437 + 0.08 * Math.sin(0.4 * t)
-      p[20] = 0, p[21] = 0.6 * t, p[22] = 1
+      p[20] = 0, p[21] = 0.8 * Math.sin(0.7 * t), p[22] = 1
       f.field = julia
       equation(f, 'q\\to q^2+c\\qquad q=(x\\cos\\theta,\\,y,\\,z,\\,x\\sin\\theta)', [0.85, 0.8, 1])
     } else {

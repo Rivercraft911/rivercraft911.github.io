@@ -1,10 +1,14 @@
-// R4 · The multiverse stutter. Hard cuts, faster and faster, through six worlds, each a reality of its own
+// R4 · The multiverse stutter. Hard cuts, faster and faster, through ten worlds, each a reality of its own
 // with its own light and its own corruption of the choir, each still running while we are elsewhere: a
-// kaleidoscopic IFS (ring-modulated), the Amazing Surface (through a comb), the Kaliset (granulated), a
-// Lyapunov fractal on the DVB-S2 start-of-frame word (through the logistic map), Newton's method on 32APSK
-// (every sample pair hard-decided to the constellation), and the {4,3,5} honeycomb (the choir's
-// descent reflected, its fall run back up). The cuts accelerate from 1.9 s to a third of a second; only
-// the slow ones flash, so there are never more than three flashes a second.
+// kaleidoscopic IFS (ring-modulated), the Mandelbulb (through T_n, its own angle multiplication), the
+// Amazing Surface (through a comb), a pseudo-Kleinian (played backwards, inverted in time), the Kaliset
+// (granulated), an Apollonian packing (an octave up, a smaller copy of itself), a Lyapunov fractal on the
+// DVB-S2 start-of-frame word (through the logistic map), a Sierpinski tetrahedron (gated by the gasket's
+// own k & (k >> 3) rhythm), Newton's method on 32APSK (every sample pair hard-decided to the
+// constellation), and the {4,3,5} honeycomb (the choir's descent reflected, its fall run back up). The
+// first pass shows each world for a second down to 0.6 s, then they come round again faster, to a third
+// of a second; only cuts of 0.6 s or more flash, so there are never more than two flashes a second.
+// ?w=<n> pins world n, for review.
 import type { Stereo } from '../audio/audio'
 import { Path } from '../beam/path'
 import { APSK32 } from '../dsp/dvbs2'

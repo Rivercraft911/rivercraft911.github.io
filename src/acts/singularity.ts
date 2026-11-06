@@ -56,14 +56,14 @@ export const singularity: Scene = {
     // the infall: arms of every colour the journey had, wound tighter as they go, gone at the shadow's edge
     if (fall > 0)
       f.ch.push({
-        w: 1.2 * fall,
+        w: 1.5 * fall,
         fn: (tt, s, u) => {
           const k = Math.floor(u * 90), a = u * 90 - k, c = INKS[k % INKS.length], seed = hash(k * 7.31)
           const age = (tt * (0.3 + 0.2 * (t / FALL)) + 0.5 + 0.5 * seed) % 1, th = (k / 90) * TAU + 9 * age + 2 * a * (1 - age)
           const r = 2 * Math.exp(-3.2 * age) * (1 + 0.15 * a)
           s.x = r * Math.cos(th) * 1.3, s.y = r * Math.sin(th) * 0.8
           s.r = c[0], s.g = c[1], s.b = c[2]
-          s.z = a < 0.02 || r < rs ? 0 : (1 - age) * (0.4 + age) * smooth(rs, 1.5 * rs, r)
+          s.z = a < 0.02 || r < rs ? 0 : 2.5 * (1 - age) * (0.4 + age) * smooth(rs, 1.5 * rs, r)
         },
       })
     // the chirp: h₊ and h× as x and y
