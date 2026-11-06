@@ -138,11 +138,11 @@ export function qsl(p: Path, t: number, b: Box, f: Face) {
   // the keyed carrier scrolling past, as a scope on the receiver's audio shows it: the 700 Hz tone in
   // bursts of one dit and three, the last 6 s of DE KJ5SCH, newest on the right
   const y = b.y0 + 0.08, n = 1400, now = t / DIT, span = 100 // dits on screen
-  p.color(1, 0.75, 0.35, 0.8)
+  p.color(1, 0.75, 0.35, 0.5)
   for (let j = 0; j <= n; j++) {
     const at = now - span * (1 - j / n), d = Math.floor(at), on = at > 0 ? KEYING[d % KEYING.length] : 0
-    const x = b.x0 + 0.03 + ((w - 0.06) * j) / n
-    p.lineTo(x, y + on * 0.03 * Math.sin(j * 2.4))
+    const x = b.x0 + 0.03 + ((w - 0.06) * j) / n, yy = y + on * 0.03 * Math.sin(j * 2.4)
+    j ? p.lineTo(x, yy) : p.moveTo(x, yy)
   }
 }
 
