@@ -1,13 +1,10 @@
 // Beam deposit: every segment of the beam lays down Gaussian energy into the phosphor.
 
-struct U {
+struct U { // the head of phosphor.ts's uniforms
   res: vec2f,     // target size in px
   aspect: f32,    // scope x spans [-aspect, aspect], y spans [-1, 1]
   sigma: f32,     // beam spot radius in px
   power: f32,     // energy per unit of beam intensity
-  exposure: f32,
-  bloom: f32,
-  time: f32,
 }
 
 struct Sample { p: vec4f, c: vec4f } // p = x, y, z, _; c = r, g, b, _
@@ -43,7 +40,7 @@ fn px(p: vec2f) -> vec2f {
   let w = a + dir * o.q.x + vec2f(-dir.y, dir.x) * o.q.y;
   o.pos = vec4f(w.x / u.res.x * 2.0 - 1.0, 1.0 - w.y / u.res.y * 2.0, 0.0, 1.0);
   o.len = len;
-  o.col = s1.c.rgb * s1.p.z;
+  o.col = pow(s1.c.rgb, vec3f(2.2)) * s1.p.z; // authored like CSS color(display-p3 r g b), deposited as light
   return o;
 }
 
