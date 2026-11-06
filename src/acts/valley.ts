@@ -1,0 +1,319 @@
+// The valley, drawn the way a pen draws it and made of signals. The meander the wave became is the
+// river; the camera cranes down from the map to its bank and the land rises around it in a wave rolling
+// upstream. The ground is a power-law field (spectral synthesis: random phases under |k|^−β, inverted)
+// carved into a valley that climbs toward the peaks in cascades, and it is drawn as the pulsar plot was,
+// cross-section after cross-section, front to back, each hidden behind the ones before it (a floating
+// horizon, recomputed every frame). Firs are triangle waves under a tapering envelope; the far peaks are
+// spectra; the stones in the shallows are 16APSK. What is being seeded is the hero: the speakers trace it
+// and its equation is written live beneath the scene.
+import { Path } from '../beam/path'
+import { load, use } from '../beam/font'
+import { draw, tex } from '../beam/math'
+import { morph } from '../beam/morph'
+import { fft, hann } from '../dsp/fft'
+import { APSK16 } from '../dsp/dvbs2'
+import { Field } from '../dsp/terrain'
+import { last } from './meander'
+import { TAU, cam, clamp, hash, lock, mix, smooth, view, type Scene } from './scene'
+
+use(await load('tech'))
+
+const INK = [0.78, 0.88, 1] as const, PINE = [0.45, 1, 0.62] as const, WATER = [0.5, 0.78, 1] as const, STONE = [1, 0.8, 0.52] as const
+const rnd = (n: number) => hash(n) * 0.5 + 0.5
+
+// ── the river: a meander of two scales, skewed, climbing in cascades ─────────────────────────────────
+const X0 = -12, X1 = 104, DX = 0.1, NX = Math.round((X1 - X0) / DX) + 1
+const RZ = new Float64Array(NX), RY = new Float64Array(NX)
+{
+  let x = X0, z = 0, s = 0, i = 0
+  while (i < NX) {
+    const k = (TAU * s) / 13, th = 0.85 * Math.sin(k) + 0.6 * 0.03 * Math.cos(3 * k) + 0.55 * Math.sin((TAU * s) / 41 + 1.1)
+    const nx = x + 0.02 * Math.cos(th), nz = z + 0.02 * Math.sin(th)
+    while (i < NX && X0 + i * DX <= nx) (RZ[i] = z + ((nz - z) * (X0 + i * DX - x)) / (nx - x)), i++
+    x = nx, z = nz, s += 0.02
+  }
+  for (let i = 0; i < NX; i++) {
+    const x = X0 + i * DX
+    RY[i] = 6.5 * (1 - Math.exp(-Math.max(0, x) / 40)) + [28, 47, 66, 81].reduce((a, c, j) => a + [0.5, 0.8, 0.6, 0.9][j] * smooth(c - 0.25, c + 0.25, x), 0)
+  }
+}
+const idx = (x: number) => Math.max(0, Math.min(NX - 1, Math.round((x - X0) / DX)))
+export const riverZ = (x: number) => RZ[idx(x)], riverY = (x: number) => RY[idx(x)]
+const W0 = 1.1
+const wide = (x: number) => W0 * (1 + 0.3 * Math.sin(0.21 * x + 0.4) + 0.2 * Math.sin(0.07 * x)) // half-width: narrows, pools
+
+// ── the land ────────────────────────────────────────────────────────────────────────────────────────
+const field = new Field(128, 2.1, 11)
+function height(x: number, z: number) {
+  const d = Math.abs(z - riverZ(x)), base = riverY(x), W = wide(x)
+  if (d < W) return base
+  const wall = (6 + 3 * Math.sin(0.05 * x + 1) + 2 * Math.sin(0.13 * x)) * smooth(W, 17, d) ** 1.4
+  const rough = field.at(x * 0.7, z * 0.7) * (0.3 + 2.4 * smooth(1.5, 12, d))
+  return base + 0.3 * smooth(W, W + 0.7, d) + wall + rough * smooth(W, W + 2, d)
+}
+
+const NR = 150, NC = 200, ZW = 21
+const rowX = (i: number) => -1 + i * 0.68
+const RH = new Float32Array(NR * NC), RZp = new Float32Array(NR * NC)
+for (let i = 0; i < NR; i++)
+  for (let j = 0; j < NC; j++) {
+    const x = rowX(i), z = riverZ(x) + (j / (NC - 1) - 0.5) * 2 * ZW
+    RZp[i * NC + j] = z, RH[i * NC + j] = height(x, z)
+  }
+
+// ── items: firs, stones, far peaks; all strokes in world space, ordered by x ────────────────────────
+type Item = { x: number; a: number; n: number; c: readonly number[]; t0: number; base: number; kind: number }
+const V: number[] = []
+const items: Item[] = []
+const TREE = 0, ROCK = 1, PEAK = 2, HATCH = 3, FLOW = 4
+const item = (x: number, pts: number[], c: readonly number[], t0: number, base: number, kind: number) =>
+  (items.push({ x, a: V.length / 3, n: pts.length / 3, c, t0, base, kind }), V.push(...pts))
+
+function fir(x: number, z: number, H: number, seed: number, t0: number) {
+  const y0 = height(x, z), teeth = 7 + Math.floor(6 * rnd(seed)), Wd = H * (0.27 + 0.08 * rnd(seed + 3)), pts: number[] = []
+  for (let k = 0; k <= 2 * teeth; k++) {
+    const y = H * (0.12 + (0.88 * k) / (2 * teeth)), amp = Wd * (1 - (y / H) ** 0.9)
+    pts.push(x + (k & 1 ? amp : -amp) * 0.6, y0 + y, z + (k & 1 ? amp : -amp) * (0.85 + 0.3 * rnd(seed + k)))
+  }
+  pts.push(x, y0 + H * 1.04, z)
+  item(x, [x, y0, z, x, y0 + H * 0.5, z], PINE, t0, y0, TREE)
+  item(x, pts, PINE, t0, y0, TREE)
+}
+for (let i = 0; i < 420; i++) {
+  const x = 0.5 + 75 * rnd(i * 3) ** 1.2, side = i & 1 ? 1 : -1, z = riverZ(x) + side * (wide(x) + 0.5 + 9 * rnd(i * 5) ** 1.6)
+  if (height(x, z) - riverY(x) > 6) continue // the tree line
+  fir(x, z, 0.6 + 1.3 * rnd(i * 7), i, 6 + x * 0.075)
+}
+{
+  const p = APSK16.pts, cx = 3.2
+  for (let k = 0; k < p.length / 2; k++) {
+    const sx = cx + 1.6 * p[2 * k + 1], sz = riverZ(sx) + 0.8 * p[2 * k], y = riverY(sx), r = 0.14 + 0.05 * rnd(k), pts: number[] = []
+    for (let a = 0; a <= 18; a++) pts.push(sx + 0.8 * r * Math.sin((TAU * a) / 18), y + 0.03 + 0.6 * r * Math.max(0, Math.cos((TAU * a) / 18)), sz + r * Math.cos((TAU * a) / 18))
+    item(sx, pts, STONE, 12 + 0.11 * k, y, ROCK)
+  }
+}
+
+// The water: a steady flow field and its streamlines. The current runs down the channel fastest in the
+// middle; every stone sheds an eddy, every bend keeps a pool turning on its inside bank, and curl noise
+// stirs the rest. Streamlines traced through it are drawn with a bright head racing downstream, so the
+// water visibly runs, swirls and turns back on itself.
+const vortex: [number, number, number][] = [] // x, z, circulation
+for (let x = 2; x < 85; x += 0.5) {
+  const a = riverZ(x - 0.5), b = riverZ(x), c = riverZ(x + 0.5)
+  if ((b - a) * (c - b) < 0) vortex.push([x - 0.6, b - Math.sign(b - a) * wide(x) * 0.45, 1.6 * Math.sign(b - a)]) // a pool inside each bend
+}
+function flowAt(x: number, z: number, o: { x: number; z: number }) {
+  const dz = (riverZ(x + 0.1) - riverZ(x - 0.1)) / 0.2, n = Math.hypot(1, dz), d = (z - riverZ(x)) / wide(x)
+  const U = 1.2 * Math.max(0.15, 1 - d * d) * (1 + 0.8 * smooth(0.3, 0, Math.abs(((x + 0.3) % 19) - 9.5) / 9.5))
+  o.x = -U / n, o.z = (-U * dz) / n // downstream is toward −x
+  for (const [vx, vz, g] of vortex) {
+    const rx = x - vx, rz = z - vz, r2 = rx * rx + rz * rz + 0.04, k = (g / r2) * Math.exp(-r2 / 0.9)
+    o.x += -rz * k - 0.15 * rx * Math.abs(k), o.z += rx * k - 0.15 * rz * Math.abs(k) // swirling, drawing inward
+  }
+  const e = 0.08, curl = 0.5 // ψ from the land's own field, at a finer scale
+  o.x += (curl * (field.at(x * 3, (z + e) * 3) - field.at(x * 3, (z - e) * 3))) / (2 * e)
+  o.z -= (curl * (field.at((x + e) * 3, z * 3) - field.at((x - e) * 3, z * 3))) / (2 * e)
+}
+
+// The far peaks are spectra: the dB magnitude of a square wave with a slow FM wobble.
+function spectrum(seed: number, n = 512) {
+  const re = new Float64Array(n), im = new Float64Array(n)
+  const duty = 0.3 + 0.4 * rnd(seed), fm = 2 + 6 * rnd(seed + 1), f0 = 3 + 4 * rnd(seed + 2)
+  for (let k = 0; k < n; k++) {
+    const ph = (f0 * k) / n + 0.02 * fm * Math.sin((TAU * fm * k) / n)
+    re[k] = ((ph % 1) < duty ? 1 : -1) * hann(k, n) + 0.02 * hash(seed * 977 + k)
+  }
+  fft(re, im)
+  const out = new Float64Array(n / 2)
+  for (let k = 0; k < n / 2; k++) out[k] = 20 * Math.log10(Math.hypot(re[k], im[k]) + 1e-3)
+  const lo = Math.min(...out), hi = Math.max(...out)
+  return out.map((v) => (v - lo) / (hi - lo))
+}
+function peaks(seed: number, x: number, z0: number, z1: number, base: number, H: number, t0: number) {
+  const sp = spectrum(seed), P = 170, r: number[] = [], pts: number[] = []
+  const at = (u: number, lo: number, hi: number) => {
+    const f = lo + u * (hi - lo), i = Math.floor(f)
+    return sp[i] + (sp[i + 1] - sp[i]) * (f - i)
+  }
+  for (let i = 0; i < P; i++) {
+    const u = i / (P - 1)
+    r.push(H * Math.max(0, at(u, 2, 44) ** 1.4 + 0.07 * (at(u, 120, 250) - 0.5)) * Math.sin(Math.PI * u) ** 0.35)
+  }
+  const Z = (i: number) => mix(z0, z1, i / (P - 1))
+  for (let i = 0; i < P; i++) pts.push(x, base + r[i], Z(i))
+  item(x, pts, INK, t0, base, PEAK)
+  for (let i = 0; i < P - 1; i++) {
+    const shade = clamp(0.35 + (0.5 * (r[i + 1] - r[i])) / (H * 0.02)), n = Math.floor(shade * 6 * (0.6 + 0.4 * rnd(seed + i)))
+    for (let k = 1; k <= n; k++) {
+      const d = k * 0.06 * H * (0.8 + 0.4 * rnd(seed * 13 + i * 7 + k)), cut = 0.15 + 0.25 * rnd(i * 3 + k)
+      if (Math.min(r[i], r[i + 1]) - d < 0.05 * H) break
+      item(x, [x, base + mix(r[i], r[i + 1], cut) - d, mix(Z(i), Z(i + 1), cut), x, base + mix(r[i], r[i + 1], 1 - cut / 2) - d * 1.05, mix(Z(i), Z(i + 1), 1 - cut / 2)], INK, t0 + 0.8 + 0.008 * i, base, HATCH)
+    }
+  }
+}
+{
+  for (let k = 0; k < APSK16.pts.length / 2; k++) {
+    const sx = 3.2 + 1.6 * APSK16.pts[2 * k + 1]
+    vortex.push([sx - 0.35, riverZ(sx) + 0.8 * APSK16.pts[2 * k] + 0.12, k & 1 ? 0.5 : -0.5]) // each stone sheds an eddy
+  }
+  const v = { x: 0, z: 0 }, pts: number[] = []
+  for (let k = 0; k < 900; k++) {
+    let x = 0.5 + 84 * rnd(k * 11 + 1), z = riverZ(x) + (rnd(k * 13 + 2) * 2 - 1) * wide(x) * 0.9
+    pts.length = 0
+    for (let s = 0; s < 34; s++) {
+      if (Math.abs(z - riverZ(x)) > wide(x) * 0.97) break
+      pts.push(x, riverY(x) + 0.02, z)
+      flowAt(x, z, v)
+      const m = Math.hypot(v.x, v.z) || 1
+      x += (0.13 * v.x) / m, z += (0.13 * v.z) / m
+    }
+    if (pts.length >= 18) item(pts[0], pts.slice(), WATER, 2.5 + pts[0] * 0.02, 0, FLOW)
+  }
+}
+peaks(13, 104, riverZ(104) - 60, riverZ(104) + 60, riverY(100) + 4, 26, 7.5)
+items.sort((a, b) => a.x - b.x)
+const VX = Float32Array.from(V)
+
+// ── the live equation: what is being seeded now ────────────────────────────────────────────────────
+const EQ: [number, string][] = [
+  [0, '\\theta(s) = \\omega_1 \\sin(2\\pi s / M_1) + \\omega_2 \\sin(2\\pi s / M_2 + \\phi)'],
+  [2, 'T(x, z) = \\sum_k |k|^{-\\beta/2} \\cos(k r + \\phi_k)'],
+  [6, 'x(y) = A (1 - y / H)\\; tri(2\\pi f y)'],
+  [7.5, 'h(z) = 20\\, \\log_{10} |S(e^{i\\omega})|'],
+  [9.5, 'u(s, t) = U \\cos(2\\pi (s / \\lambda - f t))'],
+  [12, 's_k \\in \\{ R_1 e^{i\\pi(2m+1)/4},\\; R_2 e^{i\\pi(2m+1)/12} \\}'],
+]
+
+// ── each frame ──────────────────────────────────────────────────────────────────────────────────────
+const SCAN = 2, SCAN_DUR = 5 // rows rise in a wave rolling upstream
+const HB = 1024, horizon = new Float32Array(HB)
+const p3 = { x: 0, y: 0, z: 0 }, q3 = { x: 0, y: 0, z: 0 }
+const sx = new Float32Array(NC), sy = new Float32Array(NC), sz = new Float32Array(NC), ok = new Uint8Array(NC)
+const ink = new Path(), eqp = new Path(), from = new Path(), line = new Path(), mid = new Path()
+const HERO = 4096, hx = new Float32Array(HERO), hy = new Float32Array(HERO)
+let heroN = 0, occlude = 1
+
+const eye = { x: 0, y: 0, z: 0 }
+function crane(t: number) {
+  const k = clamp(lock([[0, 0], [0.3, 1]], t, 1.5, 0.85), 0, 1.04), drift = Math.max(0, t - 3) * 0.45
+  const ex = -14 + drift, orbit = 7 * Math.cos(0.09 * t + 0.6) // the drone drifts upstream, swinging around the valley
+  eye.x = mix(32, ex, k), eye.y = mix(70, riverY(ex + 8) + 12, k), eye.z = mix(riverZ(32) + 4, riverZ(ex + 8) - orbit, k)
+  const tx = mix(32, 22 + drift, k)
+  cam.aim(eye.x, eye.y, eye.z, tx, mix(0, riverY(tx), k), riverZ(tx), mix(1.1, 0.95, k))
+  occlude = smooth(0.55, 0.85, k) // a floating horizon only means something once we look across the land
+}
+
+const col = (x: number) => Math.max(0, Math.min(HB - 1, Math.round(((x / view.a) * 0.45 + 0.5) * (HB - 1))))
+const visible = (x: number, y: number) => occlude < 0.5 || y > horizon[col(x)] - 0.002
+function raise(x0: number, y0: number, x1: number, y1: number) {
+  let a = col(x0), b = col(x1)
+  if (a > b) [a, b, x0, y0, x1, y1] = [b, a, x1, y1, x0, y0]
+  for (let c = a; c <= b; c++) {
+    const y = b > a ? y0 + ((y1 - y0) * (c - a)) / (b - a) : Math.max(y0, y1)
+    if (y > horizon[c]) horizon[c] = y
+  }
+}
+const fog = (z: number) => Math.min(1, 0.25 + 0.9 * z)
+
+// Draws one world-space segment if both ends clear the horizon.
+function seg(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, c: readonly number[], i: number) {
+  if (!cam.project(x0, y0, z0, p3) || !cam.project(x1, y1, z1, q3)) return
+  if (!visible(p3.x, p3.y) || !visible(q3.x, q3.y)) return
+  ink.color(c[0], c[1], c[2], i * fog(p3.z)).moveTo(p3.x, p3.y).lineTo(q3.x, q3.y)
+}
+
+function items_(t: number, upto: number, next: { i: number }, hero: number) {
+  for (; next.i < items.length && items[next.i].x < upto; next.i++) {
+    const it = items[next.i]
+    if (t < it.t0) continue
+    const k = clamp(lock([[0, 0], [it.t0, 1]], t, it.kind === ROCK ? 9 : 7, 0.45), 0, 1.3)
+    let pen = false
+    for (let v = 0; v < it.n; v++) {
+      const o = 3 * (it.a + v), y = it.kind === FLOW ? VX[o + 1] : it.base + (VX[o + 1] - it.base) * (it.kind === ROCK ? 1 : k), drop = it.kind === ROCK ? (1 - Math.min(1, k)) * 3 : 0
+      if (!cam.project(VX[o], y + drop, VX[o + 2], p3) || !visible(p3.x, p3.y)) {
+        pen = false
+        continue
+      }
+      let g = it.kind === HATCH ? 0.5 : 1
+      if (it.kind === FLOW) {
+        const head = (t * 0.55 + rnd(it.a)) % 1, u = (v / (it.n - 1) - head + 1) % 1
+        g = 0.12 + 1.1 * Math.exp(-u * 9) * k // bright at the head, trailing back upstream
+      }
+      ink.color(it.c[0], it.c[1], it.c[2], fog(p3.z) * g)
+      pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
+      pen = true
+      if (it.kind === hero && it.t0 <= t && t - it.t0 < 0.5 && heroN < HERO) (hx[heroN] = p3.x), (hy[heroN++] = p3.y)
+    }
+  }
+}
+
+export const valley: Scene = {
+  dur: 22,
+  build(t, f) {
+    crane(t)
+    ink.clear(), heroN = 0
+    horizon.fill(-9)
+    const next = { i: 0 }, heroKind = t < 6 ? -1 : t < 12 ? TREE : ROCK
+    let heroRow = -1
+
+    for (let i = 0; i < NR; i++) {
+      const x = rowX(i), x0 = rowX(i - 1), rise = clamp(lock([[0, 0], [SCAN + (i / NR) * SCAN_DUR, 1]], t, 7, 0.45), 0, 1.35)
+      if (x < eye.x + 0.3) continue
+      items_(t, x, next, heroKind)
+      // the banks and the current, from the last row to this one
+      if (i > 0 && x0 >= eye.x + 0.3) {
+        const y0 = riverY(x0), y1 = riverY(x)
+        for (const side of [-1, 1]) seg(x0, y0, riverZ(x0) + side * wide(x0), x, y1, riverZ(x) + side * wide(x), WATER, 0.9)
+      }
+      if (rise <= 0) continue
+      // the cross-section, risen from the river's level, drawn where it clears the horizon
+      const o = i * NC, base = riverY(x)
+      for (let j = 0; j < NC; j++) {
+        ok[j] = cam.project(x, base + (RH[o + j] - base) * rise, RZp[o + j], p3) ? 1 : 0
+        sx[j] = p3.x, sy[j] = p3.y, sz[j] = p3.z
+      }
+      const index = i % 8 === 0 ? 1 : 0.6
+      let pen = false
+      for (let j = 0; j < NC; j++) {
+        const water = Math.abs(RZp[o + j] - riverZ(x)) < wide(x)
+        if (!ok[j] || !visible(sx[j], sy[j]) || (water && i % 3)) {
+          pen = false
+          continue
+        }
+        const c = water ? WATER : INK
+        ink.color(c[0], c[1], c[2], index * fog(sz[j]) * (water ? 0.25 : 1))
+        pen ? ink.lineTo(sx[j], sy[j]) : ink.moveTo(sx[j], sy[j])
+        pen = true
+      }
+      if (t >= SCAN && rise < 1.2) heroRow = i
+      for (let j = 1; j < NC; j++) if (ok[j] && ok[j - 1]) raise(sx[j - 1], sy[j - 1], sx[j], sy[j])
+      if (heroRow === i && heroKind < 0) for (let j = 0; j < NC && heroN < HERO; j++) if (ok[j]) (hx[heroN] = sx[j]), (hy[heroN++] = sy[j])
+    }
+    items_(t, Infinity, next, heroKind)
+    f.ch.push({ w: 1, path: ink })
+
+    // the meander, before the land: the river we watched form, laid down onto the valley floor
+    if (t < 2.2) {
+      line.clear().color(WATER[0], WATER[1], WATER[2], 1)
+      let pen = false
+      for (let x = X0 + 1; x < 96; x += 0.5)
+        if (cam.project(x, riverY(x), riverZ(x), p3)) pen ? line.lineTo(p3.x, p3.y) : line.moveTo(p3.x, p3.y), (pen = true)
+      f.ch.push({ w: 0.5, path: morph(last(from), line, clamp(lock([[0, 0], [0, 1]], t + 0.001, 3, 0.8), 0, 1), mid, 700) })
+    }
+
+    // the live equation
+    let e = 0
+    while (e + 1 < EQ.length && EQ[e + 1][0] <= t) e++
+    eqp.clear().color(0.85, 0.95, 1, 0.8)
+    draw(eqp, tex(EQ[e][1]), -view.a * 0.9, -0.88, 0.055, 0)
+    f.ch.push({ w: 0.15, path: eqp })
+
+    f.rate = mix(2.4e6, 7.2e6, smooth(1, 8, t))
+    return (tt, o) => {
+      if (heroN < 2) return
+      const ph = ((tt * 55) % 1) * 2, u = (ph < 1 ? ph : 2 - ph) * (heroN - 1), i = Math.min(heroN - 2, Math.floor(u)), a = u - i
+      o.l = (0.8 * (hx[i] + (hx[i + 1] - hx[i]) * a)) / view.a
+      o.r = 0.8 * (hy[i] + (hy[i + 1] - hy[i]) * a)
+    }
+  },
+}

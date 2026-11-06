@@ -7,14 +7,14 @@ import { idle } from './acts/idle'
 import { specimen } from './acts/specimen'
 import { hook } from './acts/hook'
 import { meander } from './acts/meander'
-import { receive } from './acts/receive'
+import { valley } from './acts/valley'
 import { fall } from './acts/fall'
 
 const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
 const beam = new Beam()
 const audio = new Audio()
-const timeline = new Timeline(q.has('specimen') ? [specimen] : [hook, meander, receive, fall])
+const timeline = new Timeline(q.has('specimen') ? [specimen] : [hook, meander, valley, fall])
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }
 

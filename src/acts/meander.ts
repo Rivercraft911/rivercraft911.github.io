@@ -20,7 +20,7 @@ function heading(t: number) {
   W[0] = 1
   for (let k = 1; k <= LAST; k++) W[k] = 1 - lock([[0, 0], [DROP(k), 1]], t, 10, 0.6)
 }
-export const omega = (t: number) => lock([[0, 0.9], [4.6, 1.5], [6.4, 2.0]], t, 3, 0.75)
+export const omega = (t: number) => lock([[0, 0.9], [4.6, 1.3], [6.4, 1.6]], t, 3, 0.75)
 
 // The reach: integrate the heading, then fit it to the screen. xs, ys hold it in screen units.
 export const xs = new Float64Array(N), ys = new Float64Array(N)
@@ -58,6 +58,13 @@ function trace(p: Path, A: number) {
 }
 
 const a = new Path(), b = new Path(), m = new Path(), o = { x: 0, y: 0 }
+
+// The river as the meander leaves it, for the valley to grow out of.
+export function last(p: Path) {
+  heading(meander.dur)
+  reach(omega(meander.dur), view.a * 0.9)
+  return river(p, meander.dur)
+}
 
 // The river read back at u ∈ [0, 1], for the speakers.
 function at(u: number) {
