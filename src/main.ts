@@ -34,6 +34,23 @@ function power() {
 }
 
 addEventListener('pointerdown', power)
+
+// ?rec=<seconds>: record what the canvas shows and the speakers play; scripts/clip.mjs collects it.
+if (q.has('rec')) {
+  const w = window as unknown as { __chunk(b64: string): void; __done(): void }
+  await audio.start()
+  const tracks = [...canvas.captureStream(60).getVideoTracks(), ...audio.tap().getAudioTracks()]
+  const rec = new MediaRecorder(new MediaStream(tracks), { mimeType: 'video/webm;codecs=vp9,opus', videoBitsPerSecond: 16e6 })
+  rec.ondataavailable = (e) => {
+    const r = new FileReader()
+    r.onload = () => w.__chunk((r.result as string).split(';base64,')[1])
+    r.readAsDataURL(e.data)
+  }
+  rec.onstop = () => setTimeout(() => w.__done(), 500)
+  rec.start(1000)
+  on = true
+  setTimeout(() => rec.stop(), Number(q.get('rec')) * 1000)
+}
 addEventListener('pointermove', (e) => ((input.x = (2 * e.clientX) / innerWidth - 1), (input.y = 1 - (2 * e.clientY) / innerHeight)))
 addEventListener('keydown', (e) => {
   if (!on) return power()

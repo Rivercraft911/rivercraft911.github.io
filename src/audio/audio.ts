@@ -39,6 +39,13 @@ export class Audio {
     }
   }
 
+  // The final mix as a stream, for recording a clip.
+  tap() {
+    const d = new MediaStreamAudioDestinationNode(this.ctx!)
+    this.gain!.connect(d)
+    return d.stream
+  }
+
   mute(m = !this.muted) {
     this.muted = m
     this.gain?.gain.setTargetAtTime(m ? 0 : GAIN, this.ctx!.currentTime, 0.05)

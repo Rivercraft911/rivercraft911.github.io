@@ -7,7 +7,8 @@
     "build": "tsc --noEmit && vite build",
     "fonts": "node scripts/bake-fonts.mjs",
     "shot": "node scripts/shot.mjs",
-    "fps": "node scripts/fps.mjs"
+    "fps": "node scripts/fps.mjs",
+    "clip": "node scripts/clip.mjs"
   },
   "devDependencies": {
     "@webgpu/types": "^0.1.74",
