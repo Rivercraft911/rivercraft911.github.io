@@ -10,7 +10,7 @@ import type { Field } from '../gpu/raster'
 import { descent, place, sing } from './choir'
 import { AT as R2, DUR as R2DUR } from './primes'
 import { aim, equation, jump, project, seen, splice } from './reality'
-import { TAU, mix, smooth, type Scene } from './scene'
+import { mix, smooth, type Scene } from './scene'
 
 export const AT = R2 + R2DUR
 export const DUR = 9
