@@ -418,6 +418,67 @@ function falls(t: number, show: number) {
   }
 }
 
+// Fish: each is a Gaussian-windowed chirp, the waveform drawn as its own body (a spindle whose stripes
+// tighten toward the tail), thrown on a ballistic arc out of the current and back in, a ripple where it
+// leaves and where it lands. The speakers chirp with it.
+const FISH = Array.from({ length: 14 }, (_, k) => {
+  const t0 = 8.5 + k * 0.95 + 0.4 * rnd(k * 17)
+  return { t0, ahead: 7 + 9 * rnd(k * 19), lane: (rnd(k * 23) * 2 - 1) * 0.6, f0: 300 + 400 * rnd(k), sweep: 1500 + 2500 * rnd(k + 9) }
+})
+const LEAP = 1.25, FG = 9.81
+const fishX = (k: number) => {
+  const f = FISH[k], d = Math.max(0, f.t0 - 4) * 0.45 // where the drone was looking when it leapt
+  return -11 + d + 8 + f.ahead
+}
+function fishes(t: number, x0: number, x1: number) {
+  for (let k = 0; k < FISH.length; k++) {
+    const f = FISH[k], a = t - f.t0, fx = fishX(k)
+    if (fx < x0 || fx >= x1 || a < -0.1 || a > LEAP + 1.2) continue
+    const fz = riverZ(fx) + f.lane * wide(fx), y0 = riverY(fx), vy = (FG * LEAP) / 2, vx = 1.6
+    if (a >= 0 && a <= LEAP) {
+      // they leap across the current, so we see them side on
+      const dir = f.lane > 0 ? -1 : 1, pz = fz + dir * vx * a, py = y0 + vy * a - 0.5 * FG * a * a, tilt = Math.atan2(vy - FG * a, vx)
+      let pen = false
+      for (let j = 0; j <= 40; j++) {
+        const u = j / 20 - 1, env = Math.exp(-3 * u * u), w = 0.55 * env * Math.cos(TAU * (1.2 * u + 0.9 * u * u) - 9 * a)
+        const along = 1.7 * u, bz = pz + dir * along * Math.cos(tilt), by = py + along * Math.sin(tilt) + w
+        if (!cam.project(fx, by, bz, p3) || !visible(p3.x, p3.y)) {
+          pen = false
+          continue
+        }
+        ink.color(0.85, 0.7, 1, (0.7 + 1.3 * env) * fog(p3.z))
+        pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
+        pen = true
+      }
+    }
+    for (const [oz, at] of [[0, 0], [(f.lane > 0 ? -1 : 1) * vx * LEAP, LEAP]]) {
+      const age = a - at
+      if (age < 0 || age > 1.2) continue
+      let pen = false
+      for (let j = 0; j <= 24; j++) {
+        const r = 0.15 + 0.7 * age
+        if (!cam.project(fx + r * Math.cos((TAU * j) / 24), y0 + 0.01, fz + oz + r * Math.sin((TAU * j) / 24), p3) || !visible(p3.x, p3.y)) {
+          pen = false
+          continue
+        }
+        ink.color(0.82, 0.72, 1, (1 - age / 1.2) * 0.7 * fog(p3.z))
+        pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
+        pen = true
+      }
+    }
+  }
+}
+const chirp = (tt: number) => {
+  let s = 0
+  for (const f of FISH) {
+    const a = tt - f.t0
+    if (a < 0 || a > LEAP) continue
+    const u = a / LEAP
+    s += 0.16 * Math.sin(Math.PI * u) ** 2 * Math.sin(TAU * (f.f0 * a + 0.5 * (f.sweep / LEAP) * a * a))
+  }
+  return s
+}
+
 export const valley: Scene = {
   dur: 39,
   build(t, f) {
@@ -433,7 +494,7 @@ export const valley: Scene = {
       if (x < eye.x + 0.3) continue
       items_(t, x, next, heroKind)
       for (const c of CASCADES) if (c >= x0 && c < x && t > 2.5) whitewater(t, c)
-      if (i > 0) ripples(t, x0, x)
+      if (i > 0) ripples(t, x0, x), fishes(t, x0, x)
       // the banks and the current, from the last row to this one
       if (i > 0 && x0 >= eye.x + 0.3) {
         const y0 = riverY(x0), y1 = riverY(x)
@@ -497,6 +558,8 @@ export const valley: Scene = {
         o.l += roar + fish, o.r += roar + fish
         if (tt > 24) sing(tt - 24, o)
       }
+      const ch = chirp(tt)
+      o.l += ch, o.r += ch
       if (tt > STONES && tt < 22) {
         // the stones are symbols: the modem itself, spinning down to lock (receive.ts's locked 16APSK stretch)
         signal(9 + tt - STONES, spin(tt))
