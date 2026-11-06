@@ -19,21 +19,26 @@ const SINGERS = 4 // per section: the beating pair, then two who join with the c
 const CENTS = [0, 0, -9, 7], SPREAD = [0, 0, -0.3, 0.3]
 const AH = [700, 1220, 2600], OO = [300, 870, 2240], GAINS = [1, 0.5, 0.25]
 const TOP = 18_000 // nothing sings above this, so nothing folds back past Nyquist
+const QUIET = 1e-3 // a singer this far down (−60 dB) is lost in the mass and the hall: skip them
 const BLOCK = 64 // samples per control step
 const TABLE = 4096
 const SIN = Float64Array.from({ length: TABLE + 1 }, (_, i) => Math.sin((2 * Math.PI * i) / TABLE))
 
 const sin = (p: number) => {
-  const f = (p - Math.floor(p)) * TABLE, i = f | 0
+  const f = p * TABLE, i = f | 0 // p ∈ [0, 1)
   return SIN[i] + (SIN[i + 1] - SIN[i]) * (f - i)
 }
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
 
-// How loudly a vowel passes frequency f: three formant bumps over log-frequency, and a floor.
-function vowel(f: number, dark: number) {
+// How loudly a vowel passes frequency f: three formant bumps over log-frequency, and a floor. The vowel's
+// formants, as log2 Hz, are set once a block by shape().
+const FORMANTS = new Float64Array(3)
+const shape = (dark: number) => FORMANTS.forEach((_, i) => (FORMANTS[i] = Math.log2(AH[i] + (OO[i] - AH[i]) * dark)))
+function vowel(f: number) {
   let g = 0.06
+  const lf = Math.log2(f)
   for (let i = 0; i < 3; i++) {
-    const c = AH[i] + (OO[i] - AH[i]) * dark, d = Math.log2(f / c) / 0.3
+    const d = (lf - FORMANTS[i]) / 0.3
     g += GAINS[i] * Math.exp(-0.5 * d * d)
   }
   return g
@@ -52,15 +57,15 @@ export class Shepard {
   prime = 0
   n = 2
   chorus = 0
-  private ph: Float64Array // phase in cycles, per singer
+  private ph: Float64Array // phase in cycles, per singer, kept in [0, 1)
   private hz: Float64Array
-  private al: Float64Array // per singer, gain into the left, the right and the dread
+  private al: Float64Array // per singer, gain into the left and the right (a dread singer's is all in al)
   private ar: Float64Array
-  private ad: Float64Array
   private gl: Float64Array // per singer, where they stand: constant-power gains
   private gr: Float64Array
-  private on: Int32Array // the singers audible this block
+  private on: Int32Array // the singers audible this block: angels from the start, dread from the end
   private live = 0
+  private dead = 0 // where the dread singers begin in on
   private crawl: Float64Array // each dread tone's detune in cents: where it is, where it is going
   private last = 0
   private left = 0 // samples until the next control step
@@ -73,7 +78,6 @@ export class Shepard {
     this.hz = new Float64Array(k)
     this.al = new Float64Array(k)
     this.ar = new Float64Array(k)
-    this.ad = new Float64Array(k)
     this.gl = new Float64Array(k)
     this.gr = new Float64Array(k)
     this.on = new Int32Array(k)
@@ -100,8 +104,10 @@ export class Shepard {
   // Sets every singer for the next block: where each layer sits, its bell, vowel and beating.
   private control() {
     const { layers: L, dread, prime, n, chorus } = this
-    const angel = 1 - 0.3 * dread, dark = dread, beat = 0.12 + 0.6 * dread // Hz between the pair
+    const angel = 1 - 0.3 * dread, beat = 0.12 + 0.6 * dread // Hz between the pair
+    shape(dread) // the vowel darkens with the dread
     this.live = 0
+    this.dead = this.on.length
     for (let j = 0; j < L; j++) {
       const x = (((j - this.s) % L) + L) % L // this layer's place in the span, sliding down
       const bell = 0.5 - 0.5 * Math.cos((2 * Math.PI * x) / L)
@@ -117,16 +123,14 @@ export class Shepard {
           fc *= DREAD[c - ANGEL.length] * 2 ** (this.crawl[2 * t] / 1200)
           g = 0.5 * dread
         }
-        g *= bell * bell * vowel(fc, dark)
-        if (g < 1e-4 || fc > TOP) continue
+        g *= bell * bell
+        if (g < QUIET || fc > TOP || (g *= vowel(fc)) < QUIET) continue
         for (let k = 0; k < (isAngel ? SINGERS : 2); k++) {
           const i = t * SINGERS + k, a = k < 2 ? g : g * chorus
-          if (a < 1e-4) continue
+          if (a < QUIET) continue
           this.hz[i] = k < 2 ? fc + (k ? -beat : beat) / 2 : fc * 2 ** ((CENTS[k] * chorus) / 1200)
-          this.al[i] = isAngel ? a * this.gl[i] : 0
-          this.ar[i] = isAngel ? a * this.gr[i] : 0
-          this.ad[i] = isAngel ? 0 : a
-          this.on[this.live++] = i
+          if (isAngel) (this.al[i] = a * this.gl[i]), (this.ar[i] = a * this.gr[i]), (this.on[this.live++] = i)
+          else (this.al[i] = a), (this.on[--this.dead] = i)
         }
       }
     }
@@ -138,13 +142,16 @@ export class Shepard {
     if (dt < 0 || dt > 0.1) this.reset(t)
     this.last = t
     if (this.left-- <= 0) this.control(), (this.left = BLOCK - 1)
-    const { ph, hz, al, ar, ad, on } = this
+    const { ph, hz, al, ar, on } = this
     let l = 0, r = 0, d = 0
     for (let q = 0; q < this.live; q++) {
-      const i = on[q], v = sin((ph[i] += hz[i] * dt))
+      const i = on[q], p = ph[i] + hz[i] * dt, v = sin((ph[i] = p - (p | 0)))
       l += al[i] * v
       r += ar[i] * v
-      d += ad[i] * v
+    }
+    for (let q = this.dead; q < on.length; q++) {
+      const i = on[q], p = ph[i] + hz[i] * dt
+      d += al[i] * sin((ph[i] = p - (p | 0)))
     }
     o.l += 0.05 * gain * l
     o.r += 0.05 * gain * r
