@@ -14,6 +14,7 @@ import { fft, hann } from '../dsp/fft'
 import { APSK16 } from '../dsp/dvbs2'
 import { Field } from '../dsp/terrain'
 import { last } from './meander'
+import { sig, signal } from './receive'
 import { place, sing } from './choir'
 import { heard } from '../audio/audio'
 import { TAU, cam, clamp, hash, lock, mix, smooth, view, type Scene } from './scene'
@@ -26,6 +27,7 @@ const rnd = (n: number) => hash(n) * 0.5 + 0.5
 // ── the river: a meander of two scales, skewed, climbing in cascades ─────────────────────────────────
 const CASCADES = [10, 24, 38, 51] // where the river steps down
 export const LIP = 62 // where the valley ends and the river pours off the edge
+const STONES = 12, SC = 15 // when the stepping stones arrive, and the pool they arrive in
 const X0 = -12, X1 = 104, DX = 0.1, NX = Math.round((X1 - X0) / DX) + 1
 const RZ = new Float64Array(NX), RY = new Float64Array(NX)
 {
@@ -44,7 +46,7 @@ const RZ = new Float64Array(NX), RY = new Float64Array(NX)
 const idx = (x: number) => Math.max(0, Math.min(NX - 1, Math.round((x - X0) / DX)))
 export const riverZ = (x: number) => RZ[idx(x)], riverY = (x: number) => RY[idx(x)]
 const W0 = 1.6
-const wide = (x: number) => W0 * (1 + 0.3 * Math.sin(0.21 * x + 0.4) + 0.2 * Math.sin(0.07 * x)) // half-width: narrows, pools
+const wide = (x: number) => W0 * (1 + 0.3 * Math.sin(0.21 * x + 0.4) + 0.2 * Math.sin(0.07 * x) + 1.6 * Math.exp(-(((x - SC) / 3.5) ** 2))) // narrows, pools
 
 // ── the land ────────────────────────────────────────────────────────────────────────────────────────
 const field = new Field(128, 2.1, 11)
@@ -89,11 +91,12 @@ for (let i = 0; i < 420; i++) {
   fir(x, z, 0.6 + 1.3 * rnd(i * 7), i, 6 + x * 0.075)
 }
 {
-  const p = APSK16.pts, cx = 3.2
+  const p = APSK16.pts, cx = SC
   for (let k = 0; k < p.length / 2; k++) {
-    const sx = cx + 1.6 * p[2 * k + 1], sz = riverZ(sx) + 0.8 * p[2 * k], y = riverY(sx), r = 0.14 + 0.05 * rnd(k), pts: number[] = []
-    for (let a = 0; a <= 18; a++) pts.push(sx + 0.8 * r * Math.sin((TAU * a) / 18), y + 0.03 + 0.6 * r * Math.max(0, Math.cos((TAU * a) / 18)), sz + r * Math.cos((TAU * a) / 18))
-    item(sx, pts, STONE, 12 + 0.11 * k, y, ROCK)
+    const sx = cx + 3.4 * p[2 * k + 1], sz = riverZ(cx) + 2.6 * p[2 * k], y = riverY(sx), r = 0.42 + 0.1 * rnd(k), pts: number[] = []
+    for (const q of [1, 0.66, 0.33]) for (let a = 0; a <= 18; a++) pts.push(sx + 0.8 * q * r * Math.sin((TAU * a) / 18), y + 0.03 + 0.6 * r * (1 - q * q) ** 0.5 + 0.2 * q * r * Math.max(0, Math.cos((TAU * a) / 18)), sz + q * r * Math.cos((TAU * a) / 18))
+    item(sx, pts, STONE, STONES + 0.05 * k, y, ROCK)
+    item(sx, [sx - 0.5 * r, y + 0.25 * r, sz - 0.4 * r, sx + 0.3 * r, y + 0.35 * r, sz + 0.5 * r, sx - 0.1 * r, y + 0.2 * r, sz + 0.7 * r], STONE, STONES + 0.05 * k, y, ROCK)
   }
 }
 
@@ -161,8 +164,8 @@ function peaks(seed: number, x: number, z0: number, z1: number, base: number, H:
 }
 {
   for (let k = 0; k < APSK16.pts.length / 2; k++) {
-    const sx = 3.2 + 1.6 * APSK16.pts[2 * k + 1]
-    vortex.push([sx + 0.35, riverZ(sx) + 0.8 * APSK16.pts[2 * k] + 0.12, k & 1 ? 0.5 : -0.5]) // each stone sheds an eddy
+    const sx = SC + 3.4 * APSK16.pts[2 * k + 1]
+    vortex.push([sx + 0.6, riverZ(SC) + 2.6 * APSK16.pts[2 * k] + 0.2, k & 1 ? 0.5 : -0.5]) // each stone sheds an eddy
   }
   const v = { x: 0, z: 0 }, pts: number[] = []
   for (let k = 0; k < 1800; k++) {
@@ -205,9 +208,10 @@ let heroN = 0, occlude = 1, landK = 1, lp = 0 // lp: the roar's low-pass state
 const eye = { x: 0, y: 0, z: 0 }
 function drone(t: number, o: number[]) {
   const k = clamp(lock([[0, 0], [1.3, 1]], t, 1.6, 0.9), 0, 1.03), drift = Math.max(0, t - 4) * 0.45
-  const ex = -11 + drift, orbit = 7 * Math.cos(0.09 * t + 0.6) // drifting downstream, swinging around the valley
-  const tx = mix(32, 22 + drift, k)
-  o[0] = mix(32, ex, k), o[1] = mix(70, riverY(ex + 8) + 9, k), o[2] = mix(riverZ(32) + 4, riverZ(ex + 8) - orbit, k)
+  const dip = smooth(10.5, 13, t) * (1 - smooth(18, 21, t)) // swooping down to the pool as the stones arrive
+  const ex = -11 + drift + 9 * dip, orbit = 7 * Math.cos(0.09 * t + 0.6) * (1 - 0.6 * dip) // drifting downstream, swinging around
+  const tx = mix(mix(32, 22 + drift, k), SC + 3, dip)
+  o[0] = mix(32, ex, k), o[1] = mix(70, riverY(ex + 8) + 9 - 4 * dip, k), o[2] = mix(riverZ(32) + 4, riverZ(ex + 8) - orbit, k)
   o[3] = tx, o[4] = mix(0, riverY(tx), k), o[5] = riverZ(tx), o[6] = mix(1.1, 0.95, k)
 }
 // After the valley: down the river to the lip, over it, and out into the air to face the falls.
@@ -252,6 +256,15 @@ function seg(x0: number, y0: number, z0: number, x1: number, y1: number, z1: num
   ink.color(c[0], c[1], c[2], i * fog(p3.z)).moveTo(p3.x, p3.y).lineTo(q3.x, q3.y)
 }
 
+// The stones arrive as a whirlpool: the constellation spins (a carrier offset) with its gravel strewn
+// (noise), and the loop pulls it in, overshooting, until it stands still and the gravel settles.
+const SZ = () => riverZ(SC)
+const spin = (t: number) => {
+  const u = Math.max(0, t - STONES)
+  return 2.2 * TAU * 0.9 * (1 - Math.exp(-u / 0.9)) * Math.exp(-u / 6) + 0.25 * Math.sin(1.7 * u) * Math.exp(-u / 1.5)
+}
+const strew = (t: number) => 0.35 * Math.exp(-Math.max(0, t - STONES - 1) / 1.6)
+
 function items_(t: number, upto: number, next: { i: number }, hero: number) {
   for (; next.i < items.length && items[next.i].x < upto; next.i++) {
     const it = items[next.i]
@@ -260,14 +273,19 @@ function items_(t: number, upto: number, next: { i: number }, hero: number) {
     let pen = false
     for (let v = 0; v < it.n; v++) {
       const o = 3 * (it.a + v), wv = it.kind === FLOW ? wave(VX[o], VX[o + 2], t) : 0, y = it.kind === FLOW ? VX[o + 1] + wv : it.base + (VX[o + 1] - it.base) * (it.kind === ROCK ? 1 : k), drop = it.kind === ROCK ? (1 - Math.min(1, k)) * 0.5 : 0
-      if (!cam.project(VX[o], y + drop, VX[o + 2] + 1.5 * wv, p3) || !visible(p3.x, p3.y)) {
+      let px = VX[o], pz = VX[o + 2] + 1.5 * wv
+      if (it.kind === ROCK) {
+        const a = spin(t), c = Math.cos(a), sn = Math.sin(a), dx = px - SC, dz = pz - SZ(), g = strew(t), seed = it.a
+        px = SC + dx * c - dz * sn + g * hash(seed + Math.floor(t * 9)), pz = SZ() + dx * sn + dz * c + g * hash(seed * 3 + Math.floor(t * 9))
+      }
+      if (!cam.project(px, y + drop, pz, p3) || (it.kind !== ROCK && !visible(p3.x, p3.y))) {
         pen = false
         continue
       }
       let g = it.kind === HATCH ? 0.5 : 1
       if (it.kind === FLOW) {
         const head = (t * 0.55 + rnd(it.a)) % 1, u = (v / (it.n - 1) - head + 1) % 1
-        g = 0.07 + 0.75 * Math.exp(-u * 9) * k // bright at the head, trailing back upstream
+        g = 0.04 + 0.5 * Math.exp(-u * 9) * k // bright at the head, trailing back upstream
       }
       ink.color(it.c[0], it.c[1], it.c[2], fog(p3.z) * g * landK)
       pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
@@ -308,9 +326,9 @@ function whitewater(t: number, xc: number) {
 function ripples(t: number, x0: number, x1: number) {
   const p = APSK16.pts
   for (let k = 0; k < p.length / 2; k++) {
-    const sx = 3.2 + 1.6 * p[2 * k + 1]
-    if (sx < x0 || sx >= x1 || t < 12 + 0.11 * k) continue
-    const sz = riverZ(sx) + 0.8 * p[2 * k], y = riverY(sx) + 0.01
+    const sx = SC + 3.4 * p[2 * k + 1]
+    if (sx < x0 || sx >= x1 || t < STONES + 0.05 * k) continue
+    const sz = riverZ(SC) + 2.6 * p[2 * k], y = riverY(sx) + 0.01
     for (let r = 0; r < 3; r++) {
       const age = ((t - 12 - 0.11 * k) * 0.6 + r / 3) % 1, rad = 0.2 + 0.9 * age
       let pen = false
@@ -478,6 +496,13 @@ export const valley: Scene = {
         const fish = smooth(26, 28, tt) * 0.18 * Math.exp(-(((a - 0.5) / 0.16) ** 2)) * Math.sin(TAU * (f0 * a + 0.5 * k * a * a) / 1.7)
         o.l += roar + fish, o.r += roar + fish
         if (tt > 24) sing(tt - 24, o)
+      }
+      if (tt > STONES && tt < 22) {
+        // the stones are symbols: the modem itself, spinning down to lock (receive.ts's locked 16APSK stretch)
+        signal(9 + tt - STONES, spin(tt))
+        const k = smooth(STONES, STONES + 0.5, tt) * (1 - smooth(20, 22, tt))
+        o.l += 0.6 * k * sig.i, o.r += 0.6 * k * sig.q
+        return
       }
       if (heroN < 2 || tt > 26) return
       const ph = ((tt * 55) % 1) * 2, u = (ph < 1 ? ph : 2 - ph) * (heroN - 1), i = Math.min(heroN - 2, Math.floor(u)), a = u - i
