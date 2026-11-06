@@ -2,9 +2,10 @@
 // which lands in the phosphor the way the beam's light does, so it persists, halates and tone-maps with
 // everything else, and the beam goes on drawing over it. A frame may instead be read out as text: every
 // cell of the screen is matched by shape to the nearest glyph of a character generator the beam drew.
+// And it remembers: the last frame it swept of every world of the fall is kept, a tile each, as shots.
 import prelude from './field.wgsl?raw'
 import rasterWGSL from './raster.wgsl?raw'
-import { FIELDS } from './fields'
+import { FIELDS, WORLDS } from './fields'
 
 export type Field = {
   shader: number // index into FIELDS
@@ -16,12 +17,15 @@ export type Field = {
   lift?: number // how much light makes a cell full
   rows?: { data: Uint8Array; at: number; n: number } // new rows for the shader's data texture, ring row `at`
   read?: Uint8Array // filled, a frame or two late, with the centre row of text
+  bake?: Field[] // worlds to render into their shots, for any the raster never swept itself
 }
 
 const FLOAT: GPUTextureFormat = 'rgba16float'
 export const TILE = [24, 40] // a glyph's tile in the atlas, px
 export const GRID = [6, 10] // a cell's shape: its light over this grid, and a glyph's ink over the same
 const ATLAS_COLS = 8
+export const SHOT = [512, 320] // a world's shot, px; the shots are a 4 × 3 grid of them
+const MIPS = 5 // and each is kept at five sizes, halving, so a shot seen small is averaged, not aliased
 
 export class Raster {
   scale = 0.5 // the light's resolution against the phosphor's
@@ -45,13 +49,24 @@ export class Raster {
   private reading?: Uint8Array
   private cols = 0
   private head = new Float32Array(4)
+  private shots: GPUTexture // every world's last frame, with its mips
+  private shot: GPUTexture
+  private shotView: GPUTextureView // one shot, on its way to its tile
+  private blit!: GPURenderPipeline
+  private mip!: GPURenderPipeline
+  private mips: [GPUTextureView, GPUBindGroup][] = [] // each level of the shots, and the level above it to read
+  private kept = new Uint8Array(WORLDS.length)
 
   constructor(readonly device: GPUDevice) {
     const d = device
     this.u = d.createBuffer({ size: this.uf.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
     this.glyph = d.createBuffer({ size: 64 * 60 * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
-    this.smp = d.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat' })
+    this.smp = d.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat' })
     this.back = d.createBuffer({ size: 4096, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST })
+    const use = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST
+    this.shots = d.createTexture({ size: [4 * SHOT[0], 3 * SHOT[1]], mipLevelCount: MIPS, format: FLOAT, usage: use })
+    this.shot = d.createTexture({ size: SHOT, format: FLOAT, usage: use })
+    this.shotView = this.shot.createView()
   }
 
   // Every pipeline is compiled before the first frame, so no reality hitches when it arrives.
@@ -67,11 +82,16 @@ export class Raster {
     const pipe = (module: GPUShaderModule, fs: string, format: GPUTextureFormat, blend?: GPUBlendState, lay: GPUPipelineLayout | 'auto' = 'auto') =>
       d.createRenderPipelineAsync({ layout: lay, vertex: { module, entryPoint: 'vs' }, fragment: { module, entryPoint: fs, targets: [{ format, blend }] } })
     const r = d.createShaderModule({ code: rasterWGSL }), fl = d.createPipelineLayout({ bindGroupLayouts: [layout] })
-    ;[this.light, this.cell, this.text] = await Promise.all([pipe(r, 'lightFS', acc, ADD), pipe(r, 'cellFS', 'rg32float'), pipe(r, 'textFS', acc, ADD)])
+    ;[this.light, this.cell, this.text, this.blit, this.mip] = await Promise.all([
+      pipe(r, 'lightFS', acc, ADD), pipe(r, 'cellFS', 'rg32float'), pipe(r, 'textFS', acc, ADD), pipe(r, 'shotFS', FLOAT), pipe(r, 'mipFS', FLOAT),
+    ])
+    const level = (i: number) => this.shots.createView({ baseMipLevel: i, mipLevelCount: 1 })
+    for (let i = 1; i < MIPS; i++)
+      this.mips.push([level(i), d.createBindGroup({ layout: this.mip.getBindGroupLayout(0), entries: [{ binding: 1, resource: this.smp }, { binding: 2, resource: level(i - 1) }] })])
     this.fields = await Promise.all(
       FIELDS.map(async (f) => {
         const [w, h, b = 1] = f.data ?? [1, 1]
-        const data = d.createTexture({ size: [w, h], format: b > 1 ? 'rg8unorm' : 'r8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST })
+        const data = f.shots ? this.shots : d.createTexture({ size: [w, h], format: b > 1 ? 'rg8unorm' : 'r8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST })
         const u = d.createBuffer({ size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
         const group = d.createBindGroup({ layout, entries: [{ binding: 0, resource: { buffer: u } }, { binding: 1, resource: this.smp }, { binding: 2, resource: data.createView() }] })
         return { pipe: await pipe(d.createShaderModule({ code: prelude + f.code }), 'fs', FLOAT, undefined, fl), u, data, group }
@@ -114,7 +134,7 @@ export class Raster {
         d.createBindGroup({ layout: p.getBindGroupLayout(0), entries: e.map(([binding, resource]) => ({ binding, resource })) })
       const u = { buffer: this.u }, s = this.smp, v = (this.views[0] = this.tex.createView())
       this.views[1] = this.cells.createView()
-      this.groups = [group(this.light, [[0, u], [1, s], [2, v]])]
+      this.groups = [group(this.light, [[0, u], [1, s], [2, v]]), group(this.blit, [[1, s], [2, v]])]
       if (text)
         this.groups.push(
           group(this.cell, [[0, u], [2, v], [5, { buffer: this.glyph }]]),
@@ -123,10 +143,34 @@ export class Raster {
       this.mode = +text
     }
 
-    const head = this.head
-    head[0] = fw, head[1] = fh, head[2] = aspect, head[3] = 2 / fh
-    d.queue.writeBuffer(F.u, 0, head)
-    d.queue.writeBuffer(F.u, 16, f.p)
+    const pass = (view: GPUTextureView, p: GPURenderPipeline, g: GPUBindGroup) => {
+      const r = enc.beginRenderPass({ colorAttachments: [{ view, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }] })
+      r.setPipeline(p), r.setBindGroup(0, g), r.draw(3), r.end()
+    }
+    // A field's uniforms are written once a frame, so no field is swept twice in one.
+    const sweep = (G: Field, view: GPUTextureView, w: number, h: number, aspect: number) => {
+      const S = this.fields[G.shader]
+      this.head.set([w, h, aspect, 2 / h])
+      d.queue.writeBuffer(S.u, 0, this.head)
+      d.queue.writeBuffer(S.u, 16, G.p)
+      pass(view, S.pipe, S.group)
+    }
+    const keep = (k: number) => {
+      enc.copyTextureToTexture({ texture: this.shot }, { texture: this.shots, origin: [(k % 4) * SHOT[0], Math.floor(k / 4) * SHOT[1]] }, SHOT)
+      this.mips.forEach(([view, group], i) => {
+        const w = SHOT[0] >> (i + 1), h = SHOT[1] >> (i + 1), x = (k % 4) * w, y = Math.floor(k / 4) * h
+        const r = enc.beginRenderPass({ colorAttachments: [{ view, loadOp: 'load', storeOp: 'store' }] })
+        r.setViewport(x, y, w, h, 0, 1), r.setScissorRect(x, y, w, h)
+        r.setPipeline(this.mip), r.setBindGroup(0, group), r.draw(3), r.end()
+      })
+      this.kept[k] = 1
+    }
+    // the worlds this raster never swept itself, swept now at a shot's size
+    for (const b of f.bake ?? []) {
+      const k = WORLDS.indexOf(b.shader)
+      if (k >= 0 && !this.kept[k] && b.shader !== f.shader) sweep(b, this.shotView, SHOT[0], SHOT[1], SHOT[0] / SHOT[1]), keep(k)
+    }
+
     if (f.rows) {
       const { data, at, n } = f.rows, W = F.data.width, H = F.data.height, a = at % H, m = Math.min(n, H - a)
       const B = F.data.format === 'rg8unorm' ? 2 * W : W
@@ -141,13 +185,11 @@ export class Raster {
     uf[16] = f.lift ?? 2, uf[17] = 0.2
     d.queue.writeBuffer(this.u, 0, uf)
 
-    const pass = (view: GPUTextureView, p: GPURenderPipeline, g: GPUBindGroup) => {
-      const r = enc.beginRenderPass({ colorAttachments: [{ view, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }] })
-      r.setPipeline(p), r.setBindGroup(0, g), r.draw(3), r.end()
-    }
-    pass(this.views[0], F.pipe, F.group)
+    sweep(f, this.views[0], fw, fh, aspect)
+    const k = WORLDS.indexOf(f.shader)
+    if (!text && k >= 0) pass(this.shotView, this.blit, this.groups[1]), keep(k) // a shot of this world, as it is now
     if (!text) return
-    pass(this.views[1], this.cell, this.groups[1])
+    pass(this.views[1], this.cell, this.groups[2])
     if (f.read && !this.reading) {
       enc.copyTextureToBuffer({ texture: this.cells!, origin: [0, rows >> 1] }, { buffer: this.back, bytesPerRow: 4096 }, [Math.min(cols, 512), 1])
       this.reading = f.read
@@ -159,7 +201,7 @@ export class Raster {
   composite(p: GPURenderPassEncoder) {
     if (!this.on) return
     p.setPipeline(this.mode ? this.text : this.light)
-    p.setBindGroup(0, this.groups[this.mode ? 2 : 0])
+    p.setBindGroup(0, this.groups[this.mode ? 3 : 0])
     p.draw(3)
   }
 

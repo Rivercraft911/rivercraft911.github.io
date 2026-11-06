@@ -23,8 +23,9 @@ import { BINS } from '../dsp/waterfall'
 export const ROWS = 4096 // the waterfall's ring of rows
 export const SIEVE = [1024, 64] // the primes' sieve: a byte for every 30 integers
 
-// A field's data texture: width, height, and bytes a texel (2: rg8, a 16-bit value split high and low).
-export const FIELDS: { code: string; data?: [number, number, number?] }[] = [
+// A field's data texture: width, height, and bytes a texel (2: rg8, a 16-bit value split high and low);
+// or, for shots, the raster's shot of every world.
+export const FIELDS: { code: string; data?: [number, number, number?]; shots?: true }[] = [
   { code: wrap, data: [BINS, ROWS, 2] },
   { code: film + primes, data: [SIEVE[0], SIEVE[1]] },
   { code: camera + film + indra },
@@ -40,9 +41,11 @@ export const FIELDS: { code: string; data?: [number, number, number?] }[] = [
   { code: camera + march + sierpinski },
   { code: camera + film + march + julia4 },
   { code: camera + polytope },
-  { code: camera + hole },
+  { code: camera + hole, shots: true },
 ]
 export const WRAP = 0
 export const PRIMES = 1
 export const INDRA = 2
 export const [KIFS, MANDALAY, KALISET, LYAPUNOV, NEWTON, HONEYCOMB, BULB, KLEINIAN, APOLLONIAN, SIERPINSKI, JULIA4, POLYTOPE, HOLE] = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+// The worlds of the fall, in the order we fell through them: the raster keeps a shot of each (raster.ts).
+export const WORLDS = [INDRA, KIFS, BULB, MANDALAY, KLEINIAN, KALISET, APOLLONIAN, LYAPUNOV, SIERPINSKI, NEWTON, HONEYCOMB, JULIA4]
