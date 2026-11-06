@@ -6,7 +6,8 @@
 //
 // p[0] eye, 1/tan(fov/2)     p[1] right, radius of the roll    p[2] up, z of the roll's axis
 // p[3] forward, an octave's width on the sheet                  p[4] head y, y per row, head's ring row, rows
-// p[5] gain, rows printed so far, sheet per second, spot      p[6] brightness: the black level's lift
+// p[5] gain, rows printed so far, sheet per second, spot      p[6] brightness: the black level's lift,
+//                                                             the reference level's offset
 
 const TAU = 6.2831853;
 const PI = 3.1415927;
@@ -16,7 +17,7 @@ const DB = 56.0 * 0.33219281; // the rows' range, 56 dB, in doublings of power
 // A row's level is dB over the floor, in 16 bits as two bytes (filtering is linear, so it filters them
 // apart and they add back exactly); power and back again, with the floor as zero.
 fn at(t: vec2f) -> f32 { return dot(textureSampleLevel(data, smp, t, 0.0).rg, vec2f(65280.0, 255.0) / 65535.0); }
-fn power(s: f32) -> f32 { return exp2(DB * clamp(s, 0.0, 1.0)) - 1.0; }
+fn power(s: f32) -> f32 { return exp2(DB * clamp(s - u.p[6].y, 0.0, 1.0)) - 1.0; }
 fn level(p: f32) -> f32 { return log2(1.0 + p) / DB; }
 
 // Black through blue and cyan to gold and white: the waterfall's palette, in linear light.

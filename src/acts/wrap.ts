@@ -71,15 +71,18 @@ function look(T: number, kick = 0) {
 }
 
 // The printer: rows of the waterfall at even spacing along the sheet, each at the moment it was printed.
-// A fresh sheet starts with as much history as the speakers still remember.
+// A fresh sheet starts with as much history as the speakers still remember. Like a receiver's display it
+// sets its own reference level: the loudest rows of the last second or two read just under white.
 const water = new Waterfall(), rows = new Uint8Array(2 * BINS * MAX)
-const printer = { k: 0, from: 0, T: -1 }
+const printer = { k: 0, from: 0, T: -1, ref: -1 }
 function print(T: number, now: number, f: Field) {
-  const top = Math.floor(head(T) / DY), pr = printer
-  if (T < pr.T || T - pr.T > 0.5 || top - pr.k > MAX) pr.k = pr.from = top - MAX // a jump: start a fresh sheet
+  const top = Math.floor(head(T) / DY), pr = printer, dt = T - pr.T
+  if (dt < 0 || dt > 0.5 || top - pr.k > MAX) (pr.k = pr.from = top - MAX), (pr.ref = -1) // a jump: start a fresh sheet
   pr.T = T
   const n = top - pr.k
-  for (let i = 0; i < n; i++) water.row(now - (T - printedAt((pr.k + 1 + i) * DY)), rows, 2 * i * BINS)
+  let hi = 0
+  for (let i = 0; i < n; i++) hi = Math.max(hi, water.row(now - (T - printedAt((pr.k + 1 + i) * DY)), rows, 2 * i * BINS))
+  if (n > 0) pr.ref = pr.ref < 0 ? hi : pr.ref + (hi - pr.ref) * (1 - Math.exp(-dt / 1.5))
   f.rows = n > 0 ? { data: rows, at: (((pr.k + 1) % ROWS) + ROWS) % ROWS, n } : undefined
   pr.k = top
   return top
@@ -101,6 +104,7 @@ export function tube(T: number, now: number, f: Frame, kick = 0, gain = 1, spot 
   p[16] = top * DY, p[17] = DY, p[18] = top % ROWS, p[19] = ROWS
   p[20] = gain, p[21] = top - printer.from, p[22] = speed(T), p[23] = spot
   p[24] = 0.3 * (1 - smooth(0.6, 2.2, T)) // the plot opens with its black lifted, as the valley's is; it sinks as we dive
+  p[25] = clamp(printer.ref - 0.8, -0.15, 0.3) // the reference level, as an offset in the rows' units
   field.cell = undefined
   f.field = field
   f.look = { tau: TAU_RASTER }

@@ -55,12 +55,15 @@ export class Waterfall {
   }
 
   // Prints the spectrum at timeline time t as one row into out at offset o: two bytes a bin, high then low.
+  // Returns the row's loudest level.
   // A moment the speakers have not played a half window past yet reads as the newest frame there is.
   row(t: number, out: Uint8Array, o: number) {
     const x = Math.min(t, heard.end - N / 2 / heard.sr - HOP) / HOP, j = Math.floor(x), k = x - j, a = this.frame(j), b = this.frame(j + 1), l = this.last
+    let hi = 0
     for (let m = 0; m < BINS; m++) {
       const q = Math.round((l[m] = a[m] + (b[m] - a[m]) * k) * 65535)
-      ;(out[o + 2 * m] = q >> 8), (out[o + 2 * m + 1] = q & 255)
+      ;(out[o + 2 * m] = q >> 8), (out[o + 2 * m + 1] = q & 255), (hi = Math.max(hi, l[m]))
     }
+    return hi
   }
 }
