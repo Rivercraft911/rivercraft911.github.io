@@ -490,11 +490,15 @@ export const valley: Scene = {
     }
     if (land > 0.06) items_(t, Infinity, next, heroKind)
     // nothing new growing: the speakers trace the river itself, from under us to the lip
-    if (heroN < 2 && t >= SCAN)
+    if (heroN < 2 && t >= SCAN && land > 0.06)
       for (let x = Math.max(X0, eye.x + 1); x < LIP && heroN < HERO; x += 0.3)
         if (cam.project(x, riverY(x), riverZ(x), p3)) (hx[heroN] = p3.x), (hy[heroN++] = p3.y)
-    heroGain = t < SCAN ? 0.3 : t < 3 ? 0.15 : t < 7 ? 0.35 : 0.4 // ridgelines and firs are jagged: quieter
+    heroGain = t < SCAN ? 0.3 : t < 3 ? 0.22 : t < 7 ? 0.35 : 0.4 // ridgelines and firs are jagged: quieter
     if (t > 7) listen(t), falls(t, smooth(7, 9, t))
+    // over the edge: the speakers trace the lip, the spectrum going over it, until the choir takes over
+    if (heroN < 2 && t > 7)
+      for (let l = 0; l < LANES && heroN < HERO; l++)
+        if ((fallAt(0, l, past(t, l), smooth(20.5, 24, t)), p3.z)) (hx[heroN] = p3.x), (hy[heroN++] = p3.y) // heard even where the board hides it
     // exposure: the ink is energy per length, so as the valley fills in it would burn brighter and
     // brighter; past a reference length, stop down, as an eye or a camera would
     const stop = Math.min(1, (EXPOSE / Math.max(1, ink.len)) ** 0.7)
@@ -534,6 +538,10 @@ export const valley: Scene = {
 
     f.rate = mix(2.4e6, 7.2e6, smooth(1, 8, t))
     if (t > SING) place(t - SING)
+    // autoset, as a scope does: whatever is traced fills the speakers' range, however small it is on screen
+    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity
+    for (let i = 0; i < heroN; i++) (x0 = Math.min(x0, hx[i])), (x1 = Math.max(x1, hx[i])), (y0 = Math.min(y0, hy[i])), (y1 = Math.max(y1, hy[i]))
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, fit = 1.8 / Math.max(0.3, x1 - x0, y1 - y0)
     return (tt, o) => {
       // over the edge the scope rule ends: the falls roar
       if (tt > 8 && tt < DUR) {
@@ -542,12 +550,12 @@ export const valley: Scene = {
         o.l += roar, o.r += roar
         if (tt > SING) sing(tt - SING, o) // silent until the falls flatten, then fading in
       }
-      if (heroN < 2 || tt > 12) return
+      if (heroN < 2 || tt > 24) return
       const ph = ((tt * 55) % 1) * 2, u = (ph < 1 ? ph : 2 - ph) * (heroN - 1), i = Math.min(heroN - 2, Math.floor(u)), a = u - i
-      const k = heroGain * (1 - smooth(8, 12, tt))
+      const k = heroGain * (1 - smooth(20, 24, tt))
       // a gentle low-pass (about 4 kHz) takes the edge off the traced corners
-      hl += ((k * (hx[i] + (hx[i + 1] - hx[i]) * a)) / view.a - hl) * 0.4
-      hr += (k * (hy[i] + (hy[i + 1] - hy[i]) * a) - hr) * 0.4
+      hl += (k * fit * (hx[i] + (hx[i + 1] - hx[i]) * a - cx) - hl) * 0.4
+      hr += (k * fit * (hy[i] + (hy[i + 1] - hy[i]) * a - cy) - hr) * 0.4
       o.l += hl, o.r += hr
     }
   },
