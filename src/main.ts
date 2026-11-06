@@ -5,7 +5,8 @@ import { Timeline } from './acts/timeline'
 import { input, space, view, type Frame } from './acts/scene'
 import { idle } from './acts/idle'
 import { specimen } from './acts/specimen'
-import { tune } from './acts/tune'
+import { hook } from './acts/hook'
+import { meander } from './acts/meander'
 import { receive } from './acts/receive'
 import { fall } from './acts/fall'
 
@@ -13,7 +14,7 @@ const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
 const beam = new Beam()
 const audio = new Audio()
-const timeline = new Timeline(q.has('specimen') ? [specimen] : [tune, receive, fall])
+const timeline = new Timeline(q.has('specimen') ? [specimen] : [hook, meander, receive, fall])
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }
 

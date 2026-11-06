@@ -9,7 +9,6 @@ import { Path } from '../beam/path'
 import { text } from '../beam/font'
 import { APSK16, PSK8, QPSK, SPAN, Frames, Kind, PLH, rc, type Constellation } from '../dsp/dvbs2'
 import { TAU, clamp, hash, input, lock, mix, note, smooth, view, type Scene } from './scene'
-import { carrier } from './tune'
 
 export const RS = 4800 // symbols per second
 export const R = 0.64 // outer ring radius on screen
@@ -81,7 +80,7 @@ export function signal(t: number, slip = pll.err) {
       const j = sym(k), g = rc(x - k)
       I += CI[j] * g, Q += CQ[j] * g
     }
-  const rho = mix(carrier.r / R, 1, lock([[0, 0], [0, 1]], t + 0.001, 5, 0.7))
+  const rho = mix(0.35, 1, lock([[0, 0], [0, 1]], t + 0.001, 5, 0.7))
   I = mix(rho * Math.SQRT1_2, I, m), Q = mix(rho * Math.SQRT1_2, Q, m)
   const ph = drift(t) + slip, c = Math.cos(ph), sn = Math.sin(ph), n = sigma(t)
   sig.i = I * c - Q * sn + n * gauss(x * 7, 1.3)
