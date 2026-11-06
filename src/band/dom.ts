@@ -32,6 +32,8 @@ const DEMO = {
   yapogee: 'Live: each frame names its own modcod in its header, QPSK 9/10 → 8PSK 5/6 → 16APSK → 32APSK, the four Yapogee runs.',
   ulam: 'Live: the integers on a square spiral, primes lit as they arrive. The diagonals are quadratics rich in primes.',
   raster: 'Live: a 64 × 24 frame painted the way R-01 paints, one facet a line, colour quantised to its rrrgggbb byte.',
+  scope: 'Live: what a receiver tuned here hears, drawn by the beam as the speakers play it.',
+  walk: 'Live: a phone that is not there, walking a loop at 1.4 m/s (shown 20× faster), reported as a GPS would: NMEA, checksum and all.',
 }
 
 const root = el('div', { id: 'band', hidden: '' })
@@ -132,8 +134,9 @@ function wake(a: HTMLElement) {
 export function screen(k: number) {
   const s = articles[k]?.querySelector<HTMLElement>('.screen')
   if (!s) return null
-  const r = s.getBoundingClientRect(), pg = s.closest('.media, .card, .page')!.getBoundingClientRect()
-  return r.height > 0 && r.bottom > pg.top + 20 && r.top < pg.bottom - 20 ? r : null
+  const r = s.getBoundingClientRect(), pg = s.closest('.page')!.getBoundingClientRect() // the page's box is its scroller's visible box
+  // drawn only while it is mostly inside its scroller: the beam has no clip, and must not write over the header
+  return r.height > 0 && r.top > pg.top - 0.15 * r.height && r.top < pg.bottom - 0.3 * r.height ? r : null
 }
 
 export function when(text: string, x = 0, y = 0) {

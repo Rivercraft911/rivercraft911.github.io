@@ -20,7 +20,7 @@
 
 /* quiet: read by screen readers and reachable by Tab, which tunes to it, but not shown */
 #band .quiet { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-#band .quiet:focus-within { clip-path: none; width: auto; height: auto; }
+body:has(> #band:not([hidden])) canvas { touch-action: none; }
 
 #band header .mk { margin: 0; color: var(--dim); font-size: 11px; letter-spacing: 0.08em; }
 #band header .mk span { color: var(--ph); }
@@ -29,8 +29,8 @@
 #band .rem { margin: 0; color: var(--ink); }
 
 /* lit: the marker readout, top right of the screen, while the dial sits on a carrier */
-#band .lit { position: fixed; top: 3.2vh; right: 3.4vw; max-width: min(48ch, 44vw); text-align: right; animation: lit 0.35s ease-out; pointer-events: auto; cursor: pointer; }
-#band .lit .page { display: none; }
+#band .lit, #band .quiet:focus-within { position: fixed; top: 3.2vh; right: 3.4vw; width: auto; height: auto; clip-path: none; white-space: normal; max-width: min(48ch, 44vw); text-align: right; animation: lit 0.35s ease-out; pointer-events: auto; cursor: pointer; }
+#band .lit .page, #band .quiet:focus-within .page { display: none; }
 #band .lit .rem::after { content: '  ↵ demodulate'; color: var(--dim); white-space: nowrap; }
 @keyframes lit { from { opacity: 0; transform: translateY(-4px); filter: blur(2px); } }
 
@@ -51,7 +51,7 @@
 #band figure { margin: 0 0 3.2em; }
 #band figure img, #band figure video { display: block; width: 100%; height: auto; max-height: 62vh; object-fit: contain; object-position: left top; background: #000; }
 #band figcaption { margin-top: 0.6em; color: var(--dim); font-size: 12px; max-width: 72ch; }
-#band .demo .screen { aspect-ratio: 4 / 3; max-height: 52vh; width: 100%; }
+#band .demo .screen { aspect-ratio: 4 / 3; max-height: 46vh; width: 100%; }
 
 /* A photo arrives the way R-01 paints: odd scanlines down first, then the even ones fill in, in the
    phosphor's green until the last line lands. */

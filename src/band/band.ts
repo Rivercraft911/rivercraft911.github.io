@@ -10,7 +10,7 @@ import { clamp, mix, view, type Scene } from '../acts/scene'
 import { PROJECTS, WEEK0 } from './projects'
 import { an, sweep, K, MAX, SPAN_ALL, MID, binOf, CMB_PEAK } from './analyzer'
 import { ORDER, KEYS, keyOf, hz, show, screen, when, activate, slugAt, route, weekDate, root } from './dom'
-import { constellation, qsl, raster, ulam, type Box } from './demos'
+import { constellation, qsl, raster, scope, ulam, walk, type Box } from './demos'
 import { voice } from './voice'
 
 load('tech')
@@ -133,7 +133,7 @@ function graticule(n: number, f: Face) {
   }
   for (let j = 0; j < ticks.length; j += 2) {
     const u = uOf(ticks[j]), major = ticks[j + 1]
-    if (u < 0 || u > 1) continue
+    if (u < 0 || u > 1 || ticks[j] < EDGE[0] || ticks[j] > EDGE[1]) continue
     grat.intensity(major ? 0.22 : 0.12)
     for (let v = 0; v <= 1.0001; v += 0.025) at(u, mix(L.tv0, L.tv1, v)), grat.dot(P.x, P.y, 0.0015)
     if (!major || L.quiet) continue
@@ -148,11 +148,14 @@ function graticule(n: number, f: Face) {
 function traceAndMarks(n: number, reveal: number, f: Face) {
   const bottom = ref.x - RANGE, z = L.size
   trace.clear()
+  let pen = false
   for (let i = 0; i < n; i++) {
-    const u = i / (n - 1), v = clamp((an.db[i] - bottom) / RANGE)
-    hue(10 ** (an.c + an.s * (u - 0.5)), rgb)
+    const u = i / (n - 1), v = clamp((an.db[i] - bottom) / RANGE), lf = an.c + an.s * (u - 0.5)
+    if (lf < EDGE[0] || lf > EDGE[1]) { pen = false; continue } // past the ends of the dial: nothing
+    hue(10 ** lf, rgb)
     trace.color(rgb[0], rgb[1], rgb[2], 1)
-    i ? to(trace, u, mix(L.tv0, L.tv1, v)) : mv(trace, u, mix(L.tv0, L.tv1, v))
+    pen ? to(trace, u, mix(L.tv0, L.tv1, v)) : mv(trace, u, mix(L.tv0, L.tv1, v))
+    pen = true
   }
   trace.reveal(reveal)
 
@@ -235,8 +238,8 @@ function waterfall(n: number, f: Face, show: number) {
     const wk = WEEKS - 1 - r, w = mix(L.wv0, L.wv1, r / (WEEKS - 1)), fade = show * smoothRow(r)
     if (fade <= 0) continue
     // the floor's own history, a faint speckle pinned to frequency so it scrolls with the dial
-    for (let j = j0; j < j0 + n; j++) {
-      const h = Math.imul(j ^ Math.imul(r + 7, 0x27d4eb2d), 0x9e3779b1) >>> 0, x = (h ^ (h >>> 15)) & 1023
+    for (let j = Math.max(j0, Math.ceil(EDGE[0] / d)); j < Math.min(j0 + n, EDGE[1] / d); j++) {
+      const h =Math.imul(j ^ Math.imul(r + 7, 0x27d4eb2d), 0x9e3779b1) >>> 0, x = (h ^ (h >>> 15)) & 1023
       if (x >= 22) continue
       wf.intensity(fade * (0.06 + 0.22 * ((h >>> 20) / 4096) ** 3))
       at((j * d - lo) / an.s, w), wf.dot(P.x, P.y, 0.0012)
@@ -290,6 +293,8 @@ function drawDemo(f: Face) {
   if (p.demo === 'esp' || p.demo === 'yapogee') constellation(demo, p.demo, t, b, f)
   else if (p.demo === 'ulam') ulam(demo, t, b, f)
   else if (p.demo === 'raster') raster(demo, t, b, f)
+  else if (p.demo === 'scope') scope(demo, p.slug, t, b, f)
+  else if (p.demo === 'walk') walk(demo, t, b, f)
   else if (p.slug === 'qsl') qsl(demo, t, b, f)
 }
 
@@ -334,7 +339,7 @@ function capture() {
 function update(dt: number) {
   if (coast) {
     c.to += coast * dt
-    coast *= Math.exp(-dt / 0.45)
+    coast *= Math.exp(-dt / 0.35)
     if (Math.abs(coast) < 0.06 * an.s) (coast = 0), (idle = 0.3)
   }
   c.to = clamp(c.to, EDGE[0], EDGE[1])
@@ -357,7 +362,7 @@ function update(dt: number) {
 type Drag = { id: number; x: number; y: number; t: number; v: number; moved: number }
 let drag: Drag | null = null
 const pts = new Map<number, { x: number; y: number }>()
-const along = (e: { clientX: number; clientY: number }) => (L.vert ? -e.clientY : e.clientX)
+const along = (e: { clientX: number; clientY: number }) => (L.vert ? e.clientY : e.clientX) // px in the direction of rising u
 const busy = (e: Event) => !!(e.target as Element).closest?.('a, button, video, input, .open .page, .open .card, .lit')
 
 function hit(cx: number, cy: number) {
@@ -415,7 +420,7 @@ const lift = (e: PointerEvent) => {
     c.to = c.x + (uAtPx(e.clientX, e.clientY) - 0.5) * an.s // a click elsewhere tunes there
     return touched()
   }
-  if (e.timeStamp - d.t < 90 && Math.abs(d.v) > 0.2 * an.s) coast = d.v
+  if (e.timeStamp - d.t < 90 && Math.abs(d.v) > 0.2 * an.s) coast = clamp(d.v, -0.8 * an.s, 0.8 * an.s) // a flick glides a fraction of a span, then pulls in
   touched()
 }
 addEventListener('pointerup', lift)
@@ -555,6 +560,6 @@ export const band: Scene = {
     if (demo.len) fr.ch.push({ w: 1.4, gain: 0.85, path: demo })
     fr.rate = 3e6
     fr.look = { tau: 0.06 }
-    return voice(open >= 0 ? open : tuned, open >= 0 ? 1 : tuned >= 0 ? clamp(1 - Math.abs(LF[tuned] - c.x) / (0.03 * an.s)) : 0, clock)
+    return voice(open >= 0 ? open : tuned, open >= 0 ? 1 : tuned >= 0 ? clamp(1 - Math.abs(LF[tuned] - c.x) / (0.03 * an.s)) : 0)
   },
 }

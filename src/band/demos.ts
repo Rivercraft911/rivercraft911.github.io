@@ -4,6 +4,7 @@ import { Path } from '../beam/path'
 import { text, type Face } from '../beam/font'
 import { APSK16, Frames, Kind, PLH, PSK8, QPSK, rc, rings, SPAN, type Constellation } from '../dsp/dvbs2'
 import { TAU, clamp, hash } from '../acts/scene'
+import { DIT, KEYING, station, type Ear } from './voice'
 
 export type Box = { x0: number; y0: number; x1: number; y1: number }
 const GREEN = [0.35, 1, 0.55] as const
@@ -130,21 +131,6 @@ export function raster(p: Path, t: number, b: Box, f: Face) {
 }
 
 // ---- the QSL: the callsign, and its CW keying at 20 WPM ---------------------------------------------
-const MORSE: Record<string, string> = { D: '-..', E: '.', K: '-.-', J: '.---', '5': '.....', S: '...', C: '-.-.', H: '....' }
-export const KEYING = (() => {
-  // on/off per dit: dit 1, dah 3, gap 1, letter gap 3, word gap 7
-  const out: number[] = []
-  for (const w of ['DE', 'KJ5SCH']) {
-    for (const ch of w) {
-      for (const s of MORSE[ch]) out.push(...Array(s === '.' ? 1 : 3).fill(1), 0)
-      out.push(0, 0)
-    }
-    out.push(0, 0, 0, 0)
-  }
-  return out
-})()
-export const DIT = 0.06 // s at 20 WPM
-
 export function qsl(p: Path, t: number, b: Box, f: Face) {
   const w = b.x1 - b.x0, size = Math.min(0.2, w / 7.2)
   p.color(...GREEN, 1)
@@ -158,4 +144,61 @@ export function qsl(p: Path, t: number, b: Box, f: Face) {
     const x = b.x0 + 0.03 + ((w - 0.06) * j) / n
     p.lineTo(x, y + on * 0.03 * Math.sin(j * 2.4))
   }
+}
+
+// ---- what the receiver hears, on a scope: the same signal the speakers play --------------------------
+const WINDOW: Record<string, number> = { strobeglasses: 0.4, infiniterecon: 0.6 }
+const scopeEar: Ear = { lp: 0, lp1: 0, lp2: 0 }
+export function scope(p: Path, slug: string, t: number, b: Box, f: Face) {
+  const W = WINDOW[slug] ?? 0.1, n = 2400, cy = (b.y0 + b.y1) / 2, h = (b.y1 - b.y0) * 0.6
+  scopeEar.lp = scopeEar.lp1 = scopeEar.lp2 = 0
+  p.color(...GREEN, 0.18).moveTo(b.x0 + 0.02, cy).lineTo(b.x1 - 0.02, cy)
+  p.color(...GREEN, 0.9)
+  for (let j = 0; j <= n; j++) {
+    const tt = Math.floor(t * 30) / 30 - W + (W * j) / n, x = b.x0 + 0.02 + ((b.x1 - b.x0 - 0.04) * j) / n // a sweep every refresh
+    const y = cy + h * station(slug, tt, hash(tt * 48000), scopeEar)
+    j ? p.lineTo(x, y) : p.moveTo(x, y)
+  }
+  p.color(...GREEN, 0.5)
+  text(p, `what the receiver hears   ${Math.round(W * 1000)} ms`, b.x0 + 0.02, b.y0 + 0.03, 0.024, 0, f)
+}
+
+// ---- driftwood: a phone that is not there, walking ----------------------------------------------------
+// A loop of city blocks in metres, walked at 1.4 m/s (shown 20× faster), reported the way a GPS would:
+// an NMEA RMC sentence with its real checksum.
+const ROUTE = [[0, 0], [140, 0], [140, 90], [300, 90], [300, -50], [430, -50], [430, 130], [60, 130], [60, 60], [0, 60], [0, 0]]
+const LEGS = ROUTE.slice(1).map((q, i) => Math.hypot(q[0] - ROUTE[i][0], q[1] - ROUTE[i][1]))
+const LOOP = LEGS.reduce((a, b) => a + b)
+const LAT0 = 37.4275, LON0 = -122.1697 // Stanford's Main Quad
+const where = (s: number, o: number[]) => {
+  s = ((s % LOOP) + LOOP) % LOOP
+  let i = 0
+  while (s > LEGS[i]) s -= LEGS[i++]
+  const a = ROUTE[i], b = ROUTE[i + 1], k = s / LEGS[i]
+  return (o[0] = a[0] + (b[0] - a[0]) * k), (o[1] = a[1] + (b[1] - a[1]) * k), (o[2] = Math.atan2(b[0] - a[0], b[1] - a[1])), o
+}
+const pos = [0, 0, 0]
+const dm = (deg: number, w: number) => {
+  const d = Math.floor(Math.abs(deg)), m = (Math.abs(deg) - d) * 60
+  return `${String(d).padStart(w, '0')}${m.toFixed(4).padStart(7, '0')}`
+}
+
+export function walk(p: Path, t: number, b: Box, f: Face) {
+  const s = 1.4 * 20 * t, sc = Math.min((b.x1 - b.x0 - 0.1) / 430, (b.y1 - b.y0 - 0.2) / 180)
+  const ox = (b.x0 + b.x1) / 2 - 215 * sc, oy = (b.y0 + b.y1) / 2 - 40 * sc + 0.03
+  p.color(...GREEN, 0.22)
+  ROUTE.forEach((q, i) => (i ? p.lineTo : p.moveTo).call(p, ox + q[0] * sc, oy + q[1] * sc))
+  p.color(...GREEN, 0.9)
+  for (let j = 0; j <= 60; j++) where(s - 90 + (90 * j) / 60, pos), j ? p.lineTo(ox + pos[0] * sc, oy + pos[1] * sc) : p.moveTo(ox + pos[0] * sc, oy + pos[1] * sc)
+  where(s, pos)
+  p.color(1, 0.75, 0.35, 1).dot(ox + pos[0] * sc, oy + pos[1] * sc, 0.012)
+  const lat = LAT0 + pos[1] / 111_320, lon = LON0 + pos[0] / (111_320 * Math.cos((LAT0 * Math.PI) / 180))
+  const now = new Date(), hms = now.toISOString().slice(11, 19).replace(/:/g, ''), dmy = now.toISOString().slice(2, 10).split('-').reverse().join('')
+  const course = (((pos[2] * 180) / Math.PI + 360) % 360).toFixed(1)
+  const body = `GPRMC,${hms}.00,A,${dm(lat, 2)},N,${dm(lon, 3)},W,2.72,${course},${dmy},,,A`
+  let cs = 0
+  for (const ch of body) cs ^= ch.charCodeAt(0)
+  const nmea = `$${body}*${cs.toString(16).toUpperCase().padStart(2, '0')}`, size = Math.min(0.022, (b.x1 - b.x0 - 0.04) / (nmea.length * 0.62))
+  p.color(...GREEN, 0.75)
+  text(p, nmea, b.x0 + 0.02, b.y0 + 0.03, size, 0, f)
 }

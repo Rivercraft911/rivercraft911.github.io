@@ -24,7 +24,7 @@ export type Project = {
   body: string[]
   media: Media[]
   links: [string, string][]
-  demo?: 'esp' | 'yapogee' | 'ulam' | 'raster'
+  demo?: 'esp' | 'yapogee' | 'ulam' | 'raster' | 'scope' | 'walk'
   log: [number, number][] // [week since 2024-10-28, commits]: the waterfall
   todo?: string[]
 }
@@ -144,6 +144,7 @@ export const PROJECTS: Project[] = [
     body: ['Open source strobe glasses to compete with the expensive evil ones.'],
     media: [],
     links: [['source', `${GH}strobeGlasses`]],
+    demo: 'scope',
     log: [[39, 3], [40, 1], [47, 1]],
     todo: ['strobe rate and duty (10 Hz square is a guess)', 'photos, status, a better one-liner with a number'],
   },
@@ -191,6 +192,7 @@ export const PROJECTS: Project[] = [
     ],
     media: [],
     links: [['source', `${GH}InfiniteRecon`], ['first version', `${GH}InfiniteRecon_OUTDATED`]],
+    demo: 'scope',
     log: [[14, 8], [67, 1], [71, 2], [73, 10], [74, 2]],
     todo: ['a photo of the v2 board'],
   },
@@ -298,7 +300,7 @@ export const PROJECTS: Project[] = [
     freq: 1575.42e6,
     span: 0.004,
     signature: 'It never transmits; it tells the phone what GPS L1 C/A would have said: 1.023 Mchip/s at 1575.42 MHz, under the noise.',
-    sig: [{ k: 'sinc', f: 1575.42e6, rc: 1.023e6, p: -40 }],
+    sig: [{ k: 'sinc', f: 1575.42e6, rc: 1.023e6, p: -82 }],
     years: '2026',
     numbers: [
       ['moves', 'walk, jog, bike, drive, with pauses'],
@@ -311,6 +313,7 @@ export const PROJECTS: Project[] = [
     ],
     media: [],
     links: [['source', `${GH}driftwood`]],
+    demo: 'walk',
     log: [[77, 22], [78, 3]],
     todo: ['a screenshot of the route editor'],
   },
