@@ -9,14 +9,33 @@
     <style>
       html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
       canvas { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
-      p { display: none; position: fixed; inset: 0; margin: auto; height: 1em; color: #5f9;
-          font: 14px ui-monospace, monospace; text-align: center; }
-      .no-gpu p { display: block; }
+      main { display: none; box-sizing: border-box; max-width: 46rem; margin: auto; padding: 12vh 1.5rem;
+             color: #5f9; font: 14px/1.7 ui-monospace, Menlo, monospace; text-shadow: 0 0 6px #5f96; }
+      h1 { margin: 0; font: inherit; } h1 + p { margin: 0 0 2.5em; color: #3a6; }
+      dl { display: grid; grid-template-columns: max-content 1fr; gap: 0 2ch; margin: 0 0 2.5em; }
+      dt { color: #9fc; } dd { margin: 0; }
+      a { color: inherit; } small { display: block; margin-top: 4em; color: #285; font-size: inherit; }
+      @media (max-width: 34rem) { dl { grid-template-columns: 1fr; } dd { margin-bottom: 1em; } }
+      .no-gpu { overflow: auto; } .no-gpu canvas { display: none; } .no-gpu main { display: block; }
     </style>
   </head>
   <body>
     <canvas></canvas>
-    <p>this scope needs WebGPU · try a current Chrome, Edge or Safari</p>
+    <main>
+      <h1>River Dowdy · KJ5SCH</h1>
+      <p>signals, silicon, light, orbit</p>
+      <dl>
+        <dt>esp-dvbs2</dt><dd>DVB-S2 transmitter on one ESP32-S3, out of its own Wi-Fi radio</dd>
+        <dt>Yapogee</dt><dd>RP2350 DVB-S2 through PIO+DMA to an AFE7071, up to 32APSK</dd>
+        <dt>R-01</dt><dd>RGB raster laser projector: polygon mirror, galvo, 320×120</dd>
+        <dt>PEEP</dt><dd>world's smallest IR-triggered keystroke injector, 12.06 × 8 mm</dd>
+        <dt>Pigeon Vision</dt><dd>IREC rocket video payload, dual fisheye cameras</dd>
+        <dt>SAMWISE</dt><dd>CubeSat ADCS at Stanford SSI</dd>
+        <dt>autoprime</dt><dd>an agent loop for prime-number experiments</dd>
+      </dl>
+      <a href="https://github.com/Rivercraft911">github.com/Rivercraft911</a>
+      <small>the real site is drawn by a simulated oscilloscope beam and needs WebGPU · try a current Chrome, Edge or Safari</small>
+    </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
