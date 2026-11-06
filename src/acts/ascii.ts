@@ -54,7 +54,7 @@ function rtty(t: number) {
 }
 
 // The choir, held at the cell clock and quantized to Baudot's five bits.
-const held = { k: -1, s: new Float64Array(6) }, tmp: Stereo = { l: 0, r: 0, s: new Float64Array(6) }
+const held = { k: -1, s: new Float64Array(6) }, smoothed = new Float64Array(6), tmp: Stereo = { l: 0, r: 0, s: new Float64Array(6) }
 function crush(T: number, o: Stereo) {
   const k = Math.floor(T * HOLD)
   if (k !== held.k) {
@@ -63,7 +63,8 @@ function crush(T: number, o: Stereo) {
     sing(k / HOLD, tmp)
     for (let i = 0; i < 6; i++) held.s[i] = Math.round(tmp.s[i] * 64) / 64 // 32 levels over ±0.25, the choir's swing
   }
-  for (let i = 0; i < 6; i++) o.s[i] += held.s[i]
+  // smoothed a little after the hold, so the steps are heard as grit, not as shrill images of the clock
+  for (let i = 0; i < 6; i++) o.s[i] += smoothed[i] += (held.s[i] - smoothed[i]) * 0.3
 }
 
 export const ascii: Scene = {
@@ -84,7 +85,7 @@ export const ascii: Scene = {
     return (tt, o) => {
       if (tt < 0.025) return void (o.l = o.r = 0.5 * hash(tt * 48000) * Math.exp(-tt / 0.006)) // the splice
       crush(tt + WRAP + LEAD, o)
-      const r = 0.07 * rtty(tt)
+      const r = 0.035 * rtty(tt)
       o.l += r, o.r += r
     }
   },

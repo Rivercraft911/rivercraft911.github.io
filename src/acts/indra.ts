@@ -115,7 +115,6 @@ export const indra: Scene = {
     return (tt, o) => {
       if (splice(tt, o)) return
       sing(tt + AT, o, 1, { gold: smooth(0, 1.5, tt), prime: 1 - smooth(0, 1.5, tt) })
-      o.s[2] *= Math.cos(TAU * 1700 * tt) // the rising choir, inverted about 850 Hz
     }
   },
 }
