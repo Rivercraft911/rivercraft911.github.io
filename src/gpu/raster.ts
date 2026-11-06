@@ -70,8 +70,8 @@ export class Raster {
     ;[this.light, this.cell, this.text] = await Promise.all([pipe(r, 'lightFS', acc, ADD), pipe(r, 'cellFS', 'rg32float'), pipe(r, 'textFS', acc, ADD)])
     this.fields = await Promise.all(
       FIELDS.map(async (f) => {
-        const [w, h] = f.data ?? [1, 1]
-        const data = d.createTexture({ size: [w, h], format: 'r8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST })
+        const [w, h, b = 1] = f.data ?? [1, 1]
+        const data = d.createTexture({ size: [w, h], format: b > 1 ? 'rg8unorm' : 'r8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST })
         const u = d.createBuffer({ size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
         const group = d.createBindGroup({ layout, entries: [{ binding: 0, resource: { buffer: u } }, { binding: 1, resource: this.smp }, { binding: 2, resource: data.createView() }] })
         return { pipe: await pipe(d.createShaderModule({ code: prelude + f.code }), 'fs', FLOAT, undefined, fl), u, data, group }
@@ -129,8 +129,9 @@ export class Raster {
     d.queue.writeBuffer(F.u, 16, f.p)
     if (f.rows) {
       const { data, at, n } = f.rows, W = F.data.width, H = F.data.height, a = at % H, m = Math.min(n, H - a)
-      d.queue.writeTexture({ texture: F.data, origin: [0, a] }, data, { bytesPerRow: W }, [W, m])
-      if (n > m) d.queue.writeTexture({ texture: F.data }, data, { offset: m * W, bytesPerRow: W }, [W, n - m])
+      const B = F.data.format === 'rg8unorm' ? 2 * W : W
+      d.queue.writeTexture({ texture: F.data, origin: [0, a] }, data, { bytesPerRow: B }, [W, m])
+      if (n > m) d.queue.writeTexture({ texture: F.data }, data, { offset: m * B, bytesPerRow: B }, [W, n - m])
     }
     uf[0] = w, uf[1] = h, uf[2] = cw, uf[3] = ch, uf[4] = cols, uf[5] = rows
     uf[6] = Math.floor((w - cols * cw) / 2), uf[7] = Math.floor((h - rows * ch) / 2)

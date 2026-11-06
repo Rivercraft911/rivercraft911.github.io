@@ -1,5 +1,5 @@
 // An SDR waterfall of the soundtrack: the short-time spectrum of what the speakers are playing, on a
-// log-frequency axis from A0 up nine octaves, printed as rows of bytes for the GPU. It is reassigned
+// log-frequency axis from A0 up nine octaves, printed as rows of 16-bit levels for the GPU. It is reassigned
 // (Kodera, Gendrin & de Villedary 1976; Auger & Flandrin 1995): each FFT bin's energy is moved to the
 // bin's own instantaneous frequency, ω − Im(X_h′ / X_h), so a partial is a line, not a window's lobe.
 // A row is printed at any moment asked for, between two STFT frames a hop apart (Hann, 4096 points).
@@ -54,10 +54,13 @@ export class Waterfall {
     return out
   }
 
-  // Prints the spectrum at timeline time t as one row of bytes into out at offset o.
+  // Prints the spectrum at timeline time t as one row into out at offset o: two bytes a bin, high then low.
   // A moment the speakers have not played a half window past yet reads as the newest frame there is.
   row(t: number, out: Uint8Array, o: number) {
     const x = Math.min(t, heard.end - N / 2 / heard.sr - HOP) / HOP, j = Math.floor(x), k = x - j, a = this.frame(j), b = this.frame(j + 1), l = this.last
-    for (let m = 0; m < BINS; m++) (l[m] = a[m] + (b[m] - a[m]) * k), (out[o + m] = l[m] * 255 + 0.5)
+    for (let m = 0; m < BINS; m++) {
+      const q = Math.round((l[m] = a[m] + (b[m] - a[m]) * k) * 65535)
+      ;(out[o + 2 * m] = q >> 8), (out[o + 2 * m + 1] = q & 255)
+    }
   }
 }

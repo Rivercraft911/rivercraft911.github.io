@@ -58,7 +58,7 @@ function look(T: number, kick = 0) {
   chart()
   const d = d0 * (1 / d0) ** smooth(1, 3.4, T) // our distance from the sheet: a dive, steady in log scale
   const c = Math.max(1e-3, smooth(2.4, 4.2, T)) // its curl
-  const p = lock([[0, 0], [2.7, Math.PI / 2]], T, 2.2, 0.8) // we pitch up to look down the tube as it closes
+  const p = lock([[0, 0], [1.8, Math.PI / 2]], T, 2.2, 0.8) // we pitch up to skim the sheet, then look down the tube it closes into
   const fov = mix(0.9, 1.35, smooth(3, 5.5, T)) + kick
   const v = cam
   v.rho = W / (TAU * c)
@@ -72,14 +72,14 @@ function look(T: number, kick = 0) {
 
 // The printer: rows of the waterfall at even spacing along the sheet, each at the moment it was printed.
 // A fresh sheet starts with as much history as the speakers still remember.
-const water = new Waterfall(), rows = new Uint8Array(BINS * MAX)
+const water = new Waterfall(), rows = new Uint8Array(2 * BINS * MAX)
 const printer = { k: 0, from: 0, T: -1 }
 function print(T: number, now: number, f: Field) {
   const top = Math.floor(head(T) / DY), pr = printer
   if (T < pr.T || T - pr.T > 0.5 || top - pr.k > MAX) pr.k = pr.from = top - MAX // a jump: start a fresh sheet
   pr.T = T
   const n = top - pr.k
-  for (let i = 0; i < n; i++) water.row(now - (T - printedAt((pr.k + 1 + i) * DY)), rows, i * BINS)
+  for (let i = 0; i < n; i++) water.row(now - (T - printedAt((pr.k + 1 + i) * DY)), rows, 2 * i * BINS)
   f.rows = n > 0 ? { data: rows, at: (((pr.k + 1) % ROWS) + ROWS) % ROWS, n } : undefined
   pr.k = top
   return top

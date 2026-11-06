@@ -13,7 +13,9 @@ const PI = 3.1415927;
 const OCT = 9.0;
 const DB = 56.0 * 0.33219281; // the rows' range, 56 dB, in doublings of power
 
-// A row's byte is dB over the floor; power and back again, with the floor as zero.
+// A row's level is dB over the floor, in 16 bits as two bytes (filtering is linear, so it filters them
+// apart and they add back exactly); power and back again, with the floor as zero.
+fn at(t: vec2f) -> f32 { return dot(textureSampleLevel(data, smp, t, 0.0).rg, vec2f(65280.0, 255.0) / 65535.0); }
 fn power(s: f32) -> f32 { return exp2(DB * clamp(s, 0.0, 1.0)) - 1.0; }
 fn level(p: f32) -> f32 { return log2(1.0 + p) / DB; }
 
@@ -36,29 +38,26 @@ fn across(x: f32, v: f32, w: f32) -> f32 {
   let k1 = 1.0 + f * f * (-2.5 + 1.5 * f);
   let k2 = f * (0.5 + f * (2.0 - 1.5 * f));
   let k3 = f * f * (-0.5 + 0.5 * f);
-  return k0 * textureSampleLevel(data, smp, vec2f((c - 1.0) / w, v), 0.0).r
-       + (k1 + k2) * textureSampleLevel(data, smp, vec2f((c + k2 / (k1 + k2)) / w, v), 0.0).r
-       + k3 * textureSampleLevel(data, smp, vec2f((c + 2.0) / w, v), 0.0).r;
+  return k0 * at(vec2f((c - 1.0) / w, v)) + (k1 + k2) * at(vec2f((c + k2 / (k1 + k2)) / w, v)) + k3 * at(vec2f((c + 2.0) / w, v));
 }
 
 // Magnified, a line is drawn as the beam draws one: a spot sized in pixels. Each local peak among the four
 // bins around x is fitted with its parabola, which gives where the partial truly is, how loud, and how wide
-// the estimate made it; it is drawn there at that width, but never wider than the spot, p[5].w raster
-// pixels, and as
-// bright as its energy, narrowed, makes it (up to 8 times). Crests
-// wider than 3 bins are too flat for bytes to place; they stay the glow they are.
+// the estimate made it; it is drawn there at that width, but never wider than the spot (p[5].w raster
+// pixels), and as bright as its energy, narrowed, makes it (up to 8 times). Crests wider than 8 bins are
+// too flat to place; they stay the glow they are.
 const NEPER = 0.07755; // a Gaussian's curvature in row units: 10 log10(e) / 56 dB
 fn ridge(x: f32, v: f32, w: f32, fx: f32) -> f32 {
   let c = floor(x - 0.5);
   var s: array<f32, 4>;
-  for (var j = 0; j < 4; j++) { s[j] = textureSampleLevel(data, smp, vec2f((c + f32(j) - 0.5) / w, v), 0.0).r; }
+  for (var j = 0; j < 4; j++) { s[j] = at(vec2f((c + f32(j) - 0.5) / w, v)); }
   var p = 0.0;
   for (var j = 1; j < 3; j++) {
     let a = s[j - 1];
     let b = s[j];
     let d = s[j + 1];
     let k = a - 2.0 * b + d;
-    if (b >= a && b >= d && k < -NEPER / 9.0) {
+    if (b >= a && b >= d && k < -NEPER / 64.0) {
       let at = 0.5 * (a - d) / k;
       let wide = sqrt(NEPER / -k) / fx;
       let sig = min(wide, u.p[5].w);
@@ -81,7 +80,7 @@ fn sheet(x: f32, r: f32, fx: f32, fy: f32, e: f32) -> f32 {
     let v = (r + 0.5 + ((f32(j) + e) / f32(ny) - 0.5) * fy) / size.y;
     if (fx < 1.0) { p += max(ridge(x, v, size.x, fx), power(across(x, v, size.x)) * fx); continue; }
     for (var i = 0; i < nx; i++) {
-      p += power(textureSampleLevel(data, smp, vec2f((x + ((f32(i) + 0.5) / f32(nx) - 0.5) * fx) / size.x, v), 0.0).r);
+      p += power(at(vec2f((x + ((f32(i) + 0.5) / f32(nx) - 0.5) * fx) / size.x, v)));
     }
   }
   return p / f32(ny * select(nx, 1, fx < 1.0));
@@ -133,9 +132,11 @@ fn field(q: vec2f) -> vec3f {
     let x = rho * (phi + TAU * k);
     if (abs(x) <= span) { pw += sheet((x + span) * per, r, fx, fy, e); }
   }
-  // The newest rows are still hot from the printing; a pinhole's light falls off as cos⁴ off axis.
+  // The newest rows are still hot from the printing, and the rows fade as they age, the way a long
+  // persistence screen's do; a pinhole's light falls off as cos⁴ off axis.
   let age = back / max(u.p[5].z, 1e-3);
   let cs = s * s / dot(dir, dir);
   let lv = level(pw);
-  return palette(lv + 0.3 * exp(-age / 0.12) * lv) * u.p[5].x * cs * cs * smoothstep(0.0, 0.15, back) * (1.0 - smoothstep(oldest - 1.5, oldest, back));
+  let edges = smoothstep(0.0, 0.15, back) * (1.0 - smoothstep(oldest - 1.5, oldest, back));
+  return palette(lv * (1.0 + 0.3 * exp(-age / 0.12))) * (u.p[5].x * cs * cs * exp(-age / 2.0) * edges);
 }

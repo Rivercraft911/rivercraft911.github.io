@@ -17,8 +17,9 @@ import { BINS } from '../dsp/waterfall'
 export const ROWS = 4096 // the waterfall's ring of rows
 export const SIEVE = [1024, 64] // the primes' sieve: a byte for every 30 integers
 
-export const FIELDS: { code: string; data?: [number, number] }[] = [
-  { code: wrap, data: [BINS, ROWS] },
+// A field's data texture: width, height, and bytes a texel (2: rg8, a 16-bit value split high and low).
+export const FIELDS: { code: string; data?: [number, number, number?] }[] = [
+  { code: wrap, data: [BINS, ROWS, 2] },
   { code: film + primes, data: [SIEVE[0], SIEVE[1]] },
   { code: camera + film + indra },
   { code: camera + march + kifs },
