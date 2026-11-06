@@ -1,11 +1,11 @@
 // Scenes play back to back. Across a fade the two share the beam, so the handoff is drawn, not cut.
-import type { Stereo, Voice } from '../audio/audio'
+import { stereo, type Voice } from '../audio/audio'
 import { clamp, type Frame, type Scene } from './scene'
 
 export class Timeline {
   readonly starts: number[] = []
-  private a: Stereo = { l: 0, r: 0 }
-  private b: Stereo = { l: 0, r: 0 }
+  private a = stereo()
+  private b = stereo()
 
   constructor(readonly scenes: Scene[]) {
     let t = 0
@@ -29,10 +29,12 @@ export class Timeline {
     f.ch.push(...f.ch.splice(0, n)) // the outgoing scene keeps the earlier beam slot
     return (t, o) => {
       a.l = a.r = b.l = b.r = 0
+      a.s.fill(0), b.s.fill(0)
       va?.(t, a)
       vb?.(t, b)
       o.l = a.l + b.l
       o.r = a.r + b.r
+      for (let i = 0; i < o.s.length; i++) o.s[i] = a.s[i] + b.s[i]
     }
   }
 
@@ -41,6 +43,12 @@ export class Timeline {
     const t0 = this.starts[i], n = f.ch.length
     const v = this.scenes[i].build(t - t0, f)
     for (let j = n; j < f.ch.length; j++) (f.ch[j].w *= k), (f.ch[j].off = -t0)
-    return v ? (t, o) => (v(t - t0, o), (o.l *= k), (o.r *= k)) : undefined
+    if (!v) return undefined
+    if (k >= 1) return (t, o) => v(t - t0, o)
+    return (t, o) => {
+      v(t - t0, o)
+      o.l *= k, o.r *= k
+      for (let i = 0; i < o.s.length; i++) o.s[i] *= k
+    }
   }
 }
