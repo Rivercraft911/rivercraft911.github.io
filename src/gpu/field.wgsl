@@ -16,6 +16,14 @@ struct F {
   return vec4f(f32((i << 1u) & 2u) * 2.0 - 1.0, f32(i & 2u) * 2.0 - 1.0, 0.0, 1.0);
 }
 
+// A raymarch that diverges can return NaN or infinity. One such pixel, blurred by the halo and held by the
+// phosphor's memory, grows into a grey or black blot that never fades: so it is light 0, here, at the source.
+fn finite(c: vec3f) -> vec3f {
+  let e = bitcast<vec3u>(c) & vec3u(0x7f800000u); // an all-ones exponent is NaN or infinity; fast math can't fold this away
+  let ok = (e != vec3u(0x7f800000u)) & (abs(c) < vec3f(1e4));
+  return select(vec3f(0.0), max(c, vec3f(0.0)), ok);
+}
+
 @fragment fn fs(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-  return vec4f(field(vec2f((pos.x / u.res.x * 2.0 - 1.0) * u.aspect, 1.0 - pos.y / u.res.y * 2.0)), 0.0);
+  return vec4f(finite(field(vec2f((pos.x / u.res.x * 2.0 - 1.0) * u.aspect, 1.0 - pos.y / u.res.y * 2.0))), 0.0);
 }

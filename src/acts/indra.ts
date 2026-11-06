@@ -8,11 +8,12 @@
 import { INDRA as SHADER } from '../gpu/fields'
 import type { Field } from '../gpu/raster'
 import { descent, place, sing } from './choir'
-import { AT as R2, DUR as R2DUR } from './primes'
+import { DUR as WRAP, LEAD } from './wrap'
+import { ascii } from './ascii'
 import { aim, equation, jump, project, seen, splice } from './reality'
 import { mix, smooth, type Scene } from './scene'
 
-export const AT = R2 + R2DUR
+export const AT = LEAD + WRAP + ascii.dur // the choir's clock when this reality begins
 export const DUR = 9
 const A = 1.95859, B = 0.0112 // the trace of a: a pearl necklace that spirals as it shrinks
 const MU = { re: -B, im: A } // a(z) = μ + 1/z

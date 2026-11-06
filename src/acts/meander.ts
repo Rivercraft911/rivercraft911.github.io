@@ -101,8 +101,8 @@ export const meander: Scene = {
     return (tt, out) => {
       // the hook's sweep and square, handing over to the river run there and back
       const ph = ((tt * FLOW) % 1) * 2, p = at(ph < 1 ? ph : 2 - ph)
-      out.l = mix(0.3 * (2 * (((tt * F) / PERIODS) % 1) - 1), 0.85 * p.x * s, hand)
-      out.r = mix(0.9 * AMP * square(tt, ONES), 0.85 * p.y * s * 1.6, hand)
+      out.l = mix(0.3 * (2 * (((tt * F) / PERIODS) % 1) - 1), 0.35 * p.x * s, hand)
+      out.r = mix(0.9 * AMP * square(tt, ONES), 0.35 * p.y * s * 1.6, hand)
     }
   },
 }

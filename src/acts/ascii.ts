@@ -68,7 +68,7 @@ function crush(T: number, o: Stereo) {
 }
 
 export const ascii: Scene = {
-  dur: 8,
+  dur: 5,
   build(t, f) {
     const T = t + WRAP
     const kick = 0.45 - lock([[0, 0], [0, 0.45]], t, 7, 0.4) // the jump throws the lens wide; it rings back

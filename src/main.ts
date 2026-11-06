@@ -11,7 +11,6 @@ import { valley } from './acts/valley'
 import { ident } from './acts/ident'
 import { singularity } from './acts/singularity'
 import { wrap } from './acts/wrap'
-import { primes } from './acts/primes'
 import { indra } from './acts/indra'
 import { stutter } from './acts/stutter'
 import { ophanim } from './acts/ophanim'
@@ -30,12 +29,12 @@ const scenes = q.has('specimen')
   : direct()
     ? [band]
     : q.has('fall')
-      ? [wrap, ascii, primes, indra, stutter, ophanim, singularity]
+      ? [wrap, ascii, indra, stutter, ophanim, singularity]
       : q.has('ident')
         ? [ident]
         : q.has('end')
           ? [singularity, ident, band]
-          : [hook, meander, valley, wrap, ascii, primes, indra, stutter, ophanim, singularity, ident, band]
+          : [hook, meander, valley, wrap, ascii, indra, stutter, ophanim, singularity, ident, band]
 const timeline = new Timeline(scenes)
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }

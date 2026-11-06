@@ -11,8 +11,8 @@ export const PERIODS = 3 // periods per sweep
 export const LAST = 50 // harmonics 1, 3, … 101
 export const AMP = 0.42
 const DEGAUSS = 0.7
-const T1 = 1.3 // the fundamental arrives
-const T_HARM = 1.9, T_FULL = 6.3 // the odd harmonics land between these, quickening
+const T1 = 1 // the fundamental arrives
+const T_HARM = 1.5, T_FULL = 4.9 // the odd harmonics land between these, quickening
 export const lands = (k: number) => (k ? T_HARM + (T_FULL - T_HARM) * (k / LAST) ** 0.55 : T1)
 
 // Each harmonic's weight at time t: a step through an underdamped loop.
@@ -46,7 +46,7 @@ const eq = new Say()
 
 const d = { x: 0, y: 0 }
 export const hook: Scene = {
-  dur: 7,
+  dur: 5.5,
   build(t, f) {
     const A = view.a * 0.9, open = lock([[0, 0], [DEGAUSS, 1]], t, 9, 0.55)
     weights(t)

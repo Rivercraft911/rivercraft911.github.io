@@ -8,15 +8,15 @@ import { room, type Stereo } from '../audio/audio'
 import { Shepard, type Part } from '../dsp/shepard'
 import { clamp, smooth } from './scene'
 
-export const END = 83.5 // the collapse into one point on the choir's clock: singularity's AT (ophanim's AT + DUR) + FALL
+export const END = 65 // the collapse into one point on the choir's clock: singularity's AT (ophanim's AT + DUR) + 7.5
 const GAIN = 1.1 // about the old choirs' swing, which the realities' bends expect
-const FALL = 21 // the wrap, where the fall begins: the choir is silent before it
+const FALL = 13.5 // the falls flattening into the plot: the choir is silent before it, then fades in
 
 // The swell toward the singularity, ∈ [0, 1], steepest at the end.
-export const swell = (T: number) => clamp((T - 44) / (END - 44)) ** 2
+export const swell = (T: number) => clamp((T - (END - 27)) / 27) ** 2
 
 // Octaves per second of fall, and its integral, the descent: tabulated once.
-export const rate = (T: number) => 0.12 + 0.42 * smooth(0, 10, T) + 0.5 * smooth(56, END, T)
+export const rate = (T: number) => 0.12 + 0.42 * smooth(0, 10, T) + 0.5 * smooth(END - 15, END, T)
 const DT = 1 / 1000, S = new Float64Array(120_000)
 for (let i = 1; i < S.length; i++) S[i] = S[i - 1] + rate(i * DT) * DT
 export const descent = (T: number) => {
@@ -26,7 +26,7 @@ export const descent = (T: number) => {
 }
 // The choir's own glide, far slower than the zoom: an octave every 14 s, quickening to every 6 s at the
 // climax. Faster, and the octaves stop fusing into one tone and are heard as separate sirens.
-const sungRate = (T: number) => 0.07 + 0.1 * smooth(44, END, T)
+const sungRate = (T: number) => 0.07 + 0.1 * smooth(END - 27, END, T)
 const SUNG = new Float64Array(S.length)
 for (let i = 1; i < SUNG.length; i++) SUNG[i] = SUNG[i - 1] + sungRate(i * DT) * DT
 const sung = (T: number) => (T <= 0 ? sungRate(0) * T : SUNG[Math.min(SUNG.length - 1, Math.round(T / DT))])
@@ -56,7 +56,7 @@ export function place(T: number) {
 // Every sample: the choir sings into the bed, voices 0 and 1 its left and right, 2 the dread under it.
 const part: Part = { l: 0, r: 0, d: 0 }
 export function sing(T: number, o: Stereo, gain = 1, m = CALM) {
-  const e = gain * GAIN * smooth(FALL - 0.5, FALL + 2.5, T) * (1 - smooth(END - 0.3, END, T))
+  const e = gain * GAIN * smooth(FALL, FALL + 4, T) * (1 - smooth(END - 0.3, END, T))
   if (e <= 0) return
   const g = m.gold ?? 0, td = m.mirror === undefined ? T : 2 * m.mirror - T, s = sung(td)
   part.l = part.r = part.d = 0
