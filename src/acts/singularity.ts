@@ -113,7 +113,7 @@ export const singularity: Scene = {
     // the shadow's edge on screen, as a static observer at D sees it: sin α = (√27 / D) √(1 − 2/D)
     const r1 = p[3] * Math.tan(Math.asin((Math.sqrt(27) / D) * Math.sqrt(1 - 2 / D)))
     const z = Math.exp(1.6 * Math.max(0, t - FALL) ** 1.6) // the collapse: the picture shrinks to a point
-    p[16] = 8 * t, p[17] = z, p[18] = Math.min(4, Math.sqrt(z)) * (z < 400 ? 1 : 0), p[19] = smooth(OPEN, OPEN + 1, t)
+    p[16] = 3 * t, p[17] = z, p[18] = Math.min(4, Math.sqrt(z)) * (z < 400 ? 1 : 0), p[19] = smooth(OPEN, OPEN + 1, t)
     p[20] = t > OPEN ? PER * (descent(T) - descent(AT + OPEN)) : 0
     p[21] = Math.max(0.9, Math.log((Math.hypot(view.a, 1) + 0.15) / r1)), p[22] = PSI, p[23] = 0.8 * r1
     // ring i, world i: lit in the order we fell, then spiralling down toward the photon sphere, where
