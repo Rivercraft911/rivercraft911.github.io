@@ -91,7 +91,7 @@ const TAU_RASTER = 0.006
 
 // The tube at fall time T into the frame: the raster's field and its new rows.
 const field: Field = { shader: SHADER, k: 1, p: new Float32Array(24), res: 1.5 } // its lines are drawn a pixel wide
-export function tube(T: number, now: number, f: Frame, kick = 0, gain = 1) {
+export function tube(T: number, now: number, f: Frame, kick = 0, gain = 1, spot = 0.9) {
   look(T, kick)
   const top = print(T, now, field), v = cam, p = field.p
   p.set(v.eye), (p[3] = v.s)
@@ -99,7 +99,7 @@ export function tube(T: number, now: number, f: Frame, kick = 0, gain = 1) {
   p.set(v.u, 8), (p[11] = v.cz)
   p.set(v.f, 12), (p[15] = W)
   p[16] = top * DY, p[17] = DY, p[18] = top % ROWS, p[19] = ROWS
-  p[20] = gain, p[21] = top - printer.from, p[22] = speed(T)
+  p[20] = gain, p[21] = top - printer.from, p[22] = speed(T), p[23] = spot
   field.cell = undefined
   f.field = field
   f.look = { tau: TAU_RASTER }

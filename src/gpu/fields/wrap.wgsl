@@ -6,7 +6,7 @@
 //
 // p[0] eye, 1/tan(fov/2)     p[1] right, radius of the roll    p[2] up, z of the roll's axis
 // p[3] forward, an octave's width on the sheet                  p[4] head y, y per row, head's ring row, rows
-// p[5] gain, rows printed so far, sheet per second
+// p[5] gain, rows printed so far, sheet per second, spot
 
 const TAU = 6.2831853;
 const PI = 3.1415927;
@@ -43,10 +43,10 @@ fn across(x: f32, v: f32, w: f32) -> f32 {
 
 // Magnified, a line is drawn as the beam draws one: a spot sized in pixels. Each local peak among the four
 // bins around x is fitted with its parabola, which gives where the partial truly is, how loud, and how wide
-// the estimate made it; it is drawn there at that width, but never wider than SPOT raster pixels, and as
+// the estimate made it; it is drawn there at that width, but never wider than the spot, p[5].w raster
+// pixels, and as
 // bright as its energy, narrowed, makes it (up to 8 times). Crests
 // wider than 3 bins are too flat for bytes to place; they stay the glow they are.
-const SPOT = 0.9;
 const NEPER = 0.07755; // a Gaussian's curvature in row units: 10 log10(e) / 56 dB
 fn ridge(x: f32, v: f32, w: f32, fx: f32) -> f32 {
   let c = floor(x - 0.5);
@@ -61,7 +61,7 @@ fn ridge(x: f32, v: f32, w: f32, fx: f32) -> f32 {
     if (b >= a && b >= d && k < -NEPER / 9.0) {
       let at = 0.5 * (a - d) / k;
       let wide = sqrt(NEPER / -k) / fx;
-      let sig = min(wide, SPOT);
+      let sig = min(wide, u.p[5].w);
       let dx = (x - (c + f32(j) - 0.5 + at)) / (fx * sig);
       p = max(p, power(b - 0.25 * (a - d) * at) * min(wide / sig, 8.0) * exp(-0.5 * dx * dx));
     }

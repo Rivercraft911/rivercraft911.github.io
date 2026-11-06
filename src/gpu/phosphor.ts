@@ -3,7 +3,7 @@ import beamWGSL from './beam.wgsl?raw'
 import postWGSL from './post.wgsl?raw'
 import { FLOATS, type Beam } from '../beam/beam'
 import type { Face } from '../beam/font'
-import { Raster, TILE, type Field } from './raster'
+import { GRID, Raster, TILE, type Field } from './raster'
 
 export type Look = {
   sigma: number // spot radius as a fraction of screen height
@@ -189,7 +189,7 @@ export class Phosphor {
   }
 
   // The character generator: the beam draws each glyph of the face once into the raster's atlas, and the
-  // ink in each block of a glyph's 3 × 5 grid is read back as its shape.
+  // ink in each block of a glyph's grid is read back as its shape.
   async glyphs(face: Face, chars: string) {
     const d = this.device, cols = this.raster.makeAtlas(chars.length), atlas = this.raster.atlas
     const W = atlas.width, H = atlas.height, sigma = 1.3, cap = 0.56 * TILE[1], base = 0.74 * TILE[1]
@@ -226,12 +226,13 @@ export class Phosphor {
     enc.copyTextureToBuffer({ texture: atlas }, { buffer: back, bytesPerRow: W * 8 }, [W, H])
     d.queue.submit([enc.finish()])
     await back.mapAsync(GPUMapMode.READ)
-    const px = new Uint16Array(back.getMappedRange()), ink = new Float32Array(chars.length * 15)
+    const px = new Uint16Array(back.getMappedRange()), K = GRID[0] * GRID[1], ink = new Float32Array(chars.length * K)
+    const bw = TILE[0] / GRID[0], bh = TILE[1] / GRID[1]
     for (let i = 0; i < chars.length; i++)
       for (let y = 0; y < TILE[1]; y++)
         for (let x = 0; x < TILE[0]; x++) {
           const X = (i % cols) * TILE[0] + x, Y = Math.floor(i / cols) * TILE[1] + y
-          ink[i * 15 + Math.floor((y * 5) / TILE[1]) * 3 + Math.floor((x * 3) / TILE[0])] += half(px[(Y * W + X) * 4])
+          ink[i * K + Math.floor(y / bh) * GRID[0] + Math.floor(x / bw)] += Math.min(1, half(px[(Y * W + X) * 4])) / (bw * bh)
         }
     back.destroy(), u.destroy()
     this.raster.setGlyphs(chars, ink)

@@ -20,6 +20,7 @@ export type Field = {
 
 const FLOAT: GPUTextureFormat = 'rgba16float'
 export const TILE = [24, 40] // a glyph's tile in the atlas, px
+export const GRID = [6, 10] // a cell's shape: its light over this grid, and a glyph's ink over the same
 const ATLAS_COLS = 8
 
 export class Raster {
@@ -48,7 +49,7 @@ export class Raster {
   constructor(readonly device: GPUDevice) {
     const d = device
     this.u = d.createBuffer({ size: this.uf.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
-    this.glyph = d.createBuffer({ size: 256 * 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
+    this.glyph = d.createBuffer({ size: 64 * 60 * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
     this.smp = d.createSampler({ magFilter: 'linear', minFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat' })
     this.back = d.createBuffer({ size: 4096, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST })
   }
@@ -78,14 +79,10 @@ export class Raster {
     )
   }
 
-  // The character generator: tiles the beam drew into `atlas`, and each one's ink over a 3 × 5 grid,
-  // normalized so the inkiest block of any glyph is 1.
+  // The character generator: tiles the beam drew into `atlas`, and each one's ink over the GRID, as the
+  // fraction of each block its strokes cover.
   setGlyphs(chars: string, ink: Float32Array) {
-    let hi = 0
-    for (const v of ink) hi = Math.max(hi, v)
-    const g = new Float32Array(256 * 4)
-    for (let i = 0; i < chars.length; i++) for (let k = 0; k < 15; k++) g[i * 16 + k] = ink[i * 15 + k] / hi
-    this.device.queue.writeBuffer(this.glyph, 0, g)
+    this.device.queue.writeBuffer(this.glyph, 0, ink.subarray(0, 64 * 60))
     this.chars = chars
   }
 
@@ -106,7 +103,7 @@ export class Raster {
     const text = !!f.cell && this.chars.length > 0
     const ch = Math.round((f.cell ?? 20) * dpr), cw = Math.round(ch * 0.6)
     const cols = Math.floor(w / cw), rows = Math.floor(h / ch), sc = Math.min(1, this.scale * (f.res ?? 1))
-    const fw = text ? cols * 6 : Math.max(1, Math.round(w * sc)), fh = text ? rows * 10 : Math.max(1, Math.round(h * sc))
+    const fw = text ? cols * GRID[0] : Math.max(1, Math.round(w * sc)), fh = text ? rows * GRID[1] : Math.max(1, Math.round(h * sc))
     if (this.tex?.width !== fw || this.tex.height !== fh || this.mode !== +text || (text && this.cells?.width !== cols)) {
       this.tex?.destroy(), this.cells?.destroy()
       const tex = (w: number, h: number, format: GPUTextureFormat) =>
@@ -120,7 +117,7 @@ export class Raster {
       this.groups = [group(this.light, [[0, u], [1, s], [2, v]])]
       if (text)
         this.groups.push(
-          group(this.cell, [[0, u], [1, s], [2, v], [5, { buffer: this.glyph }]]),
+          group(this.cell, [[0, u], [2, v], [5, { buffer: this.glyph }]]),
           group(this.text, [[0, u], [1, s], [3, this.views[1]], [4, this.atlas.createView()]]),
         )
       this.mode = +text
