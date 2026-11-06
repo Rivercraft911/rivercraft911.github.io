@@ -9,13 +9,14 @@ import { hook } from './acts/hook'
 import { meander } from './acts/meander'
 import { valley } from './acts/valley'
 import { ident } from './acts/ident'
+import { singularity } from './acts/singularity'
 import { fall } from './acts/fall'
 
 const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
 const beam = new Beam()
 const audio = new Audio()
-const timeline = new Timeline(q.has('specimen') ? [specimen] : q.has('ident') ? [ident] : [hook, meander, valley, fall])
+const timeline = new Timeline(q.has('specimen') ? [specimen] : q.has('ident') ? [ident] : q.has('end') ? [singularity, ident] : [hook, meander, valley, fall])
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }
 
