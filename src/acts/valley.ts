@@ -10,7 +10,6 @@ import { Path, STRIDE } from '../beam/path'
 import { load, use } from '../beam/font'
 import { fft, hann } from '../dsp/fft'
 import { Field } from '../dsp/terrain'
-import { place, sing } from './choir'
 import { heard } from '../audio/audio'
 import { Board, Say } from './say'
 import { TAU, cam, clamp, glide, hash, lock, mix, smooth, view, type Scene } from './scene'
@@ -533,17 +532,12 @@ export const valley: Scene = {
     ceil = board.show(f, t, smooth(0.2, 0.8, t))
 
     f.rate = mix(2.4e6, 7.2e6, smooth(1, 8, t))
-    if (t > SING) place(t - SING)
     return (tt, o) => {
-      // over the edge the scope rule ends: the falls roar and the choirs begin to sing around us
+      // over the edge the scope rule ends: the falls roar
       if (tt > 9.5 && tt < DUR) {
         lp += (hash(tt * 48_000) - lp) * 0.04
         const roar = 0.5 * lp * smooth(9.5, 15.5, tt) * (1 - 0.6 * smooth(21.5, 27.5, tt))
-        // fish leaping in the falls: Gaussian chirplets sweeping up, each a bright diagonal in the waterfall
-        const ft = tt * 1.7, n = Math.floor(ft), a = ft - n, f0 = 250 + 500 * rnd(n), k = 900 + 2600 * rnd(n + 7)
-        const fish = smooth(13.5, 15.5, tt) * 0.18 * Math.exp(-(((a - 0.5) / 0.16) ** 2)) * Math.sin(TAU * (f0 * a + 0.5 * k * a * a) / 1.7)
-        o.l += roar + fish, o.r += roar + fish
-        if (tt > SING) sing(tt - SING, o)
+        o.l += roar, o.r += roar
       }
       if (heroN < 2 || tt > 13.5) return
       const ph = ((tt * 55) % 1) * 2, u = (ph < 1 ? ph : 2 - ph) * (heroN - 1), i = Math.min(heroN - 2, Math.floor(u)), a = u - i

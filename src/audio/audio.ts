@@ -43,6 +43,7 @@ export class Bed {
 
   mix(o: Stereo) {
     const s = o.s, a = s[0], b = s[1], c = s[2], h = this.hall
+    if (!(Math.abs(a + b + c) < 1e3)) return void (s[0] = s[1] = s[2] = 0) // a bad sample must never reach the hall's memory
     h.run(a + c, b + c, room.rt)
     const l = this.block(0, room.gain * (a + 0.5 * c + room.wet * h.l)), r = this.block(1, room.gain * (b + 0.5 * c + room.wet * h.r))
     const p = Math.max(Math.abs(l), Math.abs(r))

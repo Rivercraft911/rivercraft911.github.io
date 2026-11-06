@@ -1,23 +1,18 @@
-// The fall's choir: a Shepard–Risset glissando (Risset's "Fall", 1968). Layers a period apart slide down
-// forever under a fixed bell over log-frequency, fading in at the top as they fade out at the bottom, so
-// the fall never lands. Each layer sings a chord from the harmonic series's own octave, harmonics 8 to 15,
-// through a vowel: the partials slide down through fixed formants, the way a falling voice does. The chord
-// fills in the order the series offers it (root, fifth, third, seventh, ninth, then 11, 13, 15), and with
-// all eight in every octave the layers fuse into one harmonic voice. Each chord tone is a section of the
-// choir standing in a fixed place on a wide stage: two singers at first, beating a fraction of a hertz
-// apart and starting at random phases so no two sections breathe together; two more join, a few cents off,
-// as the chorus swells. Under them a dread choir sings a septimal tritone, a minor second and a low
-// tritone that crawl apart from unison into a quarter-tone cluster (Ligeti, Penderecki), and the vowel
-// darkens from "ah" to "oo". A period of φ instead of 2 never lines up (Tenney).
+// The fall's choir: a Shepard–Risset glissando (Risset's "Fall", 1968). Pure tones a period apart slide
+// down forever under a fixed bell over log-frequency, fading in at the top as they fade out at the bottom,
+// so the fall never lands. Each layer is its octave and, softer, the fifth above; seven octaves, 40 Hz to
+// about 5 kHz, nothing shrill. Each tone is a section of singers in a fixed place on a wide stage: two
+// beating a fraction of a hertz apart from random phases, two more joining a few cents off as the chorus
+// swells. Under them, quietly, a dread choir sings a septimal tritone, a minor second and a low tritone
+// that crawl apart from unison into a quarter-tone cluster. A period of φ instead of 2 never lines up.
 
-const F0 = 27.5
-const ANGEL = [1, 3 / 2, 5 / 4, 7 / 4, 9 / 8, 11 / 8, 13 / 8, 15 / 8] // harmonics 8–15, in the order they enter
-const STAGE = [0, -0.4, 0.4, -0.65, 0.65, -0.85, 0.85, -0.2] // where each section stands, −1 left to 1 right
+const F0 = 40
+const ANGEL = [1, 3 / 2] // each layer: its octave and, softer, the fifth above
+const STAGE = [-0.15, 0.15] // where each section stands, −1 left to 1 right
 const DREAD = [7 / 5, 16 / 15, 45 / 64] // septimal tritone, minor second, a low tritone
 const TONES = ANGEL.length + DREAD.length
 const SINGERS = 4 // per section: the beating pair, then two who join with the chorus
 const CENTS = [0, 0, -9, 7], SPREAD = [0, 0, -0.3, 0.3]
-const AH = [700, 1220, 2600], OO = [300, 870, 2240], GAINS = [1, 0.5, 0.25]
 const TOP = 18_000 // nothing sings above this, so nothing folds back past Nyquist
 const QUIET = 1e-3 // a singer this far down (−60 dB) is lost in the mass and the hall: skip them
 const BLOCK = 64 // samples per control step
@@ -29,20 +24,6 @@ const sin = (p: number) => {
   return SIN[i] + (SIN[i + 1] - SIN[i]) * (f - i)
 }
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
-
-// How loudly a vowel passes frequency f: three formant bumps over log-frequency, and a floor. The vowel's
-// formants, as log2 Hz, are set once a block by shape().
-const FORMANTS = new Float64Array(3)
-const shape = (dark: number) => FORMANTS.forEach((_, i) => (FORMANTS[i] = Math.log2(AH[i] + (OO[i] - AH[i]) * dark)))
-function vowel(f: number) {
-  let g = 0.06
-  const lf = Math.log2(f)
-  for (let i = 0; i < 3; i++) {
-    const d = (lf - FORMANTS[i]) / 0.3
-    g += GAINS[i] * Math.exp(-0.5 * d * d)
-  }
-  return g
-}
 
 // What the choir sings into: the angels' stereo pair and the dread beneath them.
 export type Part = { l: number; r: number; d: number }
@@ -72,7 +53,7 @@ export class Shepard {
   private seed = 1
 
   constructor(readonly period = 2) {
-    this.layers = Math.ceil(Math.log(600) / Math.log(period)) // F0 up to about 16.5 kHz
+    this.layers = Math.ceil(Math.log(128) / Math.log(period)) // seven octaves, 40 Hz to about 5 kHz
     const k = this.layers * TONES * SINGERS
     this.ph = new Float64Array(k)
     this.hz = new Float64Array(k)
@@ -101,11 +82,10 @@ export class Shepard {
     return this.seed / 2147483647
   }
 
-  // Sets every singer for the next block: where each layer sits, its bell, vowel and beating.
+  // Sets every singer for the next block: where each layer sits, its bell and its beating.
   private control() {
     const { layers: L, dread, prime, n, chorus } = this
-    const angel = 1 - 0.3 * dread, beat = 0.12 + 0.6 * dread // Hz between the pair
-    shape(dread) // the vowel darkens with the dread
+    const angel = 1 - 0.3 * dread, beat = 0.05 + 0.25 * dread // Hz between the pair
     this.live = 0
     this.dead = this.on.length
     for (let j = 0; j < L; j++) {
@@ -115,16 +95,16 @@ export class Shepard {
       for (let c = 0; c < TONES; c++) {
         const t = j * TONES + c, isAngel = c < ANGEL.length
         let fc = f, g
-        if (isAngel) (fc *= ANGEL[c] * (c === 4 ? (11 / 9) ** prime : 1)), (g = (angel * clamp01(n - c)) / (1 + 0.5 * c))
+        if (isAngel) (fc *= ANGEL[c] * (c === 4 ? (11 / 9) ** prime : 1)), (g = angel * clamp01(n - c) * (c ? 0.4 : 1))
         else {
           // a slow random walk away from unison, reaching ±50 cents at full dread
           if (this.rand() < 0.004) this.crawl[2 * t + 1] = (this.rand() * 2 - 1) * 50 * dread
           this.crawl[2 * t] += (this.crawl[2 * t + 1] - this.crawl[2 * t]) * 0.02
           fc *= DREAD[c - ANGEL.length] * 2 ** (this.crawl[2 * t] / 1200)
-          g = 0.5 * dread
+          g = 0.2 * dread
         }
         g *= bell * bell
-        if (g < QUIET || fc > TOP || (g *= vowel(fc)) < QUIET) continue
+        if (g < QUIET || fc > TOP) continue
         for (let k = 0; k < (isAngel ? SINGERS : 2); k++) {
           const i = t * SINGERS + k, a = k < 2 ? g : g * chorus
           if (a < QUIET) continue
@@ -145,16 +125,16 @@ export class Shepard {
     const { ph, hz, al, ar, on } = this
     let l = 0, r = 0, d = 0
     for (let q = 0; q < this.live; q++) {
-      const i = on[q], p = ph[i] + hz[i] * dt, v = sin((ph[i] = p - (p | 0)))
+      const i = on[q], p = ph[i] + hz[i] * dt, v = sin((ph[i] = p - Math.floor(p)))
       l += al[i] * v
       r += ar[i] * v
     }
     for (let q = this.dead; q < on.length; q++) {
       const i = on[q], p = ph[i] + hz[i] * dt
-      d += al[i] * sin((ph[i] = p - (p | 0)))
+      d += al[i] * sin((ph[i] = p - Math.floor(p)))
     }
-    o.l += 0.05 * gain * l
-    o.r += 0.05 * gain * r
-    o.d += 0.05 * gain * d
+    o.l += 0.12 * gain * l
+    o.r += 0.12 * gain * r
+    o.d += 0.12 * gain * d
   }
 }

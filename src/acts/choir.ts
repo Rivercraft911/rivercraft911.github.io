@@ -10,6 +10,7 @@ import { clamp, smooth } from './scene'
 
 export const END = 83.5 // the collapse into one point on the choir's clock: singularity's AT (ophanim's AT + DUR) + FALL
 const GAIN = 1.1 // about the old choirs' swing, which the realities' bends expect
+const FALL = 21 // the wrap, where the fall begins: the choir is silent before it
 
 // The swell toward the singularity, ∈ [0, 1], steepest at the end.
 export const swell = (T: number) => clamp((T - 44) / (END - 44)) ** 2
@@ -49,7 +50,7 @@ export function place(T: number) {
 // Every sample: the choir sings into the bed, voices 0 and 1 its left and right, 2 the dread under it.
 const part: Part = { l: 0, r: 0, d: 0 }
 export function sing(T: number, o: Stereo, gain = 1, m = CALM) {
-  const e = gain * GAIN * smooth(0, 2.5, T) * (1 - smooth(END - 0.3, END, T))
+  const e = gain * GAIN * smooth(FALL - 0.5, FALL + 2.5, T) * (1 - smooth(END - 0.3, END, T))
   if (e <= 0) return
   const g = m.gold ?? 0, td = m.mirror === undefined ? T : 2 * m.mirror - T, s = descent(td)
   part.l = part.r = part.d = 0
