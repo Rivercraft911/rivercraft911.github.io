@@ -80,7 +80,7 @@ fn field(q: vec2f) -> vec3f {
                       k.yxy * pearls(P + k.yxy * e, a, b, n).x + k.xxx * pearls(P + k.xxx * e, a, b, n).x);
   let pearl = pearls(P, a, b, n);
   let trap = pearl.y;
-  let small = mix(0.3, 1.0, smoothstep(0.6, 0.12, pearl.z / H)); // the giants are dark glass
+  let small = mix(0.45, 1.0, smoothstep(0.6, 0.12, pearl.z / H)); // the giants are dark glass
   let ci = abs(dot(nrm, rd));
   let ct = sqrt(1.0 - (1.0 - ci * ci) / (1.33 * 1.33));
   // a film drains: thinner toward the top of each pearl, and thinner with time
@@ -89,6 +89,6 @@ fn field(q: vec2f) -> vec3f {
   let key = normalize(vec3f(0.4, 0.3, 1.0));
   let spec = pow(max(dot(reflect(rd, nrm), key), 0.0), 300.0);
   let fres = 0.06 + 0.94 * pow(1.0 - ci, 2.5);
-  let col = (6.0 * film(thick, ct) * fres * small + 0.6 * spec + vec3f(0.003, 0.004, 0.01)) * ao * ao;
+  let col = (8.0 * film(thick, ct) * fres * small + 0.6 * spec + vec3f(0.003, 0.004, 0.01)) * ao * ao;
   return mix(sky, col, fog) * u.p[4].w;
 }

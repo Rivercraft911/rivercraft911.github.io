@@ -93,7 +93,7 @@ export const indra: Scene = {
     const near = k * H
     let lit = false, ok = false
     f.ch.push({
-      w: 0.35 * smooth(1.5, 3, t),
+      w: 0.45 * smooth(1.5, 3, t),
       fn: (_, s) => {
         if ((lit = !lit)) {
           walk()
