@@ -106,7 +106,7 @@ for (let i = 0; i < 420; i++) {
 
 // The line the meander drew opens into the river, a wave racing downstream: when it reaches x, and how
 // far open it is there.
-const opens = (x: number) => 0.5 + 0.035 * (x - X0)
+const opens = (x: number) => 0.3 + 0.035 * (x - X0)
 const open = (x: number, t: number) => clamp(lock([[0, 0], [opens(x), 1]], t, 7, 0.55), 0, 1.25)
 
 // The water: a steady flow field and its streamlines. The current runs down the channel fastest in the
@@ -197,7 +197,7 @@ const VX = Float32Array.from(V)
 // ── the live equation: what is being seeded now, in the colour of what it draws, with its numbers ────
 const STAGES: [number, string, readonly number[]][] = [
   [0, '\\theta(s) = \\omega_1 \\sin(2\\pi s / M_1) + \\omega_2 \\sin(2\\pi s / M_2 + \\phi)', WATER],
-  [0.6, 'u = U (1 - d^2)\\, s + \\sum_j \\frac{\\Gamma_j\\, y \\times r_j}{|r_j|^2} + \\nabla \\times \\psi', WATER],
+  [0.4, 'u = U (1 - d^2)\\, s + \\sum_j \\frac{\\Gamma_j\\, y \\times r_j}{|r_j|^2} + \\nabla \\times \\psi', WATER],
   [1.6, 'T(x, z) = \\sum_k |k|^{-\\beta/2} \\cos(k \\cdot r + \\phi_k)', INK],
   [4.2, 'x(y) = A (1 - y / H)\\; tri(2\\pi f y)', PINE],
   [6.6, 'h(z) = 20\\, \\log_{10} |S(e^{i\\omega})|', INK],
@@ -217,7 +217,7 @@ function equation(f: Parameters<Scene['build']>[1], t: number, row: number) {
   const T: Val = ['t', t, 3]
   const vals: Val[] =
     e === 0 ? [['\\omega_1', W1, 2], ['\\omega_2', W2, 2], ['M_1', M1, 0], ['M_2', M2, 0]]
-    : e === 1 ? [['x', Math.min(LIP, X0 + (t - 0.5) / 0.035), 1], T]
+    : e === 1 ? [['x', Math.min(LIP, X0 + (t - 0.3) / 0.035), 1], T]
     : e === 2 ? [['\\beta', 2.1, 1], ['x', rowX(Math.max(0, row)), 2], T]
     : e === 3 ? [['n', grown, 0], T]
     : e === 5 ? [['f_0', fish.f0, 0], ['k', fish.sweep, 0], T]
@@ -252,8 +252,8 @@ const KEYS: number[][] = [
   [12.5, SC - 8, YS + 5.5, ZS + 1.5, SC + 1, YS, ZS, 0.95],
   [16, SC - 6, YS + 4.5, ZS - 4.5, SC + 2, YS, ZS, 0.95],
   [19.5, SC - 2.5, YS + 5, ZS - 6.5, SC + 5, YS, ZS + 0.5, 0.95],
-  [23, ...on(SC + 7, 8, 5, 36, 1)],
-  [27, ...on(44, 4.5, 0, 56, 1)],
+  [23, ...on(SC + 6, 11, 4, 38, 1)],
+  [27, ...on(43, 6.5, 0, 57, 1)],
   [30, LIP - 8, YL + 5, riverZ(LIP - 8) + 2, LIP + 6, YL - 4, ZL + 2, 1],
   [32.5, LIP + 10, YL + 4, ZL + 11, LIP + 2, YL - 8, ZL, 1],
   [35, LIP + 14, YL - 4, ZL + 9, LIP + 1.5, YL - 11, ZL, 0.9],
@@ -628,7 +628,7 @@ export const valley: Scene = {
           pen = false
           continue
         }
-        line.color(WATER[0], WATER[1], WATER[2], glow((x - X0) / (XM - X0), t + 4) * k)
+        line.color(WATER[0], WATER[1], WATER[2], glow((x - X0) / (XM - X0), t + 3.5) * k)
         pen ? line.lineTo(p3.x, p3.y) : line.moveTo(p3.x, p3.y)
         pen = true
         if (t < SCAN && heroN < HERO) (hx[heroN] = p3.x), (hy[heroN++] = p3.y)
