@@ -7,6 +7,9 @@ export type Stereo = { l: number; r: number; s: Float64Array } // s: the spatial
 export type Voice = (t: number, o: Stereo) => void
 export const stereo = (): Stereo => ({ l: 0, r: 0, s: new Float64Array(VOICES) })
 
+// What the speakers were last handed, mixed to mono: for drawing the true spectrum of what you hear.
+export const heard = { ring: new Float32Array(1 << 14), w: 0, sr: 48_000 }
+
 const AHEAD = 0.1 // seconds of signal kept queued past the present
 const C = 2 + VOICES
 const GAIN = 0.22
@@ -67,7 +70,7 @@ export class Audio {
       this.node.port.postMessage(null)
       this.t = now
     }
-    const sr = this.ctx!.sampleRate, n = Math.min(this.buf.length / C, Math.floor((now + AHEAD - this.t) * sr))
+    const sr = (heard.sr = this.ctx!.sampleRate), n = Math.min(this.buf.length / C, Math.floor((now + AHEAD - this.t) * sr))
     if (n <= 0) return
     const o = this.o, b = this.buf
     for (let i = 0; i < n; i++) {
@@ -76,7 +79,9 @@ export class Audio {
       voice?.(this.t + i / sr, o)
       const j = i * C
       b[j] = o.l, b[j + 1] = o.r
-      for (let v = 0; v < VOICES; v++) b[j + 2 + v] = o.s[v]
+      let m = o.l + o.r
+      for (let v = 0; v < VOICES; v++) (b[j + 2 + v] = o.s[v]), (m += o.s[v])
+      heard.ring[heard.w++ & (heard.ring.length - 1)] = m
     }
     this.t += n / sr
     this.node.port.postMessage(b.slice(0, n * C))

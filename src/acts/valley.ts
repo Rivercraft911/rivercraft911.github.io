@@ -14,6 +14,8 @@ import { fft, hann } from '../dsp/fft'
 import { APSK16 } from '../dsp/dvbs2'
 import { Field } from '../dsp/terrain'
 import { last } from './meander'
+import { place, sing } from './choir'
+import { heard } from '../audio/audio'
 import { TAU, cam, clamp, hash, lock, mix, smooth, view, type Scene } from './scene'
 
 use(await load('tech'))
@@ -22,7 +24,8 @@ const INK = [0.78, 0.88, 1] as const, PINE = [0.45, 1, 0.62] as const, WATER = [
 const rnd = (n: number) => hash(n) * 0.5 + 0.5
 
 // ── the river: a meander of two scales, skewed, climbing in cascades ─────────────────────────────────
-const CASCADES = [9, 21, 36, 55] // where the river steps down
+const CASCADES = [10, 24, 38, 51] // where the river steps down
+export const LIP = 62 // where the valley ends and the river pours off the edge
 const X0 = -12, X1 = 104, DX = 0.1, NX = Math.round((X1 - X0) / DX) + 1
 const RZ = new Float64Array(NX), RY = new Float64Array(NX)
 {
@@ -35,7 +38,7 @@ const RZ = new Float64Array(NX), RY = new Float64Array(NX)
   }
   for (let i = 0; i < NX; i++) {
     const x = X0 + i * DX
-    RY[i] = 6.5 * (1 - Math.exp(-Math.max(0, x) / 40)) + CASCADES.reduce((a, c, j) => a + [0.6, 0.8, 0.7, 0.9][j] * smooth(c - 0.25, c + 0.25, x), 0)
+    RY[i] = -4 * (1 - Math.exp(-Math.max(0, x) / 30)) - CASCADES.reduce((a, c, j) => a + [0.6, 0.8, 0.7, 0.9][j] * smooth(c - 0.25, c + 0.25, x), 0) - 60 * smooth(LIP, LIP + 0.8, x)
   }
 }
 const idx = (x: number) => Math.max(0, Math.min(NX - 1, Math.round((x - X0) / DX)))
@@ -54,7 +57,7 @@ function height(x: number, z: number) {
 }
 
 const NR = 150, NC = 200, ZW = 21
-const rowX = (i: number) => -1 + i * 0.68
+const rowX = (i: number) => -1 + (i * (LIP + 1)) / (NR - 1) // the last row is the edge
 const RH = new Float32Array(NR * NC), RZp = new Float32Array(NR * NC)
 for (let i = 0; i < NR; i++)
   for (let j = 0; j < NC; j++) {
@@ -81,7 +84,7 @@ function fir(x: number, z: number, H: number, seed: number, t0: number) {
   item(x, pts, PINE, t0, y0, TREE)
 }
 for (let i = 0; i < 420; i++) {
-  const x = 0.5 + 75 * rnd(i * 3) ** 1.2, side = i & 1 ? 1 : -1, z = riverZ(x) + side * (wide(x) + 0.5 + 9 * rnd(i * 5) ** 1.6)
+  const x = 0.5 + 57 * rnd(i * 3) ** 1.2, side = i & 1 ? 1 : -1, z = riverZ(x) + side * (wide(x) + 0.5 + 9 * rnd(i * 5) ** 1.6)
   if (height(x, z) - riverY(x) > 6) continue // the tree line
   fir(x, z, 0.6 + 1.3 * rnd(i * 7), i, 6 + x * 0.075)
 }
@@ -99,14 +102,14 @@ for (let i = 0; i < 420; i++) {
 // stirs the rest. Streamlines traced through it are drawn with a bright head racing downstream, so the
 // water visibly runs, swirls and turns back on itself.
 const vortex: [number, number, number][] = [] // x, z, circulation
-for (let x = 2; x < 85; x += 0.5) {
+for (let x = 2; x < LIP - 2; x += 0.5) {
   const a = riverZ(x - 0.5), b = riverZ(x), c = riverZ(x + 0.5)
-  if ((b - a) * (c - b) < 0) vortex.push([x - 0.6, b - Math.sign(b - a) * wide(x) * 0.45, 1.6 * Math.sign(b - a)]) // a pool inside each bend
+  if ((b - a) * (c - b) < 0) vortex.push([x + 0.6, b - Math.sign(b - a) * wide(x) * 0.45, 1.6 * Math.sign(b - a)]) // a pool inside each bend
 }
 function flowAt(x: number, z: number, o: { x: number; z: number }) {
   const dz = (riverZ(x + 0.1) - riverZ(x - 0.1)) / 0.2, n = Math.hypot(1, dz), d = (z - riverZ(x)) / wide(x)
   const U = 1.2 * Math.max(0.15, 1 - d * d) * (1 + 0.8 * smooth(0.3, 0, Math.abs(((x + 0.3) % 19) - 9.5) / 9.5))
-  o.x = -U / n, o.z = (-U * dz) / n // downstream is toward −x
+  o.x = U / n, o.z = (U * dz) / n // downstream is toward +x, away from us
   for (const [vx, vz, g] of vortex) {
     const rx = x - vx, rz = z - vz, r2 = rx * rx + rz * rz + 0.04, k = (g / r2) * Math.exp(-r2 / 0.9)
     o.x += -rz * k - 0.15 * rx * Math.abs(k), o.z += rx * k - 0.15 * rz * Math.abs(k) // swirling, drawing inward
@@ -159,14 +162,14 @@ function peaks(seed: number, x: number, z0: number, z1: number, base: number, H:
 {
   for (let k = 0; k < APSK16.pts.length / 2; k++) {
     const sx = 3.2 + 1.6 * APSK16.pts[2 * k + 1]
-    vortex.push([sx - 0.35, riverZ(sx) + 0.8 * APSK16.pts[2 * k] + 0.12, k & 1 ? 0.5 : -0.5]) // each stone sheds an eddy
+    vortex.push([sx + 0.35, riverZ(sx) + 0.8 * APSK16.pts[2 * k] + 0.12, k & 1 ? 0.5 : -0.5]) // each stone sheds an eddy
   }
   const v = { x: 0, z: 0 }, pts: number[] = []
   for (let k = 0; k < 1800; k++) {
-    let x = 0.5 + 84 * rnd(k * 11 + 1), z = riverZ(x) + (rnd(k * 13 + 2) * 2 - 1) * wide(x) * 0.9
+    let x = 0.5 + (LIP - 1) * rnd(k * 11 + 1), z = riverZ(x) + (rnd(k * 13 + 2) * 2 - 1) * wide(x) * 0.9
     pts.length = 0
     for (let s = 0; s < 34; s++) {
-      if (Math.abs(z - riverZ(x)) > wide(x) * 0.97) break
+      if (Math.abs(z - riverZ(x)) > wide(x) * 0.97 || x > LIP) break
       pts.push(x, riverY(x) + 0.02, z)
       flowAt(x, z, v)
       const m = Math.hypot(v.x, v.z) || 1
@@ -175,7 +178,7 @@ function peaks(seed: number, x: number, z0: number, z1: number, base: number, H:
     if (pts.length >= 18) item(pts[0], pts.slice(), WATER, 2.5 + pts[0] * 0.02, 0, FLOW)
   }
 }
-peaks(13, 104, riverZ(104) - 60, riverZ(104) + 60, riverY(100) + 4, 26, 7.5)
+peaks(13, 104, riverZ(104) - 60, riverZ(104) + 60, riverY(LIP) - 4, 30, 7.5)
 items.sort((a, b) => a.x - b.x)
 const VX = Float32Array.from(V)
 
@@ -187,6 +190,7 @@ const EQ: [number, string, readonly number[]][] = [ // when, what, in the colour
   [7.5, 'h(z) = 20\\, \\log_{10} |S(e^{i\\omega})|', INK],
   [9.5, 'u(s, t) = U \\cos(2\\pi (s / \\lambda - f t))', WATER],
   [12, 's_k \\in \\{ R_1 e^{i\\pi(2m+1)/4},\\; R_2 e^{i\\pi(2m+1)/12} \\}', STONE],
+  [24, 'S(f, t) = |\\sum_n x[n]\\, w[n - tH]\\, e^{-i 2\\pi f n}|', [0.1, 0.95, 0.9]],
 ]
 
 // ── each frame ──────────────────────────────────────────────────────────────────────────────────────
@@ -196,16 +200,37 @@ const p3 = { x: 0, y: 0, z: 0 }, q3 = { x: 0, y: 0, z: 0 }
 const sx = new Float32Array(NC), sy = new Float32Array(NC), sz = new Float32Array(NC), ok = new Uint8Array(NC)
 const ink = new Path(), eqp = new Path(), from = new Path(), line = new Path(), mid = new Path()
 const HERO = 4096, hx = new Float32Array(HERO), hy = new Float32Array(HERO)
-let heroN = 0, occlude = 1
+let heroN = 0, occlude = 1, landK = 1, lp = 0 // lp: the roar's low-pass state
 
 const eye = { x: 0, y: 0, z: 0 }
-function crane(t: number) {
+function drone(t: number, o: number[]) {
   const k = clamp(lock([[0, 0], [1.3, 1]], t, 1.6, 0.9), 0, 1.03), drift = Math.max(0, t - 4) * 0.45
-  const ex = -11 + drift, orbit = 7 * Math.cos(0.09 * t + 0.6) // the drone drifts upstream, swinging around the valley
-  eye.x = mix(32, ex, k), eye.y = mix(70, riverY(ex + 8) + 9, k), eye.z = mix(riverZ(32) + 4, riverZ(ex + 8) - orbit, k)
+  const ex = -11 + drift, orbit = 7 * Math.cos(0.09 * t + 0.6) // drifting downstream, swinging around the valley
   const tx = mix(32, 22 + drift, k)
-  cam.aim(eye.x, eye.y, eye.z, tx, mix(0, riverY(tx), k), riverZ(tx), mix(1.1, 0.95, k))
-  occlude = smooth(0.55, 0.85, k) // a floating horizon only means something once we look across the land
+  o[0] = mix(32, ex, k), o[1] = mix(70, riverY(ex + 8) + 9, k), o[2] = mix(riverZ(32) + 4, riverZ(ex + 8) - orbit, k)
+  o[3] = tx, o[4] = mix(0, riverY(tx), k), o[5] = riverZ(tx), o[6] = mix(1.1, 0.95, k)
+}
+// After the valley: down the river to the lip, over it, and out into the air to face the falls.
+const T_GO = 22, d22: number[] = [], cur: number[] = []
+drone(T_GO, d22)
+const YL = riverY(LIP - 0.2), ZL = riverZ(LIP)
+const FLIGHT: [number, number[]][] = [
+  [T_GO, d22],
+  [27, [LIP - 8, YL + 5, riverZ(LIP - 8), LIP + 14, YL - 3, ZL, 1]],
+  [30, [LIP + 1.5, YL + 3.5, ZL - 0.4, LIP + 7, YL - 28, ZL, 1.1]],
+  [33, [LIP + 15, YL - 13, ZL + 0.6, LIP, YL - 13, ZL, 0.95]],
+  [35, [LIP + 10, YL - 12, ZL, LIP, YL - 12, ZL, 0.3]],
+]
+const fwd = { x: 1, y: 0 }
+function crane(t: number) {
+  drone(Math.min(t, T_GO), cur)
+  if (t > T_GO) for (let c = 0; c < 7; c++) cur[c] = lock(FLIGHT.map(([k, v]) => [k, v[c]] as const), t, 2.2, 0.85)
+  eye.x = cur[0], eye.y = cur[1], eye.z = cur[2]
+  cam.aim(cur[0], cur[1], cur[2], cur[3], cur[4], cur[5], cur[6])
+  const L = Math.hypot(cur[3] - cur[0], cur[4] - cur[1], cur[5] - cur[2])
+  fwd.x = (cur[3] - cur[0]) / L, fwd.y = (cur[4] - cur[1]) / L
+  // a floating horizon only means something while we look across the land, downstream
+  occlude = smooth(0.4, 0.75, fwd.x) * smooth(-0.9, -0.7, fwd.y) * smooth(1, 1.5, t)
 }
 
 const col = (x: number) => Math.max(0, Math.min(HB - 1, Math.round(((x / view.a) * 0.45 + 0.5) * (HB - 1))))
@@ -242,9 +267,9 @@ function items_(t: number, upto: number, next: { i: number }, hero: number) {
       let g = it.kind === HATCH ? 0.5 : 1
       if (it.kind === FLOW) {
         const head = (t * 0.55 + rnd(it.a)) % 1, u = (v / (it.n - 1) - head + 1) % 1
-        g = 0.12 + 1.1 * Math.exp(-u * 9) * k // bright at the head, trailing back upstream
+        g = 0.07 + 0.75 * Math.exp(-u * 9) * k // bright at the head, trailing back upstream
       }
-      ink.color(it.c[0], it.c[1], it.c[2], fog(p3.z) * g)
+      ink.color(it.c[0], it.c[1], it.c[2], fog(p3.z) * g * landK)
       pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
       pen = true
       if (it.kind === hero && it.t0 <= t && t - it.t0 < 0.5 && heroN < HERO) (hx[heroN] = p3.x), (hy[heroN++] = p3.y)
@@ -256,12 +281,12 @@ function items_(t: number, upto: number, next: { i: number }, hero: number) {
 // ballistic arcs, each droplet a parabola; around each stone, ripple rings running outward.
 const G = 7
 function whitewater(t: number, xc: number) {
-  const y0 = riverY(xc + 0.3), zc = riverZ(xc), w = wide(xc), on = smooth(2.5, 4, t)
+  const y0 = riverY(xc - 0.3), zc = riverZ(xc), w = wide(xc), on = smooth(2.5, 4, t)
   for (let k = 0; k < 7; k++) {
     let pen = false
     for (let j = 0; j <= 24; j++) {
       const u = j / 24 - 0.5, curl = 0.08 * Math.sin(TAU * (u * 3 + t * 1.3 + k * 0.4))
-      if (!cam.project(xc - 0.1 * k + curl, y0 - 0.06 * k + wave(xc, zc + u * 2 * w, t), zc + u * 2 * w * 0.98, p3) || !visible(p3.x, p3.y)) {
+      if (!cam.project(xc + 0.1 * k + curl, y0 - 0.06 * k + wave(xc, zc + u * 2 * w, t), zc + u * 2 * w * 0.98, p3) || !visible(p3.x, p3.y)) {
         pen = false
         continue
       }
@@ -272,7 +297,7 @@ function whitewater(t: number, xc: number) {
   }
   for (let d = 0; d < 90; d++) {
     const life = 0.9 + 0.5 * rnd(d * 3 + xc), age = ((t + life * rnd(d * 7 + xc)) % life)
-    const vx = -1.2 - 1.5 * rnd(d + xc), vy = 1 + 2.2 * rnd(d * 5 + xc), vz = (rnd(d * 11 + xc) * 2 - 1) * 1.2, z0 = zc + (rnd(d * 13 + xc) * 2 - 1) * w
+    const vx = 1.2 + 1.5 * rnd(d + xc), vy = 1 + 2.2 * rnd(d * 5 + xc), vz = (rnd(d * 11 + xc) * 2 - 1) * 1.2, z0 = zc + (rnd(d * 13 + xc) * 2 - 1) * w
     const at = (a: number) => cam.project(xc + vx * a, y0 + vy * a - 0.5 * G * a * a, z0 + vz * a, p3)
     if (!at(age) || !visible(p3.x, p3.y)) continue
     const x1 = p3.x, y1 = p3.y
@@ -302,14 +327,88 @@ function ripples(t: number, x0: number, x1: number) {
   }
 }
 
+// The falls. The river leaves the lip and drops; every lane of the falling sheet is a frequency (log,
+// 80 Hz to 8 kHz) and every droplet carries the spectrum of the moment it went over: the true STFT of
+// what the speakers are playing. So the falls are a waterfall display, rows born at the lip and falling.
+const LANES = 72, ROWS = 240, NF = 1024
+const spec = new Float32Array(ROWS * LANES), stamp = new Float64Array(ROWS).fill(-1e9)
+const re = new Float64Array(NF), im = new Float64Array(NF)
+let row = 0
+function listen(t: number) {
+  const r = heard.ring, m = r.length - 1
+  for (let n = 0; n < NF; n++) (re[n] = r[(heard.w - NF + n) & m] * hann(n, NF)), (im[n] = 0)
+  fft(re, im)
+  const o = (row % ROWS) * LANES
+  for (let l = 0; l < LANES; l++) {
+    const f = 80 * 100 ** (l / (LANES - 1)), b = Math.min(NF / 2 - 1, Math.round((f * NF) / heard.sr))
+    spec[o + l] = clamp((20 * Math.log10(Math.hypot(re[b], im[b]) + 1e-6) + 12) / 36) ** 1.5
+  }
+  stamp[row % ROWS] = t
+  row++
+}
+function past(t: number, lane: number) {
+  let best = 0, bt = 1e9
+  for (let k = 0; k < 24; k++) {
+    const r = (row - 1 - k + ROWS * 4) % ROWS, d = Math.abs(stamp[r] - t)
+    if (d < bt) (bt = d), (best = r)
+    if (stamp[r] < t) break
+  }
+  return spec[best * LANES + lane]
+}
+const PAL = [[0.02, 0.08, 0.35], [0.05, 0.4, 1], [0.1, 0.95, 0.9], [1, 0.85, 0.2], [1, 1, 1]]
+const FALL_G = 5, V0 = 1.6
+const fallX = (tau: number, l: number) => LIP + V0 * tau + 0.05 * Math.sin(7 * tau + l)
+const fallZ = (tau: number, l: number) => ZL + (l / (LANES - 1) - 0.5) * 2 * wide(LIP) * 0.95 * (1 + 0.6 * tau)
+function shade(v: number, i: number, a: number) {
+  const f = clamp(v) * (PAL.length - 1), k = Math.min(PAL.length - 2, Math.floor(f)), u = f - k, c = PAL[k], d = PAL[k + 1]
+  ink.color(mix(c[0], d[0], u), mix(c[1], d[1], u), mix(c[2], d[2], u), i * a)
+}
+function falls(t: number, show: number) {
+  // as we come face to face with it, the falling lanes become what a waterfall display draws: rows
+  const rows = smooth(31.5, 34.5, t)
+  for (let j = 0; j < 130 && rows > 0; j++) {
+    const tau = 0.3 + (j / 129) * 3.1, y = YL - 0.5 * FALL_G * tau * tau
+    let pen = false
+    for (let l = 0; l < LANES; l++) {
+      if (!cam.project(fallX(tau, l), y, fallZ(tau, l), p3)) {
+        pen = false
+        continue
+      }
+      shade(past(t - tau, l), show * rows, 0.1 + 0.9 * past(t - tau, l))
+      pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
+      pen = true
+    }
+  }
+  if (rows >= 1) return
+  const zc = ZL, w = wide(LIP) * 0.95
+  for (let l = 0; l < LANES; l++) {
+    const zl = (l / (LANES - 1) - 0.5) * 2 * w
+    let pen = false
+    for (let j = 0; j <= 44; j++) {
+      const tau = (j / 44) ** 1.3 * 3.4, v = past(t - tau, l)
+      const x = LIP + V0 * tau + 0.05 * Math.sin(7 * tau + l), y = YL - 0.5 * FALL_G * tau * tau, z = zc + zl * (1 + 0.6 * tau)
+      if (!cam.project(x, y, z, p3) || !visible(p3.x, p3.y)) {
+        pen = false
+        continue
+      }
+      const f = clamp(v) * (PAL.length - 1), i = Math.min(PAL.length - 2, Math.floor(f)), a = f - i, c = PAL[i], d = PAL[i + 1]
+      const water = 0.25 * (1 - smooth(28, 31, t)) // white water until the spectrum takes it over
+      ink.color(mix(c[0], d[0], a) + water, mix(c[1], d[1], a) + water, mix(c[2], d[2], a) + water, 0.7 * show * (1 - rows) * (0.08 + 0.8 * v) * fog(p3.z) * smooth(0, 0.5, tau))
+      pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
+      pen = true
+    }
+  }
+}
+
 export const valley: Scene = {
-  dur: 22,
+  dur: 39,
   build(t, f) {
     crane(t)
     ink.clear(), heroN = 0
     horizon.fill(-9)
     const next = { i: 0 }, heroKind = t < 6 ? -1 : t < 12 ? TREE : ROCK
     let heroRow = -1
+    const land = (landK = smooth(-0.3, 0.3, fwd.x)) // the valley falls away behind us as we turn to face the falls
 
     for (let i = 0; i < NR; i++) {
       const x = rowX(i), x0 = rowX(i - 1), rise = clamp(lock([[0, 0], [SCAN + (i / NR) * SCAN_DUR, 1]], t, 7, 0.45), 0, 1.35)
@@ -329,7 +428,7 @@ export const valley: Scene = {
         ok[j] = cam.project(x, base + (RH[o + j] - base) * rise, RZp[o + j], p3) ? 1 : 0
         sx[j] = p3.x, sy[j] = p3.y, sz[j] = p3.z
       }
-      const index = (i % 8 === 0 ? 1 : 0.6) * Math.min(1, rise * 2.5)
+      const index = (i % 8 === 0 ? 1 : 0.6) * Math.min(1, rise * 2.5) * land
       let pen = false
       for (let j = 0; j < NC; j++) {
         const water = Math.abs(RZp[o + j] - riverZ(x)) < wide(x)
@@ -347,6 +446,7 @@ export const valley: Scene = {
       if (heroRow === i && heroKind < 0) for (let j = 0; j < NC && heroN < HERO; j++) if (ok[j]) (hx[heroN] = sx[j]), (hy[heroN++] = sy[j])
     }
     items_(t, Infinity, next, heroKind)
+    if (t > 18) listen(t), falls(t, smooth(18, 20, t))
     f.ch.push({ w: 1, path: ink })
 
     // the meander, before the land: the river we watched form, laid down onto the valley floor
@@ -367,11 +467,23 @@ export const valley: Scene = {
     f.ch.push({ w: 0.15, path: eqp })
 
     f.rate = mix(2.4e6, 7.2e6, smooth(1, 8, t))
+    if (t > 24) place(t - 24)
     return (tt, o) => {
-      if (heroN < 2) return
+      // over the edge the scope rule ends: the falls roar and the choirs begin to sing around us
+      if (tt > 22) {
+        lp += (hash(tt * 48_000) - lp) * 0.04
+        const roar = 0.5 * lp * smooth(22, 28, tt) * (1 - 0.6 * smooth(31, 36, tt))
+        // fish leaping in the falls: Gaussian chirplets sweeping up, each a bright diagonal in the waterfall
+        const ft = tt * 1.7, n = Math.floor(ft), a = ft - n, f0 = 250 + 500 * rnd(n), k = 900 + 2600 * rnd(n + 7)
+        const fish = smooth(26, 28, tt) * 0.18 * Math.exp(-(((a - 0.5) / 0.16) ** 2)) * Math.sin(TAU * (f0 * a + 0.5 * k * a * a) / 1.7)
+        o.l += roar + fish, o.r += roar + fish
+        if (tt > 24) sing(tt - 24, o)
+      }
+      if (heroN < 2 || tt > 26) return
       const ph = ((tt * 55) % 1) * 2, u = (ph < 1 ? ph : 2 - ph) * (heroN - 1), i = Math.min(heroN - 2, Math.floor(u)), a = u - i
-      o.l = (0.8 * (hx[i] + (hx[i + 1] - hx[i]) * a)) / view.a
-      o.r = 0.8 * (hy[i] + (hy[i + 1] - hy[i]) * a)
+      const k = 1 - smooth(22, 26, tt)
+      o.l += (0.8 * k * (hx[i] + (hx[i + 1] - hx[i]) * a)) / view.a
+      o.r += 0.8 * k * (hy[i] + (hy[i + 1] - hy[i]) * a)
     }
   },
 }
