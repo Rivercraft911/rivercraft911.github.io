@@ -42,6 +42,13 @@ export class Series {
     return this
   }
 
+  // c_n into o: the phasor of harmonic n, one epicycle.
+  coef(n: number, o: { re: number; im: number }) {
+    const k = (n + this.m) % this.m
+    o.re = this.cr[k] / this.m, o.im = this.ci[k] / this.m
+    return o
+  }
+
   // |c_n|, the size of harmonic n.
   mag(n: number) {
     const k = (n + this.m) % this.m
