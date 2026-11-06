@@ -1,5 +1,5 @@
 // Frame times at given scene times, headless Chrome on the real GPU:
-// node scripts/fps.mjs [--dpr n] [--size WxH] [--throttle n] [--q tier] t1 t2 ...
+// node scripts/fps.mjs [--dpr n] [--size WxH] [--throttle n] [--q tier] [--with query] t1 t2 ...
 // Prints median/p95 of the frame interval (paced by vsync: misses show here), of each frame's work (its
 // start until the GPU has finished it: the cost, and the headroom under the interval), and the tier the
 // quality governor settled on. --throttle slows the CPU n×; --q pins a tier.
@@ -18,7 +18,7 @@ const cdp = await page.context().newCDPSession(page)
 await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(opt.throttle) })
 console.log(`${width}x${height} @${opt.dpr}x  cpu ÷${opt.throttle}${opt.q ? `  q=${opt.q}` : ''}`)
 for (const t of times) {
-  await page.goto(`http://localhost:5198/?auto&t=${t}${opt.q ? `&q=${opt.q}` : ''}`)
+  await page.goto(`http://localhost:5198/?auto&t=${t}${opt.q ? `&q=${opt.q}` : ''}${opt.with ? `&${opt.with}` : ''}`)
   await page.waitForTimeout(4000) // let the governor settle
   const [ts, work] = await page.evaluate(() => new Promise((done) => {
     const ts = [], work = []

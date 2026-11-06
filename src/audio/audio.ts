@@ -7,12 +7,13 @@ export type Stereo = { l: number; r: number; s: Float64Array } // s: the spatial
 export type Voice = (t: number, o: Stereo) => void
 export const stereo = (): Stereo => ({ l: 0, r: 0, s: new Float64Array(VOICES) })
 
-// What the speakers were last handed, mixed to mono: for drawing the true spectrum of what you hear.
-export const heard = { ring: new Float32Array(1 << 14), w: 0, sr: 48_000 }
-
 const AHEAD = 0.1 // seconds of signal kept queued past the present
 const C = 2 + VOICES
 const GAIN = 0.22
+
+// What the speakers are about to play, summed to mono, as it is rendered: the last 2^15 samples, the
+// newest at time `end` (timeline seconds). Spectrograms of the soundtrack read it.
+export const heard = { buf: new Float32Array(1 << 15), n: 0, end: 0, sr: 48000 }
 
 export class Audio {
   muted = false
@@ -64,26 +65,26 @@ export class Audio {
   }
 
   // Renders the voice from where we left off up to `now + AHEAD` in scene time.
+  // Without an audio device (a headless ?auto run) it still renders, so what is heard can be seen.
   feed(now: number, voice?: Voice) {
-    if (!this.node) return
     if (Math.abs(this.t - now) > 0.3) {
-      this.node.port.postMessage(null)
+      this.node?.port.postMessage(null)
       this.t = now
     }
-    const sr = (heard.sr = this.ctx!.sampleRate), n = Math.min(this.buf.length / C, Math.floor((now + AHEAD - this.t) * sr))
+    const sr = (heard.sr = this.ctx?.sampleRate ?? 48000), n = Math.min(this.buf.length / C, Math.floor((now + AHEAD - this.t) * sr))
     if (n <= 0) return
-    const o = this.o, b = this.buf
+    const o = this.o, b = this.buf, h = heard.buf, mask = h.length - 1
     for (let i = 0; i < n; i++) {
       o.l = o.r = 0
       o.s.fill(0)
       voice?.(this.t + i / sr, o)
       const j = i * C
-      b[j] = o.l, b[j + 1] = o.r
-      let m = o.l + o.r
-      for (let v = 0; v < VOICES; v++) (b[j + 2 + v] = o.s[v]), (m += o.s[v])
-      heard.ring[heard.w++ & (heard.ring.length - 1)] = m
+      let m = (b[j] = o.l) + (b[j + 1] = o.r)
+      for (let v = 0; v < VOICES; v++) m += b[j + 2 + v] = o.s[v]
+      h[heard.n++ & mask] = m
     }
     this.t += n / sr
-    this.node.port.postMessage(b.slice(0, n * C))
+    heard.end = this.t
+    this.node?.port.postMessage(b.slice(0, n * C))
   }
 }

@@ -20,7 +20,7 @@ export class Timeline {
 
   build(t: number, f: Frame): Voice | undefined {
     f.ch.length = 0
-    f.rate = f.look = undefined
+    f.rate = f.look = f.field = undefined
     const i = this.index(t), s = this.scenes[i], fade = s.fade ?? 0
     const k = fade > 0 && i > 0 ? clamp((t - this.starts[i]) / fade) : 1
     const vb = this.scene(i, t, f, k)
@@ -40,7 +40,7 @@ export class Timeline {
 
   // Builds scene i in its own time, weighting its beam share and its voice by k.
   private scene(i: number, t: number, f: Frame, k: number): Voice | undefined {
-    const t0 = this.starts[i], n = f.ch.length
+    const t0 = (f.at = this.starts[i]), n = f.ch.length
     const v = this.scenes[i].build(t - t0, f)
     for (let j = n; j < f.ch.length; j++) (f.ch[j].w *= k), (f.ch[j].off = -t0)
     if (!v) return undefined

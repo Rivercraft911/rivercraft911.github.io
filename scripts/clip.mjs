@@ -1,10 +1,13 @@
-// Records a clip of the intro, picture and sound, as an mp4: node scripts/clip.mjs out.mp4 [from=0] [seconds=30] [WxH=1280x720]
+// Records a clip of the intro, picture and sound, as an mp4:
+// node scripts/clip.mjs out.mp4 [from=0] [seconds=30] [WxH=1280x720] [--q query], e.g. --q fall
 import { createServer } from 'vite'
 import { chromium } from 'playwright'
 import { rmSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 
-const [out = 'clip.mp4', from = '0', secs = '30', size = '1280x720'] = process.argv.slice(2)
+const args = process.argv.slice(2), qi = args.indexOf('--q')
+const extra = qi < 0 ? '' : `&${args.splice(qi, 2)[1]}`
+const [out = 'clip.mp4', from = '0', secs = '30', size = '1280x720'] = args
 const [width, height] = size.split('x').map(Number)
 const server = await createServer({ server: { port: 5196 }, logLevel: 'error' })
 await server.listen()
@@ -20,7 +23,7 @@ const finished = new Promise((r) => (done = r))
 await page.exposeFunction('__chunk', (b64) => chunks.push(Buffer.from(b64, 'base64')))
 page.on('console', (m) => m.type() !== 'debug' && console.log('[page]', m.text()))
 await page.exposeFunction('__done', () => done())
-await page.goto(`http://localhost:5196/?t=${from}&rec=${secs}`)
+await page.goto(`http://localhost:5196/?t=${from}&rec=${secs}${extra}`)
 await finished
 const webm = out.replace(/\.mp4$/, '') + '.webm'
 writeFileSync(webm, Buffer.concat(chunks))

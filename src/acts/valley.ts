@@ -353,8 +353,8 @@ const spec = new Float32Array(ROWS * LANES), stamp = new Float64Array(ROWS).fill
 const re = new Float64Array(NF), im = new Float64Array(NF)
 let row = 0
 function listen(t: number) {
-  const r = heard.ring, m = r.length - 1
-  for (let n = 0; n < NF; n++) (re[n] = r[(heard.w - NF + n) & m] * hann(n, NF)), (im[n] = 0)
+  const r = heard.buf, m = r.length - 1
+  for (let n = 0; n < NF; n++) (re[n] = r[(heard.n - NF + n) & m] * hann(n, NF)), (im[n] = 0)
   fft(re, im)
   const o = (row % ROWS) * LANES
   for (let l = 0; l < LANES; l++) {

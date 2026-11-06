@@ -10,13 +10,26 @@ import { meander } from './acts/meander'
 import { valley } from './acts/valley'
 import { ident } from './acts/ident'
 import { singularity } from './acts/singularity'
-import { fall } from './acts/fall'
+import { falling } from './acts/fall'
+import { LEAD, wrap } from './acts/wrap'
+import { ascii, CHARS } from './acts/ascii'
+import { load } from './beam/font'
 
 const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
 const beam = new Beam()
 const audio = new Audio()
-const timeline = new Timeline(q.has('specimen') ? [specimen] : q.has('ident') ? [ident] : q.has('end') ? [singularity, ident] : [hook, meander, valley, fall, singularity, ident])
+// ?fall plays only the fall, from the waterfall on; ?ident and ?end the last stretch.
+const scenes = q.has('specimen')
+  ? [specimen]
+  : q.has('fall')
+    ? [wrap, ascii, falling(wrap.dur + ascii.dur + LEAD, 5)]
+    : q.has('ident')
+      ? [ident]
+      : q.has('end')
+        ? [singularity, ident]
+        : [hook, meander, valley, wrap, ascii, singularity, ident]
+const timeline = new Timeline(scenes)
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }
 
@@ -24,6 +37,8 @@ const gpu = await Phosphor.create(canvas, beam.max).catch(() => {
   document.body.classList.add('no-gpu')
   throw new Error('WebGPU unavailable')
 })
+
+load('tech').then((face) => gpu.glyphs(face, CHARS)) // the raster's character generator
 
 let on = q.has('auto')
 let t = Number(q.get('t') ?? 0)
@@ -71,10 +86,10 @@ addEventListener('keydown', (e) => {
 // Eight seconds of clean frames earn a tier back; falling straight back out of a tier doubles that wait.
 // ?q=<tier> pins.
 const TIERS = [
-  { rate: Infinity, lo: 0, scale: 1 },
-  { rate: 2.4e6, lo: 0, scale: 1 },
-  { rate: 2.4e6, lo: 1, scale: 1 },
-  { rate: 2.4e6, lo: 1, scale: 0.75 },
+  { rate: Infinity, lo: 0, scale: 1, field: 0.5 },
+  { rate: 2.4e6, lo: 0, scale: 1, field: 0.5 },
+  { rate: 2.4e6, lo: 1, scale: 1, field: 0.375 },
+  { rate: 2.4e6, lo: 1, scale: 0.75, field: 0.375 },
 ]
 const hz = 1 / (Number(q.get('hz')) || Infinity) // ?hz=N steps the clock 1/N per frame, whatever the display does
 const pin = q.get('q')
@@ -106,6 +121,7 @@ function tick(now: number) {
   const dpr = Math.min(2, devicePixelRatio) * Q.scale, w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr)
   if (canvas.width !== w || canvas.height !== h) (canvas.width = w), (canvas.height = h)
   gpu.resize(w, h, Q.lo)
+  gpu.raster.scale = Q.field
   view.a = canvas.width / canvas.height
 
   frame.ch.length = 0
@@ -113,7 +129,7 @@ function tick(now: number) {
   beam.rate = Math.min(Q.rate, frame.rate ?? 1.2e6)
   Object.assign(look, LOOK, frame.look)
   beam.frame(frame.ch, t - dt, dt)
-  gpu.draw(beam, view.a, dt, look)
+  gpu.draw(beam, view.a, dt, look, frame.field, dpr)
 
   if (on) for (let i = 0; i < space.length; i += 3) audio.place(i / 3, space[i], space[i + 1], space[i + 2])
   if (on) audio.feed(t, voice) // the voice is a function of time: it plays this frame's scene ahead
