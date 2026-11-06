@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Greek and math glyphs missing from Relief SingleLine, drawn by hand on Relief's skeleton
+     (cap 680, x-height 545, ascender 745, descender -190) so they sit in the same line.
+     Baked as the math fallback for every face. Released under the same OFL as Relief. -->
+<svg xmlns="http://www.w3.org/2000/svg"><defs><font id="RiverGreek" horiz-adv-x="600">
+<font-face units-per-em="1000" cap-height="680" x-height="545"/>
+<glyph unicode="H" horiz-adv-x="706" d="M140 680V0M140 365H566M566 0V680"/>
+<glyph unicode="x" horiz-adv-x="540" d="M70 0L458 555M470 0L95 555"/>
+
+<glyph unicode="α" horiz-adv-x="620" d="M505 555C485 330 430 0 285 0C160 0 90 110 90 275C90 450 175 555 290 555C420 555 460 330 490 160C505 70 525 0 575 0"/>
+<glyph unicode="β" horiz-adv-x="590" d="M140 -190V540C140 680 200 745 295 745C385 745 445 685 445 600C445 510 375 450 270 450C410 450 500 370 500 230C500 90 410 0 295 0C225 0 170 35 140 85"/>
+<glyph unicode="γ" horiz-adv-x="560" d="M60 555L280 25M500 555L280 25C258 -25 245 -70 245 -110C245 -160 260 -190 282 -190C305 -190 318 -160 318 -112C318 -70 305 -25 280 25"/>
+<glyph unicode="δ" horiz-adv-x="592" d="M440 718C395 740 345 750 290 745C210 738 165 705 165 655C165 595 235 560 310 525C430 465 502 395 502 260C502 115 425 0 296 0C165 0 90 110 90 262C90 415 185 505 310 525"/>
+<glyph unicode="ε" horiz-adv-x="530" d="M450 465C425 520 370 555 295 555C200 555 140 505 140 432C140 350 210 300 305 300C195 300 105 255 105 160C105 60 185 0 295 0C380 0 440 40 470 105"/>
+<glyph unicode="ζ" horiz-adv-x="520" d="M140 745H445C300 625 105 470 105 255C105 120 175 45 320 25C410 12 450 -25 450 -85C450 -140 415 -175 365 -190"/>
+<glyph unicode="η" horiz-adv-x="608" d="M140 555V0M140 415C201 485 267 555 356 555C433 555 473 502 473 415V-190"/>
+<glyph unicode="θ" horiz-adv-x="600" d="M300 745C160 745 100 560 100 372C100 185 160 0 300 0C440 0 500 185 500 372C500 560 440 745 300 745M100 372H500"/>
+<glyph unicode="ι" horiz-adv-x="320" d="M140 555V110C140 35 170 0 232 0C255 0 272 4 285 10"/>
+<glyph unicode="κ" horiz-adv-x="528" d="M140 555V0M460 555L140 250M240 345L480 0"/>
+<glyph unicode="λ" horiz-adv-x="560" d="M90 745C150 745 185 720 215 650L500 0M60 0L295 470"/>
+<glyph unicode="ν" horiz-adv-x="539" d="M70 555L270 0C400 150 475 350 475 555"/>
+<glyph unicode="ξ" horiz-adv-x="520" d="M140 745H440M440 745C300 745 175 720 175 625C175 545 255 500 360 500C230 500 105 440 105 290C105 130 205 60 320 40C410 25 450 -10 450 -75C450 -135 415 -170 365 -190"/>
+<glyph unicode="ο" horiz-adv-x="592" d="M295 555C164 555 90 430 90 275C90 140 152 0 296 0S502 140 502 275C502 430 428 555 295 555"/>
+<glyph unicode="ρ" horiz-adv-x="600" d="M140 -190V275C140 440 210 555 300 555C430 555 500 430 500 275C500 120 430 0 300 0C220 0 165 50 140 120"/>
+<glyph unicode="ς" horiz-adv-x="520" d="M450 470C420 525 365 555 300 555C175 555 100 440 100 285C100 140 175 70 310 45C405 28 445 -10 445 -75C445 -135 410 -170 360 -190"/>
+<glyph unicode="σ" horiz-adv-x="600" d="M560 545H300C165 545 90 420 90 272C90 112 175 0 300 0C425 0 500 120 500 272C500 422 430 545 300 545"/>
+<glyph unicode="τ" horiz-adv-x="480" d="M50 545H440M245 545V120C245 40 275 0 335 0C360 0 380 6 395 15"/>
+<glyph unicode="υ" horiz-adv-x="600" d="M120 555V250C120 90 200 0 300 0C415 0 490 100 490 300C490 430 470 500 440 555"/>
+<glyph unicode="φ" horiz-adv-x="640" d="M320 745V-190M320 555C180 555 100 430 100 275C100 120 180 0 320 0C460 0 540 120 540 275C540 430 460 555 320 555"/>
+<glyph unicode="χ" horiz-adv-x="540" d="M70 -190L470 555M70 555L470 -190"/>
+<glyph unicode="ψ" horiz-adv-x="660" d="M330 745V-190M100 555V310C100 115 195 20 330 20C465 20 560 115 560 310V555"/>
+<glyph unicode="ω" horiz-adv-x="720" d="M175 555C115 475 85 385 85 285C85 105 155 0 245 0C320 0 360 70 360 180V320M360 180C360 70 400 0 475 0C565 0 635 105 635 285C635 385 605 475 545 555"/>
+
+<glyph unicode="Γ" horiz-adv-x="540" d="M140 0V670H490"/>
+<glyph unicode="Θ" horiz-adv-x="716" d="M357 680C168 680 95 501 95 341C95 207 147 0 358 0S621 207 621 341C621 501 548 680 359 680M230 340H486"/>
+<glyph unicode="Λ" horiz-adv-x="676" d="M606 0L342 675H338L70 0"/>
+<glyph unicode="Ξ" horiz-adv-x="600" d="M95 10H505M140 345H460M100 670H500"/>
+<glyph unicode="Π" horiz-adv-x="706" d="M140 0V670H566V0"/>
+<glyph unicode="Σ" horiz-adv-x="580" d="M500 10H90V14L325 340L100 666V670H490"/>
+<glyph unicode="Υ" horiz-adv-x="640" d="M320 0V420M70 670C200 670 300 600 320 420C340 600 440 670 570 670"/>
+<glyph unicode="Φ" horiz-adv-x="740" d="M370 680V0M370 560C190 560 90 470 90 340C90 210 190 120 370 120C550 120 650 210 650 340C650 470 550 560 370 560"/>
+<glyph unicode="Ψ" horiz-adv-x="720" d="M360 680V0M80 680V450C80 280 190 200 360 200C530 200 640 280 640 450V680"/>
+<glyph unicode="∇" horiz-adv-x="700" d="M100 662V670H600V660L355 5H345L100 660"/>
+<glyph unicode="∆" horiz-adv-x="700" d="M100 18V10H600V20L355 675H345L100 20"/>
+<glyph unicode="ℏ" horiz-adv-x="608" d="M140 745V0M140 415C201 485 267 555 356 555C433 555 473 502 473 415V0M60 640L300 700"/>
+</font></defs></svg>
