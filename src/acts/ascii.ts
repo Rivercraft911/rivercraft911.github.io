@@ -76,7 +76,7 @@ export const ascii: Scene = {
     for (let i = 0; i < 3; i++) ink[i] = 1.4 * mix(P1[i], AMBER[i], w)
     fld.cell = 20
     fld.ink = ink
-    fld.lift = 3
+    fld.lift = 0.5
     fld.read = row
     f.look = { exposure: t < 1 / 30 ? 24 : 1.6 } // a frame of overexposure as the reality splices
     place(T + LEAD)

@@ -19,8 +19,8 @@ const MAX = 256 // most rows printed in a frame
 
 // How fast we travel along the sheet's time axis (first its scroll, then our fall), and how far ahead of
 // us the head prints. Their integral is tabulated, and inverted to find when each row was printed.
-export const speed = (T: number) => 6 + 8 * smooth(1.2, 0, T) + 3 * smooth(4.5, 7, T) + 6 * smooth(8, 16, T)
-const ahead = (T: number) => mix(8, 10, smooth(4.6, 6.6, T))
+export const speed = (T: number) => 6 + 8 * smooth(1.2, 0, T) + 3 * smooth(3.9, 6.5, T) + 6 * smooth(8, 16, T)
+const ahead = (T: number) => mix(8, 10, smooth(2.8, 5, T))
 const DT = 1 / 500, Y = new Float64Array(60 * 500), H = new Float64Array(Y.length)
 for (let i = 1; i < Y.length; i++) Y[i] = Y[i - 1] + speed(i * DT) * DT
 for (let i = 0; i < Y.length; i++) H[i] = Y[i] + ahead(i * DT)
@@ -42,10 +42,10 @@ function printedAt(y: number) {
 // The camera and the sheet at fall time T. Pure: the field shader and the beam both see through it.
 export const view = { eye: [0, 0, 0], r: [1, 0, 0], u: [0, 1, 0], f: [0, 0, -1], s: 1, rho: 1, cz: 0, pitch: 0 }
 export function look(T: number, kick = 0) {
-  const d = 22 * (1 / 22) ** smooth(1.4, 4.4, T) // our distance from the sheet: a dive, steady in log scale
-  const c = Math.max(1e-3, smooth(3, 4.9, T)) // its curl
-  const p = lock([[0, 0], [4.7, Math.PI / 2]], T, 2.6, 0.75) // we pitch up to look down the tube
-  const fov = mix(0.9, 1.35, smooth(4.6, 6.5, T)) + kick
+  const d = 22 * (1 / 22) ** smooth(1, 3.4, T) // our distance from the sheet: a dive, steady in log scale
+  const c = Math.max(1e-3, smooth(2.4, 4.2, T)) // its curl
+  const p = lock([[0, 0], [2.7, Math.PI / 2]], T, 2.2, 0.8) // we pitch up to look down the tube as it closes
+  const fov = mix(0.9, 1.35, smooth(3, 5.5, T)) + kick
   const v = view
   v.rho = W / (TAU * c)
   v.cz = v.rho - d
@@ -95,7 +95,7 @@ function head_(p: Path, y: number) {
       pen = false
       continue
     }
-    p.color(1, mix(0.75, 0.95, l[m]), mix(0.45, 0.85, l[m]), 0.25 + 1.2 * l[m] * l[m])
+    p.color(1, mix(0.75, 0.95, l[m]), mix(0.45, 0.85, l[m]), (0.25 * (1 - pitch) + l[m] * l[m]) * mix(1.2, 0.35, pitch))
     pen ? p.lineTo(o.x, o.y) : p.moveTo(o.x, o.y)
     pen = true
   }
