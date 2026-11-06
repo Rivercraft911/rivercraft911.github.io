@@ -77,7 +77,7 @@ const WORLDS: World[] = [
     bend(_, o) {
       // a comb on each voice: y[n] = x[n] + 0.9 y[n − D], tuned to A, C♯, E
       for (let i = 0; i < 3; i++) {
-        const y = 0.4 * o.s[i] + 0.9 * combs[i][(w - Math.round(SR / [110, 138.6, 164.8][i]) + LINE) & (LINE - 1)]
+        const y = 0.7 * o.s[i] + 0.9 * combs[i][(w - Math.round(SR / [110, 138.6, 164.8][i]) + LINE) & (LINE - 1)]
         o.s[i] = combs[i][w] = y
       }
     },
@@ -90,7 +90,7 @@ const WORLDS: World[] = [
       const a = 0.3 * t
       aim(p, set3(eye, 0.5 + 0.2 * Math.sin(a), 0.3 * fall, fall), set3(fwd, 0.3 * Math.sin(0.4 * t), 0.3, 1), set3(up, Math.sin(0.1 * t), 1, 0), 1.2 + kick)
       p[16] = 0.53, p[17] = 0.53, p[18] = 0.53 + 0.02 * Math.sin(0.2 * t), p[19] = 1
-      p[20] = 0.85, p[21] = 0.022
+      p[20] = 0.85, p[21] = 0.009
     },
     bend(tt, o) {
       // grains: four overlapping 50 ms windows, each replaying a random moment of the last quarter second
@@ -102,7 +102,7 @@ const WORLDS: World[] = [
           const back = G + Math.floor((0.5 + 0.5 * hash(k * 13.1 + j * 7.7 + i)) * 9600)
           y += past(i, back - ph) * (0.5 - 0.5 * Math.cos((TAU * ph) / G))
         }
-        o.s[i] = 0.5 * y
+        o.s[i] = 0.9 * y
       }
     },
   },
@@ -111,7 +111,8 @@ const WORLDS: World[] = [
     eq: '\\lambda=\\frac{1}{N}\\sum\\ln|r_n(1-2x_n)|',
     ink: [1, 0.85, 0.35],
     set(p, t, _, kick) {
-      p[16] = 3.35 + 0.01 * t, p[17] = 3.5, p[18] = 0.34 * Math.exp(-0.05 * t) * (1 + 0.5 * kick), p[19] = 1
+      const k = Math.exp(-0.1 * t) // zooming on a superstable star, where the dark curves cross
+      p[16] = 3.22 - 0.07 * k, p[17] = 3.24 + 0.11 * k, p[18] = 0.5 * k * (1 + 0.5 * kick), p[19] = 1
     },
     bend(_, o) {
       // through the logistic map twice, at r just shy of 4
@@ -119,7 +120,7 @@ const WORLDS: World[] = [
         let x = Math.min(1, Math.max(0, 0.5 + 1.8 * o.s[i]))
         x = 3.9 * x * (1 - x)
         x = 3.9 * x * (1 - x)
-        o.s[i] = 0.3 * (x - 0.5)
+        o.s[i] = 0.45 * (x - 0.5)
       }
     },
   },

@@ -24,7 +24,7 @@ fn field(q: vec2f) -> vec3f {
   var col: vec3f;
   if (lam < 0.0) {
     let g = exp(lam * 1.6);
-    col = mix(vec3f(0.12, 0.05, 0.0), vec3f(1.6, 1.0, 0.25), g) + vec3f(1.2, 1.1, 0.8) * pow(g, 12.0);
+    col = mix(vec3f(0.06, 0.02, 0.0), vec3f(1.3, 0.7, 0.1), g) + vec3f(1.0, 0.9, 0.6) * pow(g, 24.0);
   } else {
     col = vec3f(0.01, 0.05, 0.24) * exp(-lam * 2.5) + vec3f(0.0, 0.003, 0.015);
   }

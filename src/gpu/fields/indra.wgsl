@@ -63,7 +63,7 @@ fn field(q: vec2f) -> vec3f {
   var t = 0.002 * H;
   var hit = false;
   var steps = 0.0;
-  for (var i = 0; i < 90; i++) {
+  for (var i = 0; i < 72; i++) {
     let d = pearls(ro + rd * t, a, b, n).x;
     if (d < px * t) { hit = true; break; }
     t += d * 0.9;
@@ -74,11 +74,10 @@ fn field(q: vec2f) -> vec3f {
   let sky = vec3f(0.003, 0.004, 0.014);
   if (!hit) { return sky * u.p[4].w; }
   let P = ro + rd * t;
-  let e = vec2f(0.5 * px * t, 0.0);
-  let nrm = normalize(vec3f(
-    pearls(P + e.xyy, a, b, n).x - pearls(P - e.xyy, a, b, n).x,
-    pearls(P + e.yxy, a, b, n).x - pearls(P - e.yxy, a, b, n).x,
-    pearls(P + e.yyx, a, b, n).x - pearls(P - e.yyx, a, b, n).x));
+  let e = 0.5 * px * t;
+  let k = vec2f(1.0, -1.0);
+  let nrm = normalize(k.xyy * pearls(P + k.xyy * e, a, b, n).x + k.yyx * pearls(P + k.yyx * e, a, b, n).x +
+                      k.yxy * pearls(P + k.yxy * e, a, b, n).x + k.xxx * pearls(P + k.xxx * e, a, b, n).x);
   let pearl = pearls(P, a, b, n);
   let trap = pearl.y;
   let small = mix(0.3, 1.0, smoothstep(0.6, 0.12, pearl.z / H)); // the giants are dark glass
@@ -86,7 +85,7 @@ fn field(q: vec2f) -> vec3f {
   let ct = sqrt(1.0 - (1.0 - ci * ci) / (1.33 * 1.33));
   // a film drains: thinner toward the top of each pearl, and thinner with time
   let thick = 220.0 + 380.0 * (0.5 + 0.5 * sin(2.2 * trap + u.p[5].x)) - 140.0 * nrm.z;
-  let ao = 1.0 - steps / 90.0;
+  let ao = 1.0 - steps / 72.0;
   let key = normalize(vec3f(0.4, 0.3, 1.0));
   let spec = pow(max(dot(reflect(rd, nrm), key), 0.0), 300.0);
   let fres = 0.06 + 0.94 * pow(1.0 - ci, 2.5);

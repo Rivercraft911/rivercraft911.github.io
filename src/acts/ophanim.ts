@@ -81,7 +81,7 @@ export const ophanim: Scene = {
       // one fiber's field through the plate, E_x and E_y on a 110 Hz carrier
       plate(tt)
       fiber(0.785, 0.9 * tt, TAU * 110 * tt, pt)
-      const g = 0.12 * smooth(0, 1, tt) * (1 - smooth(DUR - 1.5, DUR, tt))
+      const g = 0.045 * smooth(0, 1, tt) * (1 - smooth(DUR - 1.5, DUR, tt))
       o.l += g * pt.ex, o.r += g * pt.ey
     }
   },

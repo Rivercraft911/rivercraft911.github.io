@@ -40,6 +40,8 @@ const mult = (z: Z) => {
 }
 const [ZP, ZM] = Math.hypot(...mult(fixed[0])) < 1 ? fixed : [fixed[1], fixed[0]]
 const LAMBDA = mult(ZP), SHRINK = Math.hypot(LAMBDA[0], LAMBDA[1]), TURN = Math.atan2(LAMBDA[1], LAMBDA[0])
+const HALF = -0.5 / Math.log(SHRINK) // ln |q|² to powers of λ
+const POWERS = Array.from({ length: 41 }, (_, i): Z => [SHRINK ** (i - 20) * Math.cos(TURN * (i - 20)), SHRINK ** (i - 20) * Math.sin(TURN * (i - 20))]) // λⁿ, n = −20 … 20
 
 const field: Field = { shader: SHADER, k: 1, p: new Float32Array(28) }
 const eye = [0, 0, 0], fwd = [1, 0, 0], up = [0, 0, 1]
@@ -91,14 +93,13 @@ export const indra: Scene = {
     const near = k * H
     let lit = false, ok = false
     f.ch.push({
-      w: 0.6 * smooth(1.5, 3, t),
+      w: 0.35 * smooth(1.5, 3, t),
       fn: (_, s) => {
         if ((lit = !lit)) {
           walk()
           let q = div([z.re - ZP[0], z.im - ZP[1]], [z.re - ZM[0], z.im - ZM[1]])
-          const n = Math.round(Math.log(Math.hypot(q[0], q[1]) / near) / -Math.log(SHRINK))
-          const g = SHRINK ** n
-          q = mul(q, [g * Math.cos(TURN * n), g * Math.sin(TURN * n)])
+          const n = Math.round(Math.log((q[0] * q[0] + q[1] * q[1]) / (near * near)) * HALF)
+          q = mul(q, POWERS[Math.max(0, Math.min(40, n + 20))])
           ok = project(p, q[0], q[1], 0)
           s.x = seen.x, s.y = seen.y, s.z = 0
           return
