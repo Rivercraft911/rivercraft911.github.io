@@ -48,13 +48,14 @@ export class Series {
     return Math.hypot(this.cr[k], this.ci[k]) / this.m
   }
 
-  // Keeps |n| ≤ N (a fractional N weighs in the next pair) and inverts into x, y, z.
-  band(N: number) {
+  // Keeps |n| ≤ N (a fractional N weighs in the next pair) and inverts into x, y, z. keep scales every
+  // term of x + iy but c_1: at keep = 0 only c_1 e^{iωt} is left, a pure carrier.
+  band(N: number, keep = 1) {
     const m = this.m, f = Math.floor(N), fr = N - f
     const inv = (re: Float64Array, im: Float64Array, a: Float64Array, b?: Float64Array) => {
       const wr = this.wr, wi = this.wi
       for (let k = 0; k < m; k++) {
-        const n = Math.abs(k < m / 2 ? k : k - m), w = n <= f ? 1 : n === f + 1 ? fr : 0
+        const n = Math.abs(k < m / 2 ? k : k - m), w = (n <= f ? 1 : n === f + 1 ? fr : 0) * (b && k !== 1 ? keep : 1)
         wr[k] = re[k] * w, wi[k] = -im[k] * w // conj, so a forward FFT inverts
       }
       fft(wr, wi)
