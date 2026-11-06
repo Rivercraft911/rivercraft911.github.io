@@ -8,21 +8,23 @@
 import type { Stereo } from '../audio/audio'
 import { Path } from '../beam/path'
 import { APSK32 } from '../dsp/dvbs2'
-import { HONEYCOMB, KALISET, KIFS, LYAPUNOV, MANDALAY, NEWTON } from '../gpu/fields'
+import { APOLLONIAN, BULB, HONEYCOMB, KALISET, KIFS, KLEINIAN, LYAPUNOV, MANDALAY, NEWTON, SIERPINSKI } from '../gpu/fields'
 import type { Field } from '../gpu/raster'
-import { descent, place, sing } from './choir'
+import { descent, place, sing, type Mood } from './choir'
 import { AT as R3, DUR as R3DUR } from './indra'
 import { aim, equation, jump, splice } from './reality'
 import { TAU, hash, smooth, type Frame, type Scene } from './scene'
 
 export const AT = R3 + R3DUR
-export const DUR = 9
 const SR = 48000
 
 // When each cut lands, and which world it opens on.
-const LENGTHS = [1.9, 1.4, 1.05, 0.8, 0.6, 0.45, 0.42, 0.38, 0.35, 0.34, 0.34, 0.34, 0.34, 0.34]
+const LENGTHS = [1.1, 0.95, 0.85, 0.78, 0.72, 0.68, 0.64, 0.6, 0.6, 0.6, 0.5, 0.46, 0.42, 0.4, 0.38, 0.36, 0.35, 0.34, 0.34, 0.34, 0.34, 0.34]
 const STARTS = LENGTHS.map((_, i) => LENGTHS.slice(0, i).reduce((a, b) => a + b, 0))
+export const DUR = STARTS[STARTS.length - 1] + LENGTHS[LENGTHS.length - 1]
+const PIN = Number(new URLSearchParams(location.search).get('w') ?? -1)
 const cut = (t: number) => {
+  if (PIN >= 0) return PIN
   let i = 0
   while (i + 1 < STARTS.length && t >= STARTS[i + 1]) i++
   return i
@@ -30,7 +32,8 @@ const cut = (t: number) => {
 
 type World = {
   shader: number
-  eq: string
+  eq: string | ((t: number) => string)
+  mood?: Mood
   ink: readonly number[]
   set(p: Float32Array, t: number, fall: number, kick: number): void
   beam?(f: Frame, t: number): void
@@ -51,6 +54,7 @@ const past = (i: number, d: number) => lines[i][(w - d + LINE) & (LINE - 1)]
 const combs = [0, 1, 2].map(() => new Float32Array(LINE)) // the comb's own output, fed back
 
 const roots = new Path()
+const power = (t: number) => 7.5 + 1.5 * Math.sin(0.45 * t)
 
 const WORLDS: World[] = [
   {
@@ -67,6 +71,22 @@ const WORLDS: World[] = [
     },
   },
   {
+    shader: BULB,
+    eq: (t) => `z\\to z^{${power(t).toFixed(1)}}+c`,
+    ink: [0.75, 0.82, 1],
+    mood: { gold: 1, prime: 1 },
+    set(p, t, fall, kick) {
+      const a = 0.25 * t, r = 1.8 - 0.4 * smooth(0, 13, t) - 0.05 * Math.sin(0.5 * fall)
+      aim(p, set3(eye, r * Math.cos(a), 0.5 * Math.sin(0.3 * t), r * Math.sin(a)), set3(fwd, -Math.cos(a) + 0.4 * Math.sin(a), -0.3 * Math.sin(0.3 * t), -Math.sin(a) - 0.4 * Math.cos(a)), set3(up, 0.2 * Math.sin(0.2 * t), 1, 0), 1.2 + kick)
+      p[16] = power(t), p[17] = 1
+    },
+    bend(_, o, from) {
+      // the bulb's own move, angles times n, as a waveshaper: cos(n acos x), the Chebyshev polynomial T_n
+      const n = power(from)
+      for (let i = 0; i < 3; i++) o.s[i] = 0.25 * Math.cos(n * Math.acos(Math.max(-1, Math.min(1, o.s[i] / 0.25))))
+    },
+  },
+  {
     shader: MANDALAY,
     eq: 'p\\to s\\frac{B(p)}{\\min(|p|^2,1)}+c',
     ink: [1, 0.78, 0.4],
@@ -79,6 +99,28 @@ const WORLDS: World[] = [
       for (let i = 0; i < 3; i++) {
         const y = 0.7 * o.s[i] + 0.9 * combs[i][(w - Math.round(SR / [110, 138.6, 164.8][i]) + LINE) & (LINE - 1)]
         o.s[i] = combs[i][w] = y
+      }
+    },
+  },
+  {
+    shader: KLEINIAN,
+    eq: 'p\\to\\max(1,\\frac{k}{|p|^2})(2\\,\\clamp(p)-p)',
+    ink: [0.6, 0.85, 1],
+    mood: { gold: 0.5, dread: 0.3 },
+    set(p, t, fall, kick) {
+      aim(p, set3(eye, 0.1 * Math.sin(0.3 * t), 0.15 * fall, 0.05 * Math.cos(0.4 * t)), set3(fwd, 0.25 * Math.sin(0.2 * t), 1, 0.15 * Math.cos(0.25 * t)), set3(up, Math.sin(0.1 * t), 0, Math.cos(0.1 * t)), 1.4 + kick)
+      p[16] = 0.808, p[17] = 1.167, p[18] = 0.70968, p[19] = 1
+    },
+    bend(tt, o) {
+      // inversion, heard: overlapping grains of the last fifth of a second, played backwards
+      const G = 9600, n = Math.round(tt * SR)
+      for (let i = 0; i < 3; i++) {
+        let y = 0
+        for (let j = 0; j < 2; j++) {
+          const ph = (n + (j * G) / 2) % G
+          y += past(i, 2 * ph) * (0.5 - 0.5 * Math.cos((TAU * ph) / G))
+        }
+        o.s[i] = y
       }
     },
   },
@@ -107,6 +149,29 @@ const WORLDS: World[] = [
     },
   },
   {
+    shader: APOLLONIAN,
+    eq: 'p\\to\\frac{s}{|p|^2}\\,p',
+    ink: [1, 0.8, 0.7],
+    mood: {},
+    set(p, t, fall, kick) {
+      const z = 0.4 * fall
+      aim(p, set3(eye, 0.3 * Math.sin(0.4 * t), 0.35 + 0.1 * Math.cos(0.3 * t), z), set3(fwd, 0.4 * Math.sin(0.23 * t), -0.1, 1), set3(up, Math.sin(0.12 * t), 1, 0), 1.3 + kick)
+      p[16] = 1.15 + 0.08 * Math.sin(0.2 * t), p[17] = 1
+    },
+    bend(tt, o) {
+      // every sphere a smaller copy: the choir an octave up, read from its own past at twice the speed
+      const G = 2400, n = Math.round(tt * SR)
+      for (let i = 0; i < 3; i++) {
+        let y = 0
+        for (let j = 0; j < 2; j++) {
+          const ph = (n + (j * G) / 2) % G
+          y += past(i, G - ph) * (0.5 - 0.5 * Math.cos((TAU * ph) / G))
+        }
+        o.s[i] = y
+      }
+    },
+  },
+  {
     shader: LYAPUNOV,
     eq: '\\lambda=\\frac{1}{N}\\sum\\ln|r_n(1-2x_n)|',
     ink: [1, 0.85, 0.35],
@@ -122,6 +187,22 @@ const WORLDS: World[] = [
         x = 3.9 * x * (1 - x)
         o.s[i] = 0.45 * (x - 0.5)
       }
+    },
+  },
+  {
+    shader: SIERPINSKI,
+    eq: 'p\\to 2Rp-(1,1,1)',
+    ink: [0.5, 1, 0.65],
+    mood: { gold: 1, dread: 0.5 },
+    set(p, t, fall, kick) {
+      const a = 0.2 * t, r = 1.7 - 0.7 * smooth(0, 13, t)
+      aim(p, set3(eye, r * Math.cos(a), 0.6 + 0.3 * Math.sin(0.25 * t), r * Math.sin(a)), set3(fwd, -Math.cos(a), -0.3, -Math.sin(a)), set3(up, 0, 1, 0), 1.1 + kick)
+      p[16] = 0.25 * Math.sin(0.17 * t + 0.5 * fall), p[17] = 0.2 * Math.cos(0.13 * t), p[18] = 1
+    },
+    bend(tt, o) {
+      // the gasket as a rhythm: a 32nd sounds only where its count k has k & (k >> 3) = 0
+      const k = Math.floor(tt * 24)
+      if (k & (k >> 3)) for (let i = 0; i < 3; i++) o.s[i] *= 0.1
     },
   },
   {
@@ -170,6 +251,7 @@ const WORLDS: World[] = [
   },
 ]
 
+export const INKS = WORLDS.map((w) => w.ink)
 const field: Field = { shader: KIFS, k: 1, p: new Float32Array(28) }
 const GOLD = { gold: 1 }, mirrored = { gold: 1, mirror: 0 }
 const MIRROR = (at: number) => ((mirrored.mirror = at), mirrored)
@@ -185,7 +267,7 @@ export const stutter: Scene = {
     field.shader = W.shader
     f.field = field
     W.beam?.(f, t)
-    equation(f, W.eq, W.ink)
+    equation(f, typeof W.eq === 'string' ? W.eq : W.eq(t), W.ink)
     f.rate = 2e6
     place(T)
 
@@ -193,7 +275,7 @@ export const stutter: Scene = {
       const j = cut(tt), from = STARTS[j], V = WORLDS[j % WORLDS.length]
       if (splice(tt - from, o)) return
       const TT = tt + AT
-      sing(TT, o, smooth(0, 0.03, tt - from), V.shader === HONEYCOMB ? MIRROR(from + AT) : GOLD)
+      sing(TT, o, smooth(0, 0.03, tt - from), V.shader === HONEYCOMB ? MIRROR(from + AT) : V.mood ?? GOLD)
       remember(o)
       V.bend(tt, o, from)
     }

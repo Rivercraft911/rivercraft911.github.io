@@ -11,7 +11,13 @@ import kaliset from './fields/kaliset.wgsl?raw'
 import lyapunov from './fields/lyapunov.wgsl?raw'
 import newton from './fields/newton.wgsl?raw'
 import honeycomb from './fields/honeycomb.wgsl?raw'
-import ophanim from './fields/ophanim.wgsl?raw'
+import julia4 from './fields/julia4.wgsl?raw'
+import polytope from './fields/polytope.wgsl?raw'
+import hole from './fields/hole.wgsl?raw'
+import bulb from './fields/bulb.wgsl?raw'
+import kleinian from './fields/kleinian.wgsl?raw'
+import apollonian from './fields/apollonian.wgsl?raw'
+import sierpinski from './fields/sierpinski.wgsl?raw'
 import { BINS } from '../dsp/waterfall'
 
 export const ROWS = 4096 // the waterfall's ring of rows
@@ -27,9 +33,15 @@ export const FIELDS: { code: string; data?: [number, number] }[] = [
   { code: lyapunov },
   { code: newton },
   { code: camera + honeycomb },
-  { code: camera + ophanim },
+  { code: camera + march + bulb },
+  { code: camera + march + kleinian },
+  { code: camera + march + apollonian },
+  { code: camera + march + sierpinski },
+  { code: camera + film + march + julia4 },
+  { code: camera + polytope },
+  { code: camera + hole },
 ]
 export const WRAP = 0
 export const PRIMES = 1
 export const INDRA = 2
-export const [KIFS, MANDALAY, KALISET, LYAPUNOV, NEWTON, HONEYCOMB, OPHANIM] = [3, 4, 5, 6, 7, 8, 9]
+export const [KIFS, MANDALAY, KALISET, LYAPUNOV, NEWTON, HONEYCOMB, BULB, KLEINIAN, APOLLONIAN, SIERPINSKI, JULIA4, POLYTOPE, HOLE] = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
