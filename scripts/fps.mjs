@@ -12,13 +12,14 @@ const [width, height] = opt.size.split('x').map(Number)
 
 const server = await createServer({ server: { port: 5198 }, logLevel: 'error' })
 await server.listen()
+const base = server.resolvedUrls.local[0] // the port it got: other checkouts may hold the default
 const browser = await chromium.launch({ channel: 'chrome', args: ['--enable-unsafe-webgpu', '--use-angle=metal'] })
 const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: Number(opt.dpr) })
 const cdp = await page.context().newCDPSession(page)
 await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(opt.throttle) })
 console.log(`${width}x${height} @${opt.dpr}x  cpu ÷${opt.throttle}${opt.q ? `  q=${opt.q}` : ''}`)
 for (const t of times) {
-  await page.goto(`http://localhost:5198/?auto&t=${t}${opt.q ? `&q=${opt.q}` : ''}${opt.with ? `&${opt.with}` : ''}`)
+  await page.goto(`${base}?auto&t=${t}${opt.q ? `&q=${opt.q}` : ''}${opt.with ? `&${opt.with}` : ''}`)
   await page.waitForTimeout(4000) // let the governor settle
   const [ts, work] = await page.evaluate(() => new Promise((done) => {
     const ts = [], work = []

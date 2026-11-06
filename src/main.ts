@@ -10,8 +10,8 @@ import { meander } from './acts/meander'
 import { valley } from './acts/valley'
 import { ident } from './acts/ident'
 import { singularity } from './acts/singularity'
-import { falling } from './acts/fall'
-import { LEAD, wrap } from './acts/wrap'
+import { wrap } from './acts/wrap'
+import { primes } from './acts/primes'
 import { ascii, CHARS } from './acts/ascii'
 import { load } from './beam/font'
 
@@ -23,12 +23,12 @@ const audio = new Audio()
 const scenes = q.has('specimen')
   ? [specimen]
   : q.has('fall')
-    ? [wrap, ascii, falling(wrap.dur + ascii.dur + LEAD, 5)]
+    ? [wrap, ascii, primes, singularity]
     : q.has('ident')
       ? [ident]
       : q.has('end')
         ? [singularity, ident]
-        : [hook, meander, valley, wrap, ascii, singularity, ident]
+        : [hook, meander, valley, wrap, ascii, primes, singularity, ident]
 const timeline = new Timeline(scenes)
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }

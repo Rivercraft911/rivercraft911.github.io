@@ -11,6 +11,7 @@ const [out = 'clip.mp4', from = '0', secs = '30', size = '1280x720'] = args
 const [width, height] = size.split('x').map(Number)
 const server = await createServer({ server: { port: 5196 }, logLevel: 'error' })
 await server.listen()
+const base = server.resolvedUrls.local[0] // the port it got: other checkouts may hold the default
 const browser = await chromium.launch({
   channel: 'chrome',
   args: ['--enable-unsafe-webgpu', '--enable-gpu', '--use-angle=metal', '--autoplay-policy=no-user-gesture-required'],
@@ -23,7 +24,7 @@ const finished = new Promise((r) => (done = r))
 await page.exposeFunction('__chunk', (b64) => chunks.push(Buffer.from(b64, 'base64')))
 page.on('console', (m) => m.type() !== 'debug' && console.log('[page]', m.text()))
 await page.exposeFunction('__done', () => done())
-await page.goto(`http://localhost:5196/?t=${from}&rec=${secs}${extra}`)
+await page.goto(`${base}?t=${from}&rec=${secs}${extra}`)
 await finished
 const webm = out.replace(/\.mp4$/, '') + '.webm'
 writeFileSync(webm, Buffer.concat(chunks))
