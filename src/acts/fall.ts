@@ -48,18 +48,22 @@ export function aim(t: number) {
   cam.aim(sway * Math.sin(0.7 * t), sway * Math.cos(0.9 * t), d, 0.3 * sway * Math.sin(1.3 * t), 0, 0, fov)
 }
 
-// The walls at time t: every choir's pitch helices, angels then dread then the rising choir.
-export function walls(p: Path, t: number) {
+// The walls at time t (T on the choirs' clock): every choir's pitch helices, angels, dread, the rising choir.
+export function walls(p: Path, t: number, T = t) {
   const V = speed(t), A = CHOIRS[0], X = CHOIRS[2]
-  ANGEL.forEach((r, i) => helix(p, t, V, Math.log2(r), A.k, 1, mix(0.85, 1, i / 4), mix(0.45, 0.95, i / 4), (T) => A.enter(T) * (1 - 0.5 * dread(T)) / (1 + 0.3 * i)))
-  DREAD.forEach((r) => helix(p, t, V, Math.log2(r), A.k, 1, 0.12, 0.25, (T) => A.enter(T) * dread(T)))
-  ANGEL.forEach((r) => helix(p, t, V, Math.log2(r), X.k, 0.6, 0.25, 1, (T) => X.enter(T)))
+  ANGEL.forEach((r, i) => helix(p, T, V, Math.log2(r), A.k, 1, mix(0.85, 1, i / 4), mix(0.45, 0.95, i / 4), (T) => A.enter(T) * (1 - 0.5 * dread(T)) / (1 + 0.3 * i)))
+  DREAD.forEach((r) => helix(p, T, V, Math.log2(r), A.k, 1, 0.12, 0.25, (T) => A.enter(T) * dread(T)))
+  ANGEL.forEach((r) => helix(p, T, V, Math.log2(r), X.k, 0.6, 0.25, 1, (T) => X.enter(T)))
   return p
 }
 
-export const fall: Scene = {
-  dur: 10,
+// The fall from the receiver. falling(at, skip) joins it later: the choirs' clock already reads `at`, and
+// the fall itself `skip` seconds in, at speed.
+export const falling = (at = 0, skip = 0): Scene => ({
+  dur: 10 - skip,
   build(t, f) {
+    const T = t + at
+    t += skip
     const V = speed(t), slip = residual()
     aim(t)
     const kNow = Math.floor((T0 + t) * RS)
@@ -81,18 +85,21 @@ export const fall: Scene = {
       },
     })
 
-    f.ch.push({ w: 0.9, gain: 0.9, path: walls(wall.clear(), t) })
+    f.ch.push({ w: 0.9, gain: 0.9, path: walls(wall.clear(), t, T) })
 
-    place(t)
+    place(T)
     f.rate = mix(1.2e6, 3e6, smooth(0, 2, t))
     f.look = { tau: 0.06 }
     return (tt, o) => {
+      const TT = tt + at
+      tt += skip
       // The scope's last words: the carrier, fading as the choirs come in. Then the fall's own rumble.
       const k = 1 - smooth(0.5, 2.5, tt)
       if (k > 0) signal(T0 + tt, slip), (o.l = 0.6 * k * sig.i), (o.r = 0.6 * k * sig.q)
       const rum = 0.05 * clamp(speed(tt) / 8) * (noise(tt * 70) + 0.5 * Math.sin(TAU * 31 * tt))
       o.l += rum, o.r += rum
-      sing(tt, o)
+      sing(TT, o)
     }
   },
-}
+})
+export const fall = falling()

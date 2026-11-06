@@ -2,6 +2,8 @@
 import beamWGSL from './beam.wgsl?raw'
 import postWGSL from './post.wgsl?raw'
 import { FLOATS, type Beam } from '../beam/beam'
+import type { Face } from '../beam/font'
+import { Raster, TILE, type Field } from './raster'
 
 export type Look = {
   sigma: number // spot radius as a fraction of screen height
@@ -9,6 +11,11 @@ export type Look = {
   exposure: number
   halo: number // fraction of the light the faceplate scatters into glare
   tau: number // persistence time constant, seconds
+}
+
+const half = (h: number) => {
+  const e = (h >> 10) & 31, m = h & 1023
+  return (e ? (1 + m / 1024) * 2 ** (e - 15) : (m / 1024) * 2 ** -14) * (h >> 15 ? -1 : 1)
 }
 
 export const LOOK: Look = { sigma: 0.0009, power: 1.4, exposure: 1.6, halo: 0.05, tau: 0.05 }
@@ -52,15 +59,19 @@ export class Phosphor {
   private stale = true
   private fresh = true
   private n = 0
+  readonly raster: Raster
 
   static async create(canvas: HTMLCanvasElement, maxSamples: number) {
     const adapter = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' })
     if (!adapter) throw new Error('WebGPU unavailable')
-    return new Phosphor(await adapter.requestDevice(), canvas.getContext('webgpu')!, maxSamples)
+    const p = new Phosphor(await adapter.requestDevice(), canvas.getContext('webgpu')!, maxSamples)
+    await p.raster.compile(FLOAT)
+    return p
   }
 
   private constructor(readonly device: GPUDevice, private ctx: GPUCanvasContext, maxSamples: number) {
     const d = device
+    this.raster = new Raster(d)
     const beam = d.createShaderModule({ code: beamWGSL })
     this.post = d.createShaderModule({ code: postWGSL })
     this.u = d.createBuffer({ size: this.uf.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
@@ -127,7 +138,7 @@ export class Phosphor {
     this.stale = false
   }
 
-  draw(beam: Beam, aspect: number, dt: number, look: Look) {
+  draw(beam: Beam, aspect: number, dt: number, look: Look, field?: Field, dpr = 1) {
     const d = this.device, { width: w, height: h } = this.acc, uf = this.uf, k = this.k
     const s = Math.hypot(look.sigma * h, PIXEL) // the spot as the pixel grid can show it
     const decay = Math.exp(-dt / look.tau)
@@ -148,11 +159,14 @@ export class Phosphor {
     const pass = (view: GPUTextureView, load: GPULoadOp = 'clear') =>
       enc.beginRenderPass({ colorAttachments: [{ view, loadOp: load, storeOp: 'store', clearValue: [0, 0, 0, 1] }] })
 
+    // A raster's frame, decaying as it lands like the beam's light: a steady field holds its own level.
+    this.raster.render(enc, field, w, h, aspect, dpr, 1 - decay)
     const p = pass(this.views[0], this.fresh ? 'clear' : 'load')
     k.fill(decay)
     p.setBlendConstant(k)
     p.setPipeline(this.decay)
     p.draw(3)
+    this.raster.composite(p)
     if (beam.n > 1) {
       p.setPipeline(this.seg)
       p.setBindGroup(0, this.segGroup)
@@ -171,6 +185,56 @@ export class Phosphor {
     }
     this.quad(pass(this.ctx.getCurrentTexture().createView()), this.show, this.groups.show)
     d.queue.submit([enc.finish()])
+    this.raster.collect()
+  }
+
+  // The character generator: the beam draws each glyph of the face once into the raster's atlas, and the
+  // ink in each block of a glyph's 3 × 5 grid is read back as its shape.
+  async glyphs(face: Face, chars: string) {
+    const d = this.device, { cols } = this.raster.makeAtlas(chars.length), atlas = this.raster.atlas
+    const W = atlas.width, H = atlas.height, sigma = 1.3, cap = 0.56 * TILE[1], base = 0.74 * TILE[1]
+    const v: number[] = []
+    const put = (X: number, Y: number, z: number) => v.push(((X / W) * 2 - 1) * (W / H), 1 - (Y / H) * 2, z, 0, 1, 1, 1, 0)
+    for (let i = 0; i < chars.length; i++) {
+      const g = face.g[chars[i]]
+      if (!g) continue
+      const x0 = (i % cols) * TILE[0] + (TILE[0] - g[0] * cap) / 2, y0 = Math.floor(i / cols) * TILE[1] + base
+      for (const st of g[1]) {
+        const dot = Math.hypot(st[st.length - 2] - st[0], st[st.length - 1] - st[1]) < 0.06 && st.length <= 6
+        let px = x0 + st[0] * cap, py = y0 - st[1] * cap
+        put(px, py, 0)
+        if (dot) put(px, py, 0.25 * cap) // the beam parks on a dot as long as it would trace a quarter cap
+        else
+          for (let j = 2; j < st.length; j += 2) {
+            const x = x0 + st[j] * cap, y = y0 - st[j + 1] * cap
+            put(x, y, Math.hypot(x - px, y - py)) // energy in proportion to length: an even line
+            ;(px = x), (py = y)
+          }
+      }
+    }
+    // A line's peak is power · 0.399 / σ per unit length: power = σ / 0.399 makes every stroke peak at 1.
+    const u = d.createBuffer({ size: 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
+    d.queue.writeBuffer(u, 0, new Float32Array([W, H, W / H, sigma, sigma / 0.3989423]))
+    d.queue.writeBuffer(this.samples, 0, new Float32Array(v))
+    const back = d.createBuffer({ size: W * H * 8, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST })
+    const enc = d.createCommandEncoder()
+    const p = enc.beginRenderPass({ colorAttachments: [{ view: atlas.createView(), loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }] })
+    p.setPipeline(this.seg)
+    p.setBindGroup(0, d.createBindGroup({ layout: this.seg.getBindGroupLayout(0), entries: [{ binding: 0, resource: { buffer: u } }, { binding: 1, resource: { buffer: this.samples } }] }))
+    p.draw(6, v.length / FLOATS - 1)
+    p.end()
+    enc.copyTextureToBuffer({ texture: atlas }, { buffer: back, bytesPerRow: W * 8 }, [W, H])
+    d.queue.submit([enc.finish()])
+    await back.mapAsync(GPUMapMode.READ)
+    const px = new Uint16Array(back.getMappedRange()), ink = new Float32Array(chars.length * 15)
+    for (let i = 0; i < chars.length; i++)
+      for (let y = 0; y < TILE[1]; y++)
+        for (let x = 0; x < TILE[0]; x++) {
+          const X = (i % cols) * TILE[0] + x, Y = Math.floor(i / cols) * TILE[1] + y
+          ink[i * 15 + Math.floor((y * 5) / TILE[1]) * 3 + Math.floor((x * 3) / TILE[0])] += half(px[(Y * W + X) * 4])
+        }
+    back.destroy(), u.destroy()
+    this.raster.setGlyphs(chars, ink)
   }
 
   private quad(p: GPURenderPassEncoder, pipe: GPURenderPipeline, groups: GPUBindGroup[]) {

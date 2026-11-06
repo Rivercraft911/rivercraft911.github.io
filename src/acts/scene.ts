@@ -2,10 +2,12 @@
 import type { Channel } from '../beam/beam'
 import { VOICES, type Voice } from '../audio/audio'
 import type { Look } from '../gpu/phosphor'
+import type { Field } from '../gpu/raster'
 import type { Path } from '../beam/path'
 import { measure, text } from '../beam/font'
 
-export type Frame = { ch: Channel[]; rate?: number; look?: Partial<Look> }
+// field: a frame of raster light under the beam. at: the timeline time of the building scene's t = 0.
+export type Frame = { ch: Channel[]; rate?: number; look?: Partial<Look>; field?: Field; at?: number }
 // build pushes beam channels into the frame and returns what the speakers should play.
 export type Scene = { dur: number; fade?: number; build(t: number, f: Frame): Voice | void }
 
