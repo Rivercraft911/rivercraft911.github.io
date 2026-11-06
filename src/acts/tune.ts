@@ -30,6 +30,7 @@ const see = new Series(4096) // what the beam draws
 const hear = new Series(4096) // what the speakers play: the same sum, capped at hearing
 const comb = new Float64Array(2 * BINS + 1)
 const pic = new Path(), ink = new Path(), mid = eq()
+export const carrier = { r: 0.2 } // |c_1|: the radius of the carrier the screen collapses into
 const o = { x: 0, y: 0, z: 0 }, d = { x: 0, y: 0 }
 let aspect = 0, scale = 1, nSee = -1, nHear = -1, kSee = -1, kHear = -1
 
@@ -41,6 +42,7 @@ function compose() {
   text(pic, 'signals · silicon · light · orbit', 0, -0.2, 0.055, 0.5)
   see.load(pic)
   hear.load(pic)
+  carrier.r = see.mag(1)
   scale = 0.8 / Math.max(...Array.from(see.x.keys(), (i) => Math.abs(see.x[i])), 0.5)
   comb.fill(0)
   for (let n = 1; n <= 1024; n++) {

@@ -2,7 +2,7 @@ import { Beam } from './beam/beam'
 import { Audio } from './audio/audio'
 import { LOOK, Phosphor } from './gpu/phosphor'
 import { Timeline } from './acts/timeline'
-import { view, type Frame } from './acts/scene'
+import { input, view, type Frame } from './acts/scene'
 import { idle } from './acts/idle'
 import { wave } from './acts/wave'
 import { xy } from './acts/xy'
@@ -14,12 +14,13 @@ import { waterfall } from './acts/waterfall'
 import { ascii } from './acts/ascii'
 import { specimen } from './acts/specimen'
 import { tune } from './acts/tune'
+import { receive } from './acts/receive'
 
 const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
 const beam = new Beam()
 const audio = new Audio()
-const timeline = new Timeline(q.has('specimen') ? [specimen] : [tune, wave, xy, knot, nameScene, cwScene, iqScene, waterfall, ascii])
+const timeline = new Timeline(q.has('specimen') ? [specimen] : [tune, receive, wave, xy, knot, nameScene, cwScene, iqScene, waterfall, ascii])
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }
 
@@ -40,6 +41,7 @@ function power() {
 }
 
 addEventListener('pointerdown', power)
+addEventListener('pointermove', (e) => ((input.x = (2 * e.clientX) / innerWidth - 1), (input.y = 1 - (2 * e.clientY) / innerHeight)))
 addEventListener('keydown', (e) => {
   if (!on) return power()
   const k = e.key

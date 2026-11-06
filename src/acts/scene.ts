@@ -10,6 +10,7 @@ export type Frame = { ch: Channel[]; rate?: number; look?: Partial<Look> }
 export type Scene = { dur: number; fade?: number; build(t: number, f: Frame): Voice | void }
 
 export const view = { a: 16 / 9 } // half-width of the screen in scope units; height spans [-1, 1]
+export const input = { x: 0, y: 0 } // the pointer, each axis in [-1, 1]
 
 export const TAU = Math.PI * 2
 export const clamp = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x))
