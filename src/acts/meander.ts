@@ -10,6 +10,8 @@ import { TAU, clamp, lock, mix, smooth, view, type Scene } from './scene'
 
 const N = 900 // points along the reach
 const ONES = new Float64Array(LAST + 1).fill(1)
+const PACE = 1.5 // the meander's story runs this much faster than its clock
+const END = 9 // its story time at the end
 const FLOW = 55 // Hz: how fast the speakers run the river, there and back
 export const WATER = [0.62, 0.86, 1] as const // Coe's lidar blue, white where it runs hot
 
@@ -61,9 +63,9 @@ const a = new Path(), b = new Path(), m = new Path(), o = { x: 0, y: 0 }
 
 // The river as the meander leaves it, for the valley to grow out of.
 export function last(p: Path) {
-  heading(meander.dur)
-  reach(omega(meander.dur), view.a * 0.9)
-  return river(p, meander.dur)
+  heading(END)
+  reach(omega(END), view.a * 0.9)
+  return river(p, END)
 }
 
 // The river read back at u ∈ [0, 1], for the speakers.
@@ -74,8 +76,9 @@ function at(u: number) {
 }
 
 export const meander: Scene = {
-  dur: 9,
+  dur: END / PACE,
   build(t, f) {
+    t *= PACE
     const A = view.a * 0.9, fold = clamp(lock([[0, 0], [0.3, 1]], t, 5, 0.7), 0, 1.15)
     heading(t)
     reach(omega(t), A)
