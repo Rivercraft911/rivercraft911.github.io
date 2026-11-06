@@ -2,6 +2,8 @@
 // itself out of odd harmonics on a quickening beat. Each one lands like a loop locking, overshooting
 // and ringing before it settles, so the Gibbs ears flicker as the edges sharpen. A real scope in YT
 // mode: L is the sweep, R is the signal.
+import { GREEN } from '../beam/beam'
+import { Say } from './say'
 import { TAU, lock, mix, smooth, view, type Scene } from './scene'
 
 export const F = 110 // Hz
@@ -9,8 +11,8 @@ export const PERIODS = 3 // periods per sweep
 export const LAST = 50 // harmonics 1, 3, … 101
 export const AMP = 0.42
 const DEGAUSS = 0.7
-const T1 = 2 // the fundamental arrives
-const T_HARM = 3, T_FULL = 11.5 // the odd harmonics land between these, quickening
+const T1 = 1.3 // the fundamental arrives
+const T_HARM = 1.9, T_FULL = 6.3 // the odd harmonics land between these, quickening
 export const lands = (k: number) => (k ? T_HARM + (T_FULL - T_HARM) * (k / LAST) ** 0.55 : T1)
 
 // Each harmonic's weight at time t: a step through an underdamped loop.
@@ -36,14 +38,22 @@ export function degauss(t: number, o: { x: number; y: number }) {
   o.x = e * Math.sin(TAU * 60 * t), o.y = 0.7 * e * Math.sin(TAU * 60 * t + 1.3)
 }
 
+// The live equation: the partial sum written out while it is short, then summed, N counting up.
+const SIN = (n: number) => (n > 1 ? ` + \\frac{1}{${n}} \\sin ${n}\\omega t` : '\\sin \\omega t')
+const SUM = (k: number) => (k < 0 ? 'y(t) = 0' : k > 3 ? 'y(t) = \\frac{4}{\\pi} \\sum_{k=0}^{N} \\frac{\\sin((2k+1)\\, \\omega t)}{2k+1}'
+  : `y(t) = \\frac{4}{\\pi} (${[1, 3, 5, 7].slice(0, k + 1).map(SIN).join('')}${k === 3 ? ' + ...' : ''})`)
+const eq = new Say()
+
 const d = { x: 0, y: 0 }
 export const hook: Scene = {
-  dur: 12,
+  dur: 7,
   build(t, f) {
     const A = view.a * 0.9, open = lock([[0, 0], [DEGAUSS, 1]], t, 9, 0.55)
     weights(t)
     let fresh = Infinity // time since the latest landing
-    for (let k = 0; k <= LAST && lands(k) <= t; k++) fresh = t - lands(k)
+    let N = -1
+    for (let k = 0; k <= LAST && lands(k) <= t; k++) (fresh = t - lands(k)), (N = k)
+    eq.say(f, t, SUM(N), GREEN, N < 0 ? [['t', t, 3]] : [['N', N, 0], ['f_N', (2 * N + 1) * F, 0], ['t', t, 3]])
 
     f.ch.push({
       w: 1,

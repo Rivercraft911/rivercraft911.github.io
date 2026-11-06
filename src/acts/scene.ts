@@ -46,6 +46,26 @@ export function lock(keys: readonly (readonly [number, number])[], t: number, wn
   return x
 }
 
+// Motion that flows through its keys [t, ...values] without stopping at them, for a camera that flies
+// rather than hops: a cubic Hermite whose velocity at each key is the slope between its neighbours, zero
+// for a value at its turn (so nothing overshoots) and at the ends. Position and velocity are continuous.
+export function glide(keys: readonly (readonly number[])[], t: number, out: number[]) {
+  const n = keys.length, last = keys[n - 1]
+  let i = 0
+  while (i + 2 < n && t >= keys[i + 1][0]) i++
+  const a = keys[i], b = keys[i + 1], h = b[0] - a[0], u = clamp((t - a[0]) / h)
+  const slope = (j: number, c: number) => {
+    if (j <= 0 || j >= n - 1) return 0
+    const p = keys[j - 1][c], q = keys[j][c], r = keys[j + 1][c]
+    return (q - p) * (r - q) <= 0 ? 0 : (r - p) / (keys[j + 1][0] - keys[j - 1][0])
+  }
+  for (let c = 1; c < last.length; c++) {
+    const h00 = (1 + 2 * u) * (1 - u) ** 2, h10 = u * (1 - u) ** 2, h01 = u * u * (3 - 2 * u), h11 = u * u * (u - 1)
+    out[c - 1] = h00 * a[c] + h10 * h * slope(i, c) + h01 * b[c] + h11 * h * slope(i + 1, c)
+  }
+  return out
+}
+
 // A hairline leader from an anchor out to a label written by the beam. Notes on one path dodge each
 // other greedily: a label that would land on an earlier one slides down or up until it is clear.
 // A path that has been cleared since its last note starts a new frame of notes.

@@ -11,7 +11,7 @@ import type { Field } from '../gpu/raster'
 import { place, sing } from './choir'
 import { TAU, clamp, lock, mix, smooth, type Frame, type Scene } from './scene'
 
-export const LEAD = 15 // how long the choir has been falling when the wrap begins: since the valley's edge
+export const LEAD = 21 // how long the choir has been falling when the wrap begins: valley.DUR − valley.SING
 export const DUR = 7
 const W = TAU // an octave's width on the sheet: once around a tube of radius 1
 const DY = 0.01 // sheet per printed row
@@ -122,6 +122,7 @@ export function tube(T: number, now: number, f: Frame, kick = 0) {
 
 export const wrap: Scene = {
   dur: DUR,
+  fade: 1.2, // the valley's flattened falls and this sheet share the beam a moment
   build(t, f) {
     tube(t, (f.at ?? 0) + t, f)
     place(t + LEAD)
