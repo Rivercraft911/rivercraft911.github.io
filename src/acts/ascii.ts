@@ -72,12 +72,12 @@ export const ascii: Scene = {
   build(t, f) {
     const T = t + WRAP
     const kick = 0.45 - lock([[0, 0], [0, 0.45]], t, 7, 0.4) // the jump throws the lens wide; it rings back
-    const fld = tube(T, (f.at ?? 0) + t, f, kick)
+    const fld = tube(T, (f.at ?? 0) + t, f, kick, 1, 2.5)
     const w = smooth(0.5, 7.5, t)
     for (let i = 0; i < 3; i++) ink[i] = 1.4 * mix(P1[i], AMBER[i], w)
-    fld.cell = 20
+    fld.cell = 14
     fld.ink = ink
-    fld.lift = 0.5
+    fld.lift = 6
     fld.read = row
     // A frame of overexposure as the reality splices, burning the last one out of the phosphor.
     if (t < 1 / 30) f.look = { exposure: 24, tau: 0.004 }
