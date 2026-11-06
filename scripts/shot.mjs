@@ -11,12 +11,13 @@ const [out = 'shots', ...times] = args
 mkdirSync(out, { recursive: true })
 const server = await createServer({ server: { port: 5199 }, logLevel: 'error' })
 await server.listen()
+const base = server.resolvedUrls.local[0] // the port it got: other checkouts may hold the default
 const browser = await chromium.launch({ channel: 'chrome', args: ['--enable-unsafe-webgpu', '--enable-gpu', '--use-angle=metal'] })
 const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 })
 page.on('console', (m) => console.log('[page]', m.type(), m.text()))
 page.on('pageerror', (e) => console.log('[error]', e.message))
 for (const t of times.length ? times : ['1']) {
-  await page.goto(`http://localhost:5199/?auto&pause&t=${t}${extra}`)
+  await page.goto(`${base}?auto&pause&t=${t}${extra}`)
   await page.waitForTimeout(1500)
   await page.screenshot({ path: `${out}/t${t}.png` })
   console.log(`${out}/t${t}.png`)

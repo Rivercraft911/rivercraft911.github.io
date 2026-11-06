@@ -28,6 +28,14 @@ export const CHOIRS: Choir[] = [
   { k: -0.35, dread: () => 1, enter: (T) => 0.7 * smooth(7, 13, T), r: 3, off: 1.6, period: 11, a0: 4, tilt: 0.3 },
 ]
 const voices = CHOIRS.map(() => new Shepard())
+// The same choirs with a period of φ instead of an octave, for when the fall turns golden.
+export const PHI = (1 + Math.sqrt(5)) / 2
+const golden = CHOIRS.map(() => new Shepard(PHI))
+
+// How a reality mutates the choirs: more dread, the ninth glided to the 11th harmonic, the period
+// crossfaded toward φ (gold ∈ [0, 1]), the descent reflected about a moment so the fall runs back up.
+export type Mood = { dread?: number; prime?: number; gold?: number; mirror?: number }
+const CALM: Mood = {}
 
 // Where choir i is at time T, in metres around the listener (−z ahead).
 const at = { x: 0, y: 0, z: 0 }
@@ -45,12 +53,14 @@ export function place(T: number) {
 }
 
 // Every sample: each choir sings into its spatial voice, heard at its retarded time.
-export function sing(T: number, o: Stereo, gain = 1) {
+export function sing(T: number, o: Stereo, gain = 1, m = CALM) {
+  const g = m.gold ?? 0, pr = m.prime ?? 0
   for (let i = 0; i < CHOIRS.length; i++) {
     const c = CHOIRS[i], e = c.enter(T) * gain
     if (e <= 0) continue
-    const tr = T - where(i, T) / C, v = voices[i]
-    v.s = c.k * descent(tr)
-    o.s[i] += e * v.sample(tr, 0, c.dread(tr))
+    const tr = T - where(i, T) / C, td = m.mirror === undefined ? tr : 2 * m.mirror - tr
+    const d = Math.min(1, c.dread(td) + (m.dread ?? 0)), s = c.k * descent(td)
+    if (g < 1) (voices[i].s = s), (o.s[i] += e * (1 - g) * voices[i].sample(tr, 0, d, pr))
+    if (g > 0) (golden[i].s = s / Math.log2(PHI)), (o.s[i] += e * g * golden[i].sample(tr, 0, d, pr))
   }
 }

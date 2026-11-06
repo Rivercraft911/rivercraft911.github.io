@@ -10,8 +10,11 @@ import { meander } from './acts/meander'
 import { valley } from './acts/valley'
 import { ident } from './acts/ident'
 import { singularity } from './acts/singularity'
-import { falling } from './acts/fall'
-import { LEAD, wrap } from './acts/wrap'
+import { wrap } from './acts/wrap'
+import { primes } from './acts/primes'
+import { indra } from './acts/indra'
+import { stutter } from './acts/stutter'
+import { ophanim } from './acts/ophanim'
 import { ascii, CHARS } from './acts/ascii'
 import { load } from './beam/font'
 import { band, direct } from './band/band'
@@ -27,12 +30,12 @@ const scenes = q.has('specimen')
   : direct()
     ? [band]
     : q.has('fall')
-      ? [wrap, ascii, falling(wrap.dur + ascii.dur + LEAD, 5)]
+      ? [wrap, ascii, primes, indra, stutter, ophanim, singularity]
       : q.has('ident')
         ? [ident]
         : q.has('end')
           ? [singularity, ident, band]
-          : [hook, meander, valley, wrap, ascii, singularity, ident, band]
+          : [hook, meander, valley, wrap, ascii, primes, indra, stutter, ophanim, singularity, ident, band]
 const timeline = new Timeline(scenes)
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }

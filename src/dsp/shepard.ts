@@ -60,7 +60,7 @@ export class Shepard {
   }
 
   // Sets every oscillator for the next block: where each layer sits, its bell, vowel and beating.
-  private control(dread: number) {
+  private control(dread: number, prime: number) {
     const L = this.layers, angel = 1 - 0.55 * dread, dark = dread
     const beat = 0.12 + 0.6 * dread // Hz between the paired copies
     for (let j = 0; j < L; j++) {
@@ -69,7 +69,7 @@ export class Shepard {
       const f = F0 * this.period ** x
       for (let c = 0; c < TONES; c++) {
         const i = j * TONES + c, isAngel = c < ANGEL.length
-        let fc = f * (isAngel ? ANGEL[c] : DREAD[c - ANGEL.length])
+        let fc = f * (isAngel ? ANGEL[c] * (c === 1 ? (11 / 9) ** prime : 1) : DREAD[c - ANGEL.length])
         let g = isAngel ? angel / (1 + c * 0.5) : dread * 0.7
         if (!isAngel) {
           // a slow random walk away from unison, reaching ±50 cents at full dread
@@ -85,13 +85,14 @@ export class Shepard {
     }
   }
 
-  // One sample at time t: rate is periods per second of fall, dread ∈ [0, 1] how much horror sings.
-  sample(t: number, rate: number, dread: number) {
+  // One sample at time t: rate is periods per second of fall, dread ∈ [0, 1] how much horror sings. prime
+  // ∈ [0, 1] glides the ninth, 9/8, up to 11/8, so every chord tone is a prime harmonic (2, 3, 5, 7, 11).
+  sample(t: number, rate: number, dread: number, prime = 0) {
     const dt = t - this.last
     if (dt < 0 || dt > 0.1) this.reset(t)
     this.last = t
     this.s += rate * dt
-    if (this.n-- <= 0) this.control(dread), (this.n = BLOCK - 1)
+    if (this.n-- <= 0) this.control(dread, prime), (this.n = BLOCK - 1)
     const { ph, hz, amp } = this
     let out = 0
     for (let i = 0; i < amp.length; i++) {
