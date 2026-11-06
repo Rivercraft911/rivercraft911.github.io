@@ -3,6 +3,8 @@
 // TransformMatchingTex does, and roll() turns a live number over like an odometer.
 // Syntax: x^2  x_{n+1}  \frac{a}{b}  \sum_{n=0}^{N}  \int_a^b  \omega …  \, \; \quad  and @id{…}
 // (or \id{id}{…}) to name a term, so it keeps its identity when the equation around it changes.
+// \num{k}{-00.00} holds a live number: room for that many digits, filled at draw time from vals[k]
+// on odometer wheels, so an equation can carry the values it is running on.
 import { font, glyph, type Face, type Glyph } from './font'
 import type { Path } from './path'
 
@@ -101,6 +103,13 @@ function layout(src: string, face: Face): Eq {
       const t = tag(/^[^}]*/)
       w = (i++, arg(x, y, s, t))
     }
+    else if (ch === 'num') {
+      const k = tag(/^\{\d+\}/).slice(1, -1), f = tag(/^\{[^}]*\}/).slice(1, -1), dot = f.indexOf('.')
+      const dec = dot < 0 ? 0 : f.length - dot - 1, n = f.replace(/[^0]/g, '').length
+      w = (n * (face.g['0']?.[0] ?? 0.6) + (dec ? (face.g['.']?.[0] ?? 0.3) : 0) + (f[0] === '-' ? (face.g['−']?.[0] ?? 0.6) : 0)) * s
+      g.push({ id: `${k}:${dec}`, ch: '#', x, y, s, w, a: 1 })
+      op = false
+    }
     else if (ch === 'frac') {
       const k = s * 0.8, gap = 0.16 * s, ax = y + axis(face) * s
       const n0 = g.length, wn = arg(x, y, k, id), n1 = g.length, wd = arg(x, y, k, id), wb = Math.max(wn, wd) + 0.3 * s
@@ -163,14 +172,17 @@ export function tex(src: string, f = mathFont.face ?? font.face) {
 }
 
 // Traces e with its baseline at y; align as for text. Returns the width.
-export function draw(p: Path, e: Eq, x: number, y: number, size: number, align = 0, i = 1) {
+export function draw(p: Path, e: Eq, x: number, y: number, size: number, align = 0, i = 1, vals?: ArrayLike<number>) {
   const ox = x - e.w * size * align
   for (let j = 0; j < e.n; j++) {
     const q = e.g[j]
     if (q.a < 0.005) continue
     p.intensity(i * q.a)
     const gx = ox + q.x * size, gy = y + q.y * size
-    if (q.ch) glyph(p, q.ch, gx, gy, q.s * size, e.face)
+    if (q.ch === '#') {
+      const c = q.id.indexOf(':')
+      roll(p, vals?.[+q.id.slice(0, c)] ?? 0, gx + q.w * size, gy, q.s * size, +q.id.slice(c + 1), 1, i * q.a, e.face)
+    } else if (q.ch) glyph(p, q.ch, gx, gy, q.s * size, e.face)
     else p.moveTo(gx, gy).lineTo(gx + q.w * size, gy)
   }
   p.intensity(i)

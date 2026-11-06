@@ -4,7 +4,7 @@
 import { Path } from '../beam/path'
 import { draw, eq, mathFont, morphEq, roll, tex } from '../beam/math'
 import { load } from '../beam/font'
-import { clamp, lock, view, type Frame } from './scene'
+import { clamp, lock, mix, smooth, view, type Frame } from './scene'
 
 // Every equation in the piece is set in this face (?math=<face> to try another).
 mathFont.face = await load(new URLSearchParams(location.search).get('math') ?? 'mserif')
@@ -31,5 +31,31 @@ export class Say {
       cx += roll(p, v, cx, y - 2.7 * SIZE, SUB, dec, 0, 0.75 * i) + 1.4 * SUB
     }
     f.ch.push({ w: 0.2, path: p })
+  }
+}
+
+// The board: every equation a scene is made of, set across the top with the live numbers in it (\num
+// slots), so the whole world could be rebuilt from what is on screen. Each line arrives when what it
+// draws does, and burns brightest in its own colour while that is being drawn.
+export type Line = { src: string; c: readonly number[]; at: number; vals: number[]; hot: number }
+export class Board {
+  private p = new Path()
+  constructor(readonly lines: Line[], private size = 0.03) {}
+
+  // Draws the lines that have arrived by t, wrapped across the top; returns the y the board ends at.
+  show(f: Frame, t: number, k = 1) {
+    const p = this.p.clear(), A = view.a * 0.92, z = this.size, rh = 2.5 * z
+    let x = -A, y = 0.93
+    for (const l of this.lines) {
+      if (l.at > t) continue
+      const e = tex(l.src), w = e.w * z
+      if (x > -A && x + w > A) (x = -A), (y -= rh)
+      const i = k * smooth(l.at, l.at + 0.6, t) * mix(0.35, 1, l.hot)
+      p.color(mix(0.75, l.c[0], l.hot), mix(0.8, l.c[1], l.hot), mix(0.85, l.c[2], l.hot), i)
+      draw(p, e, x, y, z, 0, i, l.vals)
+      x += w + 3 * z
+    }
+    if (p.len) f.ch.push({ w: 0.25 * k, path: p })
+    return x > -A ? y - 1.4 * z : y + rh - 1.4 * z
   }
 }
