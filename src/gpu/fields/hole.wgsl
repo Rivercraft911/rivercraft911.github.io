@@ -6,7 +6,7 @@
 // up, each turn e^−π thinner than the last.
 //
 // The worlds orbit it as twelve rings, each in its own plane (an orbit here keeps its plane), each the
-// raster's own last frame of that world (raster.ts keeps them) round its rim eight times, mirrored so it
+// raster's own last frame of that world (raster.ts keeps them) round its rim twelve times, mirrored so it
 // closes. Each turns at Kepler's Ω = r^−3/2, and its light is shifted by g = √(1 − 3/r) / (1 − Ω b), b the
 // photon's angular momentum about the ring's axis: I_ν/ν³ is conserved along a ray, so the side coming
 // toward us is brighter, as g³, and bluer, red, green and blue going as g², g³, g⁴. The sky is the twelve
@@ -24,12 +24,15 @@
 
 fn hash3(p: vec3f) -> f32 { return fract(sin(dot(p, vec3f(127.1, 311.7, 74.7))) * 43758.5453); }
 
-// World i's shot, at uv across it and mip lod, its brightness evened out so no one world drowns the rest.
+// World i's shot, at uv across it and mip lod. Each world is brought to one level, by its mean light
+// from its smallest mip, 8 × 5, so that no one world drowns the rest and each keeps its own contrast.
 fn world(i: i32, uv: vec2f, lod: f32) -> vec3f {
-  let l = clamp(lod, 0.0, 4.0);
+  let l = clamp(lod, 0.0, 5.0);
   let e = exp2(l) * vec2f(0.5 / 512.0, 0.5 / 320.0);
-  let c = textureSampleLevel(data, smp, (vec2f(f32(i % 4), f32(i / 4)) + clamp(uv, e, 1.0 - e)) / vec2f(4.0, 3.0), l).rgb;
-  return c / (0.25 + dot(c, vec3f(0.3, 0.6, 0.1))) * 0.6;
+  let at = vec2f(f32(i % 4), f32(i / 4));
+  let mean = textureSampleLevel(data, smp, (at + 0.5) / vec2f(4.0, 3.0), 6.0).rgb;
+  let c = textureSampleLevel(data, smp, (at + clamp(uv, e, 1.0 - e)) / vec2f(4.0, 3.0), l).rgb;
+  return c * 0.35 / (0.03 + dot(mean, vec3f(0.3, 0.6, 0.1)));
 }
 
 // Ring i's axis: tipped from the pole by up to 80°, the nodes a golden angle apart. The axes are kept
@@ -47,23 +50,24 @@ fn sides(x: vec3f) -> array<vec4f, 3> {
 }
 
 // The light and opacity where a photon going k, after running len, crosses ring i's plane at P. The ring is
-// 0.24 r wide, a shot's height; a copy of the shot runs 2πr/8 round it.
+// 0.16 r wide, a shot's height; a copy of the shot runs 2πr/12 round it.
 fn ring(i: i32, P: vec3f, k: vec3f, len: f32) -> vec4f {
   let R = u.p[6 + i / 4][i % 4];
   let A = u.p[9 + i / 4][i % 4];
   let r = length(P);
-  let e = (r - R) / (0.12 * R);
+  let e = (r - R) / (0.08 * R);
   if (A <= 0.0 || abs(e) >= 1.0) { return vec4f(0.0); }
   let n = axis(i);
   let e1 = normalize(cross(n, vec3f(0.36, 0.48, 0.8)));
   let om = pow(r, -1.5);
-  let m = (atan2(dot(P, cross(n, e1)), dot(P, e1)) - om * u.p[4].x) * 1.2732395;
+  let m = (atan2(dot(P, cross(n, e1)), dot(P, e1)) - om * u.p[4].x) * 1.9098593;
   let h = fract(0.5 * m) * 2.0;
   let g = sqrt(max(1.0 - 3.0 / r, 0.0)) / (1.0 - om * dot(cross(P, k), n));
-  let s = 1.0 - e * e;
-  let lod = log2(spread * cone() * len / (0.00075 * R * max(abs(dot(n, k)), 0.125)));
+  let s = smoothstep(1.0, 0.8, abs(e));
+  // a texel is about 0.0007 r on the ring; a slanting ray's footprint stretches across it as 1/cos
+  let lod = log2(spread * cone() * len / (0.0007 * R * sqrt(max(abs(dot(n, k)), 0.06))));
   let c = world(i, vec2f(min(h, 2.0 - h), 0.5 - 0.5 * e), lod) * vec3f(g * g, g * g * g, g * g * g * g);
-  return vec4f(c * A * s * s, 0.85 * A * s);
+  return vec4f(c * A * s, 0.85 * A * s);
 }
 
 // The sky toward d: the dodecahedron's faces, each the world on the icosahedron's vertex it faces.

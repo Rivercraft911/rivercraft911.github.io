@@ -27,8 +27,8 @@ const TC = 13 // merger
 const F0 = 24 // Hz at the start of the inspiral
 const FR = 250, DAMP = 0.12 // ringdown frequency and decay
 const T0 = TC + 0.0001 // τ at t = 0 is TC
-const PER = 0.7 // levels of the horizon per octave of the choir's descent
-const PSI = 0.9 // each level turned by this much
+const PER = 0.45 // levels of the horizon per octave of the choir's descent
+const PSI = 0.6 // each level turned by this much
 
 // Inspiral frequency f(τ) = F0 (TC / τ)^(3/8) with τ = TC − t; its phase, integrated in closed form.
 const freq = (t: number) => Math.min(FR * 1.6, F0 * (T0 / Math.max(1e-3, TC - t)) ** 0.375)
@@ -71,7 +71,7 @@ function rays(k: number, t: number, i0: number) {
         pen = false
         continue
       }
-      light.color(c[0], c[1], c[2], 0.12 + Math.exp(-((ago - 1) ** 2) / 0.6))
+      light.color(c[0], c[1], c[2], 0.04 + Math.exp(-((ago - 1) ** 2) / 0.6))
       pen ? light.lineTo(x, y) : light.moveTo(x, y)
       pen = true
     }
@@ -105,23 +105,25 @@ export const singularity: Scene = {
   build(t, f) {
     field.bake ??= worlds() // before anything of ours: the other scenes' builds share the equation's path
     const T = t + AT, kick = jump(t, f, true, 0.6), p = field.p
-    // a spiral in, from 30 M to just outside the rings
-    const D = mix(30, 15, smooth(0, OPEN + 0.5, t)), az = 0.5 + 0.15 * t, el = mix(0.4, 0.18, smooth(0, OPEN, t))
+    // a spiral in, from 30 M to 10, always outside the rings
+    const D = mix(30, 10, smooth(0, OPEN + 0.5, t)), az = 0.5 + 0.08 * t, el = mix(0.4, 0.18, smooth(0, OPEN, t))
     eye[0] = D * Math.cos(el) * Math.cos(az), eye[1] = D * Math.sin(el), eye[2] = D * Math.cos(el) * Math.sin(az)
     fwd[0] = -eye[0], fwd[1] = -eye[1], fwd[2] = -eye[2]
     aim(p, eye, fwd, up, 0.95 + kick)
     // the shadow's edge on screen, as a static observer at D sees it: sin α = (√27 / D) √(1 − 2/D)
     const r1 = p[3] * Math.tan(Math.asin((Math.sqrt(27) / D) * Math.sqrt(1 - 2 / D)))
     const z = Math.exp(1.6 * Math.max(0, t - FALL) ** 1.6) // the collapse: the picture shrinks to a point
-    p[16] = 20 * t, p[17] = z, p[18] = Math.min(4, Math.sqrt(z)) * (z < 400 ? 1 : 0), p[19] = smooth(OPEN, OPEN + 1, t)
+    p[16] = 8 * t, p[17] = z, p[18] = Math.min(4, Math.sqrt(z)) * (z < 400 ? 1 : 0), p[19] = smooth(OPEN, OPEN + 1, t)
     p[20] = t > OPEN ? PER * (descent(T) - descent(AT + OPEN)) : 0
     p[21] = Math.max(0.9, Math.log((Math.hypot(view.a, 1) + 0.15) / r1)), p[22] = PSI, p[23] = 0.8 * r1
-    // ring i, world i: lit in the order we fell, drawn in a little as the hole takes them
+    // ring i, world i: lit in the order we fell, then spiralling down toward the photon sphere, where
+    // its light is redshifted away into the photon ring
+    const sink = 1 - 0.55 * smooth(2.5, OPEN + 0.5, t)
     for (let i = 0; i < 12; i++) {
-      p[24 + i] = (4 + 0.55 * i) * (1 - 0.2 * smooth(0, FALL, t))
+      p[24 + i] = 3 + (1 + 0.55 * i) * sink
       p[36 + i] = smooth(0.2 + 0.2 * i, 0.5 + 0.2 * i, t)
     }
-    p[48] = 0.07, p[49] = 0.3
+    p[48] = 0.012, p[49] = 0.3
     if (p[18] > 0) f.field = field
 
     const lit = smooth(0.6, 1.5, t) * (1 - smooth(OPEN - 1, OPEN + 0.3, t))
@@ -139,7 +141,7 @@ export const singularity: Scene = {
     const said = 1 - smooth(TC - 0.5, TC + 0.5, t)
     if (said > 0) equation(f, t < OPEN ? "u''+u=3u^2" : t < FALL ? 'z\\to Ke^{i\\psi}z' : 'f=f_0(1-t/t_c)^{-3/8}', [1, 0.9, 0.75], 0.9 * said)
     f.rate = 2e6
-    f.look ??= look
+    if (t > FALL) f.look ??= look // the chirp's long trail
     place(T)
     return (tt, o) => {
       const p = phase(tt), A = clamp(amp(tt), 0, 0.85)

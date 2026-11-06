@@ -25,7 +25,7 @@ export const TILE = [24, 40] // a glyph's tile in the atlas, px
 export const GRID = [6, 10] // a cell's shape: its light over this grid, and a glyph's ink over the same
 const ATLAS_COLS = 8
 export const SHOT = [512, 320] // a world's shot, px; the shots are a 4 × 3 grid of them
-const MIPS = 5 // and each is kept at five sizes, halving, so a shot seen small is averaged, not aliased
+const MIPS = 7 // and each is kept at seven sizes, halving, so a shot seen small is averaged, not aliased
 
 export class Raster {
   scale = 0.5 // the light's resolution against the phosphor's
