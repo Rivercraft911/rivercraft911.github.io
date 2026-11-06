@@ -12,6 +12,7 @@ import { ident } from './acts/ident'
 import { singularity } from './acts/singularity'
 import { wrap } from './acts/wrap'
 import { primes } from './acts/primes'
+import { indra } from './acts/indra'
 import { ascii, CHARS } from './acts/ascii'
 import { load } from './beam/font'
 
@@ -23,12 +24,12 @@ const audio = new Audio()
 const scenes = q.has('specimen')
   ? [specimen]
   : q.has('fall')
-    ? [wrap, ascii, primes, singularity]
+    ? [wrap, ascii, primes, indra, singularity]
     : q.has('ident')
       ? [ident]
       : q.has('end')
         ? [singularity, ident]
-        : [hook, meander, valley, wrap, ascii, primes, singularity, ident]
+        : [hook, meander, valley, wrap, ascii, primes, indra, singularity, ident]
 const timeline = new Timeline(scenes)
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }
