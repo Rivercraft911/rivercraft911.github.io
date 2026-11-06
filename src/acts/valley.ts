@@ -223,7 +223,7 @@ const FLIGHT: [number, number[]][] = [
   [27, [LIP - 8, YL + 5, riverZ(LIP - 8), LIP + 14, YL - 3, ZL, 1]],
   [30, [LIP + 1.5, YL + 3.5, ZL - 0.4, LIP + 7, YL - 28, ZL, 1.1]],
   [33, [LIP + 15, YL - 13, ZL + 0.6, LIP, YL - 13, ZL, 0.95]],
-  [35, [LIP + 10, YL - 12, ZL, LIP, YL - 12, ZL, 0.3]],
+  [35, [LIP + 10, YL - 12, ZL, LIP, YL - 12, ZL, 0.6]],
 ]
 const fwd = { x: 1, y: 0 }
 function crane(t: number) {
