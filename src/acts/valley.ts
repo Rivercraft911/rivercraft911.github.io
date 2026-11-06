@@ -180,17 +180,17 @@ items.sort((a, b) => a.x - b.x)
 const VX = Float32Array.from(V)
 
 // ── the live equation: what is being seeded now ────────────────────────────────────────────────────
-const EQ: [number, string][] = [
-  [0, '\\theta(s) = \\omega_1 \\sin(2\\pi s / M_1) + \\omega_2 \\sin(2\\pi s / M_2 + \\phi)'],
-  [2, 'T(x, z) = \\sum_k |k|^{-\\beta/2} \\cos(k r + \\phi_k)'],
-  [6, 'x(y) = A (1 - y / H)\\; tri(2\\pi f y)'],
-  [7.5, 'h(z) = 20\\, \\log_{10} |S(e^{i\\omega})|'],
-  [9.5, 'u(s, t) = U \\cos(2\\pi (s / \\lambda - f t))'],
-  [12, 's_k \\in \\{ R_1 e^{i\\pi(2m+1)/4},\\; R_2 e^{i\\pi(2m+1)/12} \\}'],
+const EQ: [number, string, readonly number[]][] = [ // when, what, in the colour of what it draws
+  [0, '\\theta(s) = \\omega_1 \\sin(2\\pi s / M_1) + \\omega_2 \\sin(2\\pi s / M_2 + \\phi)', WATER],
+  [2, 'T(x, z) = \\sum_k |k|^{-\\beta/2} \\cos(k r + \\phi_k)', INK],
+  [6, 'x(y) = A (1 - y / H)\\; tri(2\\pi f y)', PINE],
+  [7.5, 'h(z) = 20\\, \\log_{10} |S(e^{i\\omega})|', INK],
+  [9.5, 'u(s, t) = U \\cos(2\\pi (s / \\lambda - f t))', WATER],
+  [12, 's_k \\in \\{ R_1 e^{i\\pi(2m+1)/4},\\; R_2 e^{i\\pi(2m+1)/12} \\}', STONE],
 ]
 
 // ── each frame ──────────────────────────────────────────────────────────────────────────────────────
-const SCAN = 2, SCAN_DUR = 5 // rows rise in a wave rolling upstream
+const SCAN = 2.6, SCAN_DUR = 5 // rows rise in a wave rolling upstream
 const HB = 1024, horizon = new Float32Array(HB)
 const p3 = { x: 0, y: 0, z: 0 }, q3 = { x: 0, y: 0, z: 0 }
 const sx = new Float32Array(NC), sy = new Float32Array(NC), sz = new Float32Array(NC), ok = new Uint8Array(NC)
@@ -200,7 +200,7 @@ let heroN = 0, occlude = 1
 
 const eye = { x: 0, y: 0, z: 0 }
 function crane(t: number) {
-  const k = clamp(lock([[0, 0], [0.3, 1]], t, 1.5, 0.85), 0, 1.04), drift = Math.max(0, t - 3) * 0.45
+  const k = clamp(lock([[0, 0], [1.3, 1]], t, 1.6, 0.9), 0, 1.03), drift = Math.max(0, t - 4) * 0.45
   const ex = -11 + drift, orbit = 7 * Math.cos(0.09 * t + 0.6) // the drone drifts upstream, swinging around the valley
   eye.x = mix(32, ex, k), eye.y = mix(70, riverY(ex + 8) + 9, k), eye.z = mix(riverZ(32) + 4, riverZ(ex + 8) - orbit, k)
   const tx = mix(32, 22 + drift, k)
@@ -329,7 +329,7 @@ export const valley: Scene = {
         ok[j] = cam.project(x, base + (RH[o + j] - base) * rise, RZp[o + j], p3) ? 1 : 0
         sx[j] = p3.x, sy[j] = p3.y, sz[j] = p3.z
       }
-      const index = i % 8 === 0 ? 1 : 0.6
+      const index = (i % 8 === 0 ? 1 : 0.6) * Math.min(1, rise * 2.5)
       let pen = false
       for (let j = 0; j < NC; j++) {
         const water = Math.abs(RZp[o + j] - riverZ(x)) < wide(x)
@@ -350,18 +350,19 @@ export const valley: Scene = {
     f.ch.push({ w: 1, path: ink })
 
     // the meander, before the land: the river we watched form, laid down onto the valley floor
-    if (t < 2.2) {
+    if (t < 1.9) {
       line.clear().color(WATER[0], WATER[1], WATER[2], 1)
       let pen = false
       for (let x = X0 + 1; x < 96; x += 0.5)
         if (cam.project(x, riverY(x), riverZ(x), p3)) pen ? line.lineTo(p3.x, p3.y) : line.moveTo(p3.x, p3.y), (pen = true)
-      f.ch.push({ w: 0.5, path: morph(last(from), line, clamp(lock([[0, 0], [0, 1]], t + 0.001, 3, 0.8), 0, 1), mid, 700) })
+      f.ch.push({ w: 0.5 * smooth(1.9, 1.3, t), path: morph(last(from), line, clamp(lock([[0, 0], [0, 1]], t + 0.001, 4, 0.9), 0, 1), mid, 700) })
     }
 
     // the live equation
     let e = 0
     while (e + 1 < EQ.length && EQ[e + 1][0] <= t) e++
-    eqp.clear().color(0.85, 0.95, 1, 0.8)
+    const ec = EQ[e][2]
+    eqp.clear().color(ec[0], ec[1], ec[2], 0.9)
     draw(eqp, tex(EQ[e][1]), -view.a * 0.9, 0.86, 0.055, 0)
     f.ch.push({ w: 0.15, path: eqp })
 
