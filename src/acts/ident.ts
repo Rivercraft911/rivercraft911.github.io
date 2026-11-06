@@ -31,7 +31,7 @@ const keyed = (t: number) => {
   return 0
 }
 
-const tape = new Path(), name = new Path(), call = new Path(), out = new Path()
+const tape = new Path(), name = new Path(), call = new Path(), out = new Path(), both = new Path(), head = new Path()
 let built = 0
 
 // The tape: one line across the screen, raised where the key was down, written as it is sent.
@@ -49,16 +49,28 @@ function writeTape(t: number, A: number) {
 }
 
 export const ident: Scene = {
-  dur: 12,
+  dur: END + 5.6,
   build(t, f) {
     const A = view.a
     if (built !== A) {
       const size = Math.min(0.3, (1.75 * A) / measure('RIVER DOWDY', 1))
       name.clear().color(0.75, 1, 0.8, 1.6)
       text(name, 'RIVER DOWDY', 0, -0.02, size, 0.5)
+      // the name and call as one, and where the instrument will wear them: the band's header
+      both.clear().color(0.75, 1, 0.8, 1.6)
+      text(both, 'RIVER DOWDY', 0, -0.02, size, 0.5)
+      both.color(0.75, 1, 0.8, 0.8)
+      text(both, 'KJ5SCH', 0, -0.3, 0.075, 0.5)
+      const vert = A < 1, z = (vert ? 0.024 : 0.03) * 0.95
+      head.clear().color(1, 0.7, 0.28, 0.75)
+      text(head, 'RIVER DOWDY  KJ5SCH', vert ? -A + 0.03 : -A + 0.12, 0.93, z, 0)
       built = A
     }
-    if (t < KEY) {
+    const up = clamp(lock([[0, 0], [END + 4.2, 1]], t, 3.5, 0.8), 0, 1.05)
+    if (up > 0) {
+      // the name rises into the corner of the instrument that powers up around it
+      f.ch.push({ w: 1, path: morph(both, head, up, out, 900) })
+    } else if (t < KEY) {
       // the dot, alone, shivering
       f.ch.push({ w: 1, fn: (_, s) => ((s.x = 0.004 * hash(Math.random() * 1e4)), (s.y = 0.004 * hash(Math.random() * 1e4)), (s.z = 0.6)) })
     } else {
@@ -66,7 +78,7 @@ export const ident: Scene = {
       f.ch.push({ w: 1, path: k > 0 ? morph(writeTape(Math.min(t, END), A), name, k, out, 800) : writeTape(t, A) })
     }
     const c = smooth(END + 1.4, END + 2.4, t)
-    if (c > 0) {
+    if (c > 0 && up <= 0) {
       call.clear().color(0.75, 1, 0.8, 0.8)
       text(call, 'KJ5SCH', 0, -0.3, 0.075, 0.5)
       f.ch.push({ w: 0.25, path: call.reveal(c) })
@@ -78,7 +90,7 @@ export const ident: Scene = {
       if (tt > END + 0.5) {
         // the name, traced fifty times a second: a real scope on the headphone jack would read it
         const n = name.v.length / 8, u = ((tt * 50) % 1) * (n - 1), i = Math.floor(u), a = u - i, v = name.v, j = Math.min(n - 1, i + 1)
-        const g = 0.7 * smooth(END + 0.5, END + 1.5, tt)
+        const g = 0.7 * smooth(END + 0.5, END + 1.5, tt) * (1 - smooth(END + 4, END + 5.5, tt))
         o.l += (g * mix(v[8 * i], v[8 * j], a)) / A, o.r += g * mix(v[8 * i + 1], v[8 * j + 1], a) * 2
       }
     }
