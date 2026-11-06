@@ -9,7 +9,7 @@ import { draw, eq, morphEq, roll, tex } from '../beam/math'
 import { Series } from '../dsp/fourier'
 import { TAU, clamp, lock, mix, smooth, view, type Scene } from './scene'
 
-use(await load('relief'))
+use(await load('tech')) // River's pick: EMS Tech, a drafting hand
 
 const F0 = 50 // Hz: how often the speakers trace the screen
 const EAR = Math.floor(20_000 / F0) // the last harmonic anyone can hear
