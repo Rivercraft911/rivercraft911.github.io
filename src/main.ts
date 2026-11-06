@@ -106,15 +106,14 @@ function tick(now: number) {
   view.a = canvas.width / canvas.height
 
   frame.ch.length = 0
-  if (on) timeline.build(t, frame)
-  else idle.build(now / 1000, frame)
+  const voice = on ? timeline.build(t, frame) : (idle.build(now / 1000, frame), undefined)
   beam.rate = Math.min(Q.rate, frame.rate ?? 1.2e6)
   Object.assign(look, LOOK, frame.look)
   beam.frame(frame.ch, t - dt, dt)
   gpu.draw(beam, view.a, dt, look)
 
   if (on) for (let i = 0; i < space.length; i += 3) audio.place(i / 3, space[i], space[i + 1], space[i + 2])
-  if (on) audio.feed(t, timeline.build(t + 0.05, frame) || undefined)
+  if (on) audio.feed(t, voice) // the voice is a function of time: it plays this frame's scene ahead
   requestAnimationFrame(tick)
 }
 
