@@ -22,6 +22,7 @@ const INK = [0.78, 0.88, 1] as const, PINE = [0.45, 1, 0.62] as const, WATER = [
 const rnd = (n: number) => hash(n) * 0.5 + 0.5
 
 // ── the river: a meander of two scales, skewed, climbing in cascades ─────────────────────────────────
+const CASCADES = [9, 21, 36, 55] // where the river steps down
 const X0 = -12, X1 = 104, DX = 0.1, NX = Math.round((X1 - X0) / DX) + 1
 const RZ = new Float64Array(NX), RY = new Float64Array(NX)
 {
@@ -34,12 +35,12 @@ const RZ = new Float64Array(NX), RY = new Float64Array(NX)
   }
   for (let i = 0; i < NX; i++) {
     const x = X0 + i * DX
-    RY[i] = 6.5 * (1 - Math.exp(-Math.max(0, x) / 40)) + [28, 47, 66, 81].reduce((a, c, j) => a + [0.5, 0.8, 0.6, 0.9][j] * smooth(c - 0.25, c + 0.25, x), 0)
+    RY[i] = 6.5 * (1 - Math.exp(-Math.max(0, x) / 40)) + CASCADES.reduce((a, c, j) => a + [0.6, 0.8, 0.7, 0.9][j] * smooth(c - 0.25, c + 0.25, x), 0)
   }
 }
 const idx = (x: number) => Math.max(0, Math.min(NX - 1, Math.round((x - X0) / DX)))
 export const riverZ = (x: number) => RZ[idx(x)], riverY = (x: number) => RY[idx(x)]
-const W0 = 1.1
+const W0 = 1.6
 const wide = (x: number) => W0 * (1 + 0.3 * Math.sin(0.21 * x + 0.4) + 0.2 * Math.sin(0.07 * x)) // half-width: narrows, pools
 
 // ── the land ────────────────────────────────────────────────────────────────────────────────────────
@@ -115,6 +116,10 @@ function flowAt(x: number, z: number, o: { x: number; z: number }) {
   o.z -= (curl * (field.at((x + e) * 3, z * 3) - field.at((x - e) * 3, z * 3))) / (2 * e)
 }
 
+// The surface: travelling waves crossing at angles, choppier where the water is fast. Heave and sway.
+const wave = (x: number, z: number, t: number) =>
+  0.035 * Math.sin(3.1 * x + 1.7 * z + 7 * t) + 0.025 * Math.sin(-2.3 * x + 3.7 * z + 5.3 * t) + 0.02 * Math.sin(5.9 * x - 1.1 * z + 9.1 * t)
+
 // The far peaks are spectra: the dB magnitude of a square wave with a slow FM wobble.
 function spectrum(seed: number, n = 512) {
   const re = new Float64Array(n), im = new Float64Array(n)
@@ -157,7 +162,7 @@ function peaks(seed: number, x: number, z0: number, z1: number, base: number, H:
     vortex.push([sx - 0.35, riverZ(sx) + 0.8 * APSK16.pts[2 * k] + 0.12, k & 1 ? 0.5 : -0.5]) // each stone sheds an eddy
   }
   const v = { x: 0, z: 0 }, pts: number[] = []
-  for (let k = 0; k < 900; k++) {
+  for (let k = 0; k < 1800; k++) {
     let x = 0.5 + 84 * rnd(k * 11 + 1), z = riverZ(x) + (rnd(k * 13 + 2) * 2 - 1) * wide(x) * 0.9
     pts.length = 0
     for (let s = 0; s < 34; s++) {
@@ -196,8 +201,8 @@ let heroN = 0, occlude = 1
 const eye = { x: 0, y: 0, z: 0 }
 function crane(t: number) {
   const k = clamp(lock([[0, 0], [0.3, 1]], t, 1.5, 0.85), 0, 1.04), drift = Math.max(0, t - 3) * 0.45
-  const ex = -14 + drift, orbit = 7 * Math.cos(0.09 * t + 0.6) // the drone drifts upstream, swinging around the valley
-  eye.x = mix(32, ex, k), eye.y = mix(70, riverY(ex + 8) + 12, k), eye.z = mix(riverZ(32) + 4, riverZ(ex + 8) - orbit, k)
+  const ex = -11 + drift, orbit = 7 * Math.cos(0.09 * t + 0.6) // the drone drifts upstream, swinging around the valley
+  eye.x = mix(32, ex, k), eye.y = mix(70, riverY(ex + 8) + 9, k), eye.z = mix(riverZ(32) + 4, riverZ(ex + 8) - orbit, k)
   const tx = mix(32, 22 + drift, k)
   cam.aim(eye.x, eye.y, eye.z, tx, mix(0, riverY(tx), k), riverZ(tx), mix(1.1, 0.95, k))
   occlude = smooth(0.55, 0.85, k) // a floating horizon only means something once we look across the land
@@ -229,8 +234,8 @@ function items_(t: number, upto: number, next: { i: number }, hero: number) {
     const k = clamp(lock([[0, 0], [it.t0, 1]], t, it.kind === ROCK ? 9 : 7, 0.45), 0, 1.3)
     let pen = false
     for (let v = 0; v < it.n; v++) {
-      const o = 3 * (it.a + v), y = it.kind === FLOW ? VX[o + 1] : it.base + (VX[o + 1] - it.base) * (it.kind === ROCK ? 1 : k), drop = it.kind === ROCK ? (1 - Math.min(1, k)) * 3 : 0
-      if (!cam.project(VX[o], y + drop, VX[o + 2], p3) || !visible(p3.x, p3.y)) {
+      const o = 3 * (it.a + v), wv = it.kind === FLOW ? wave(VX[o], VX[o + 2], t) : 0, y = it.kind === FLOW ? VX[o + 1] + wv : it.base + (VX[o + 1] - it.base) * (it.kind === ROCK ? 1 : k), drop = it.kind === ROCK ? (1 - Math.min(1, k)) * 0.5 : 0
+      if (!cam.project(VX[o], y + drop, VX[o + 2] + 1.5 * wv, p3) || !visible(p3.x, p3.y)) {
         pen = false
         continue
       }
@@ -243,6 +248,56 @@ function items_(t: number, upto: number, next: { i: number }, hero: number) {
       pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
       pen = true
       if (it.kind === hero && it.t0 <= t && t - it.t0 < 0.5 && heroN < HERO) (hx[heroN] = p3.x), (hy[heroN++] = p3.y)
+    }
+  }
+}
+
+// White water: at each cascade a foam lip curling across the river, and spray thrown downstream on
+// ballistic arcs, each droplet a parabola; around each stone, ripple rings running outward.
+const G = 7
+function whitewater(t: number, xc: number) {
+  const y0 = riverY(xc + 0.3), zc = riverZ(xc), w = wide(xc), on = smooth(2.5, 4, t)
+  for (let k = 0; k < 7; k++) {
+    let pen = false
+    for (let j = 0; j <= 24; j++) {
+      const u = j / 24 - 0.5, curl = 0.08 * Math.sin(TAU * (u * 3 + t * 1.3 + k * 0.4))
+      if (!cam.project(xc - 0.1 * k + curl, y0 - 0.06 * k + wave(xc, zc + u * 2 * w, t), zc + u * 2 * w * 0.98, p3) || !visible(p3.x, p3.y)) {
+        pen = false
+        continue
+      }
+      ink.color(0.85, 0.95, 1, on * (1 - k / 8) * fog(p3.z))
+      pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
+      pen = true
+    }
+  }
+  for (let d = 0; d < 90; d++) {
+    const life = 0.9 + 0.5 * rnd(d * 3 + xc), age = ((t + life * rnd(d * 7 + xc)) % life)
+    const vx = -1.2 - 1.5 * rnd(d + xc), vy = 1 + 2.2 * rnd(d * 5 + xc), vz = (rnd(d * 11 + xc) * 2 - 1) * 1.2, z0 = zc + (rnd(d * 13 + xc) * 2 - 1) * w
+    const at = (a: number) => cam.project(xc + vx * a, y0 + vy * a - 0.5 * G * a * a, z0 + vz * a, p3)
+    if (!at(age) || !visible(p3.x, p3.y)) continue
+    const x1 = p3.x, y1 = p3.y
+    if (!at(Math.max(0, age - 0.05))) continue
+    ink.color(0.9, 0.97, 1, on * (1 - age / life) * fog(p3.z)).moveTo(p3.x, p3.y).lineTo(x1, y1)
+  }
+}
+function ripples(t: number, x0: number, x1: number) {
+  const p = APSK16.pts
+  for (let k = 0; k < p.length / 2; k++) {
+    const sx = 3.2 + 1.6 * p[2 * k + 1]
+    if (sx < x0 || sx >= x1 || t < 12 + 0.11 * k) continue
+    const sz = riverZ(sx) + 0.8 * p[2 * k], y = riverY(sx) + 0.01
+    for (let r = 0; r < 3; r++) {
+      const age = ((t - 12 - 0.11 * k) * 0.6 + r / 3) % 1, rad = 0.2 + 0.9 * age
+      let pen = false
+      for (let a = 0; a <= 28; a++) {
+        if (!cam.project(sx + rad * 0.8 * Math.cos((TAU * a) / 28), y, sz + rad * Math.sin((TAU * a) / 28), p3) || !visible(p3.x, p3.y)) {
+          pen = false
+          continue
+        }
+        ink.color(WATER[0], WATER[1], WATER[2], (1 - age) * 0.7 * fog(p3.z))
+        pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
+        pen = true
+      }
     }
   }
 }
@@ -260,6 +315,8 @@ export const valley: Scene = {
       const x = rowX(i), x0 = rowX(i - 1), rise = clamp(lock([[0, 0], [SCAN + (i / NR) * SCAN_DUR, 1]], t, 7, 0.45), 0, 1.35)
       if (x < eye.x + 0.3) continue
       items_(t, x, next, heroKind)
+      for (const c of CASCADES) if (c >= x0 && c < x && t > 2.5) whitewater(t, c)
+      if (i > 0) ripples(t, x0, x)
       // the banks and the current, from the last row to this one
       if (i > 0 && x0 >= eye.x + 0.3) {
         const y0 = riverY(x0), y1 = riverY(x)
@@ -305,7 +362,7 @@ export const valley: Scene = {
     let e = 0
     while (e + 1 < EQ.length && EQ[e + 1][0] <= t) e++
     eqp.clear().color(0.85, 0.95, 1, 0.8)
-    draw(eqp, tex(EQ[e][1]), -view.a * 0.9, -0.88, 0.055, 0)
+    draw(eqp, tex(EQ[e][1]), -view.a * 0.9, 0.86, 0.055, 0)
     f.ch.push({ w: 0.15, path: eqp })
 
     f.rate = mix(2.4e6, 7.2e6, smooth(1, 8, t))
