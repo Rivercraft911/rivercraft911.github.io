@@ -80,7 +80,7 @@ function print(T: number, now: number, f: Field) {
   pr.T = T
   const n = top - pr.k
   for (let i = 0; i < n; i++) water.row(now - (T - printedAt((pr.k + 1 + i) * DY)), rows, i * BINS)
-  f.rows = n > 0 ? { data: rows, at: (pr.k + 1) % ROWS, n } : undefined
+  f.rows = n > 0 ? { data: rows, at: (((pr.k + 1) % ROWS) + ROWS) % ROWS, n } : undefined
   pr.k = top
   return top
 }

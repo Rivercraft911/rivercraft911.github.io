@@ -109,7 +109,8 @@ fn field(q: vec2f) -> vec3f {
   let back = u.p[4].x - P.y; // behind the head: older
   let dy = u.p[4].y;
   let ring = u.p[4].w;
-  if (back < 0.0 || back > min(u.p[5].y, ring - 8.0) * dy) { return vec3f(0.0); }
+  let oldest = min(u.p[5].y, ring - 8.0) * dy;
+  if (back < 0.0 || back > oldest) { return vec3f(0.0); }
   let r = u.p[4].z - back / dy;
   // A pixel's footprint on the wall (ray differentials: the hit slides along the wall as the ray turns),
   // in bins around the roll and rows along it.
@@ -136,5 +137,5 @@ fn field(q: vec2f) -> vec3f {
   let age = back / max(u.p[5].z, 1e-3);
   let cs = s * s / dot(dir, dir);
   let lv = level(pw);
-  return palette(lv + 0.3 * exp(-age / 0.12) * lv) * u.p[5].x * cs * cs * smoothstep(0.0, 0.15, back);
+  return palette(lv + 0.3 * exp(-age / 0.12) * lv) * u.p[5].x * cs * cs * smoothstep(0.0, 0.15, back) * (1.0 - smoothstep(oldest - 1.5, oldest, back));
 }
