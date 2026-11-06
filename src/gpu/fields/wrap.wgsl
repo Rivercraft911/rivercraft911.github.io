@@ -6,7 +6,7 @@
 //
 // p[0] eye, 1/tan(fov/2)     p[1] right, radius of the roll    p[2] up, z of the roll's axis
 // p[3] forward, an octave's width on the sheet                  p[4] head y, y per row, head's ring row, rows
-// p[5] gain, rows printed so far, sheet per second, spot
+// p[5] gain, rows printed so far, sheet per second, spot      p[6] brightness: the black level's lift
 
 const TAU = 6.2831853;
 const PI = 3.1415927;
@@ -34,7 +34,7 @@ fn palette(s: f32) -> vec3f {
 // drawn as the beam draws one, with a spot sized in pixels: each local peak is fitted with its parabola,
 // which gives where the partial truly is, how loud, and how wide the estimate made it, and it is drawn
 // there at that width, but never wider than the spot (p[5].w raster pixels), and as bright as its energy,
-// narrowed, makes it (up to 8 times). Crests wider than 8 bins are too flat to place; they stay glow.
+// narrowed, makes it (up to 4 times). Crests wider than 8 bins are too flat to place; they stay glow.
 const NEPER = 0.07755; // a Gaussian's curvature in row units: 10 log10(e) / 56 dB
 fn ridge(x: f32, v: f32, w: f32, fx: f32) -> f32 {
   let c = floor(x - 0.5);
@@ -54,7 +54,7 @@ fn ridge(x: f32, v: f32, w: f32, fx: f32) -> f32 {
       let wide = sqrt(NEPER / -k) / fx;
       let sig = min(wide, u.p[5].w);
       let dx = (x - (c + f32(j) - 0.5 + at)) / (fx * sig);
-      p = max(p, power(b - 0.25 * (a - d) * at) * min(wide / sig, 8.0) * exp(-0.5 * dx * dx));
+      p = max(p, power(b - 0.25 * (a - d) * at) * min(wide / sig, 4.0) * exp(-0.5 * dx * dx));
     }
   }
   return p;
@@ -128,7 +128,7 @@ fn field(q: vec2f) -> vec3f {
   // persistence screen's do; a pinhole's light falls off as cos⁴ off axis.
   let age = back / max(u.p[5].z, 1e-3);
   let cs = s * s / dot(dir, dir);
-  let lv = level(pw);
+  let lv = level(pw) * (1.0 - u.p[6].x) + u.p[6].x;
   let edges = smoothstep(0.0, 0.15, back) * (1.0 - smoothstep(oldest - 1.5, oldest, back));
   return palette(lv * (1.0 + 0.3 * exp(-age / 0.12))) * (u.p[5].x * cs * cs * exp(-age / 2.0) * edges);
 }

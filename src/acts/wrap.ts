@@ -90,7 +90,7 @@ function print(T: number, now: number, f: Field) {
 const TAU_RASTER = 0.006
 
 // The tube at fall time T into the frame: the raster's field and its new rows.
-const field: Field = { shader: SHADER, k: 1, p: new Float32Array(24), res: 1.5 } // its lines are drawn a pixel wide
+const field: Field = { shader: SHADER, k: 1, p: new Float32Array(28), res: 1.5 } // its lines are drawn a pixel wide
 export function tube(T: number, now: number, f: Frame, kick = 0, gain = 1, spot = 0.9) {
   look(T, kick)
   const top = print(T, now, field), v = cam, p = field.p
@@ -100,6 +100,7 @@ export function tube(T: number, now: number, f: Frame, kick = 0, gain = 1, spot 
   p.set(v.f, 12), (p[15] = W)
   p[16] = top * DY, p[17] = DY, p[18] = top % ROWS, p[19] = ROWS
   p[20] = gain, p[21] = top - printer.from, p[22] = speed(T), p[23] = spot
+  p[24] = 0.3 * (1 - smooth(0.6, 2.2, T)) // the plot opens with its black lifted, as the valley's is; it sinks as we dive
   field.cell = undefined
   f.field = field
   f.look = { tau: TAU_RASTER }
