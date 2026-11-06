@@ -24,6 +24,12 @@ export const descent = (T: number) => {
   const f = Math.min(T / DT, S.length - 1), i = Math.floor(f)
   return S[i] + (S[Math.min(i + 1, S.length - 1)] - S[i]) * (f - i)
 }
+// The choir's own glide, far slower than the zoom: an octave every 14 s, quickening to every 6 s at the
+// climax. Faster, and the octaves stop fusing into one tone and are heard as separate sirens.
+const sungRate = (T: number) => 0.07 + 0.1 * smooth(44, END, T)
+const SUNG = new Float64Array(S.length)
+for (let i = 1; i < SUNG.length; i++) SUNG[i] = SUNG[i - 1] + sungRate(i * DT) * DT
+const sung = (T: number) => (T <= 0 ? sungRate(0) * T : SUNG[Math.min(SUNG.length - 1, Math.round(T / DT))])
 export const dread = (T: number) => 0.6 * smooth(4, 16, T) + 0.25 * swell(T)
 // How many chord tones sing: an open fifth at the edge, the full 7-limit chord by the wrap, 11, 13, 15 at the end.
 const tones = (T: number) => 2 + 3 * smooth(2, 26, T) + 3 * smooth(50, 68, T)
@@ -52,7 +58,7 @@ const part: Part = { l: 0, r: 0, d: 0 }
 export function sing(T: number, o: Stereo, gain = 1, m = CALM) {
   const e = gain * GAIN * smooth(FALL - 0.5, FALL + 2.5, T) * (1 - smooth(END - 0.3, END, T))
   if (e <= 0) return
-  const g = m.gold ?? 0, td = m.mirror === undefined ? T : 2 * m.mirror - T, s = descent(td)
+  const g = m.gold ?? 0, td = m.mirror === undefined ? T : 2 * m.mirror - T, s = sung(td)
   part.l = part.r = part.d = 0
   for (let i = 0; i < 2; i++) {
     const v = both[i], k = i ? g : 1 - g

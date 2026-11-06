@@ -1,18 +1,18 @@
 // The fall's choir: a Shepard–Risset glissando (Risset's "Fall", 1968). Pure tones a period apart slide
 // down forever under a fixed bell over log-frequency, fading in at the top as they fade out at the bottom,
-// so the fall never lands. Each layer is its octave and, softer, the fifth above; seven octaves, 40 Hz to
-// about 5 kHz, nothing shrill. Each tone is a section of singers in a fixed place on a wide stage: two
+// so the fall never lands. Pure octaves, so they fuse into one tone; seven of them, 40 Hz to about 5 kHz,
+// nothing shrill; and slow (choir.ts), or the partials come apart and are heard as sirens. Each tone is a section of singers in a fixed place on a wide stage: two
 // beating a fraction of a hertz apart from random phases, two more joining a few cents off as the chorus
 // swells. Under them, quietly, a dread choir sings a septimal tritone, a minor second and a low tritone
 // that crawl apart from unison into a quarter-tone cluster. A period of φ instead of 2 never lines up.
 
 const F0 = 40
-const ANGEL = [1, 3 / 2] // each layer: its octave and, softer, the fifth above
-const STAGE = [-0.15, 0.15] // where each section stands, −1 left to 1 right
+const ANGEL = [1] // each layer is its octave alone: pure octaves fuse into one endless tone
+const STAGE = [0] // where each section stands, −1 left to 1 right
 const DREAD = [7 / 5, 16 / 15, 45 / 64] // septimal tritone, minor second, a low tritone
 const TONES = ANGEL.length + DREAD.length
 const SINGERS = 4 // per section: the beating pair, then two who join with the chorus
-const CENTS = [0, 0, -9, 7], SPREAD = [0, 0, -0.3, 0.3]
+const CENTS = [0, 0, -9, 7], SPREAD = [-0.6, 0.6, -0.9, 0.9] // the beating pair stands left and right
 const TOP = 18_000 // nothing sings above this, so nothing folds back past Nyquist
 const QUIET = 1e-3 // a singer this far down (−60 dB) is lost in the mass and the hall: skip them
 const BLOCK = 64 // samples per control step
