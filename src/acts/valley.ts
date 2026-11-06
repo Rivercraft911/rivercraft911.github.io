@@ -208,7 +208,7 @@ const p3 = { x: 0, y: 0, z: 0 }, q3 = { x: 0, y: 0, z: 0 }
 const sx = new Float32Array(NC), sy = new Float32Array(NC), sz = new Float32Array(NC), ok = new Uint8Array(NC)
 const ink = new Path(), line = new Path()
 const HERO = 4096, hx = new Float32Array(HERO), hy = new Float32Array(HERO)
-let heroN = 0, occlude = 1, landK = 1, lp = 0 // lp: the roar's low-pass state
+let heroN = 0, heroGain = 0.7, occlude = 1, landK = 1, lp = 0, hl = 0, hr = 0 // lp: the roar's low-pass state; hl, hr: the hero's
 
 // The flight: one continuous path, eye, target and lens gliding through these without stopping. Straight
 // down on the map the meander drew; a crane up and back as the valley rises; downstream over the firs;
@@ -489,6 +489,11 @@ export const valley: Scene = {
       if (heroRow === i && heroKind < 0) for (let j = 0; j < NC && heroN < HERO; j++) if (ok[j]) (hx[heroN] = sx[j]), (hy[heroN++] = sy[j])
     }
     if (land > 0.06) items_(t, Infinity, next, heroKind)
+    // nothing new growing: the speakers trace the river itself, from under us to the lip
+    if (heroN < 2 && t >= SCAN)
+      for (let x = Math.max(X0, eye.x + 1); x < LIP && heroN < HERO; x += 0.3)
+        if (cam.project(x, riverY(x), riverZ(x), p3)) (hx[heroN] = p3.x), (hy[heroN++] = p3.y)
+    heroGain = t < SCAN ? 0.7 : t < 4 ? 0.22 : t < 8 ? 0.55 : 0.7 // ridgelines and firs are jagged: quieter
     if (t > 8) listen(t), falls(t, smooth(8, 10, t))
     // exposure: the ink is energy per length, so as the valley fills in it would burn brighter and
     // brighter; past a reference length, stop down, as an eye or a camera would
@@ -542,9 +547,11 @@ export const valley: Scene = {
       }
       if (heroN < 2 || tt > 13.5) return
       const ph = ((tt * 55) % 1) * 2, u = (ph < 1 ? ph : 2 - ph) * (heroN - 1), i = Math.min(heroN - 2, Math.floor(u)), a = u - i
-      const k = 1 - smooth(9.5, 13.5, tt)
-      o.l += (0.8 * k * (hx[i] + (hx[i + 1] - hx[i]) * a)) / view.a
-      o.r += 0.8 * k * (hy[i] + (hy[i + 1] - hy[i]) * a)
+      const k = heroGain * (1 - smooth(9.5, 13.5, tt))
+      // a gentle low-pass (about 4 kHz) takes the edge off the traced corners
+      hl += ((k * (hx[i] + (hx[i + 1] - hx[i]) * a)) / view.a - hl) * 0.4
+      hr += (k * (hy[i] + (hy[i + 1] - hy[i]) * a) - hr) * 0.4
+      o.l += hl, o.r += hr
     }
   },
 }
