@@ -210,9 +210,9 @@ function drone(t: number, o: number[]) {
   const k = clamp(lock([[0, 0], [1.3, 1]], t, 1.6, 0.9), 0, 1.03), drift = Math.max(0, t - 4) * 0.45
   const dip = smooth(10.5, 13, t) * (1 - smooth(18, 21, t)) // swooping down to the pool as the stones arrive
   const ex = -11 + drift + 9 * dip, orbit = 7 * Math.cos(0.09 * t + 0.6) * (1 - 0.6 * dip) // drifting downstream, swinging around
-  const tx = mix(mix(32, 22 + drift, k), SC + 3, dip)
-  o[0] = mix(32, ex, k), o[1] = mix(70, riverY(ex + 8) + 9 - 4 * dip, k), o[2] = mix(riverZ(32) + 4, riverZ(ex + 8) - orbit, k)
-  o[3] = tx, o[4] = mix(0, riverY(tx), k), o[5] = riverZ(tx), o[6] = mix(1.1, 0.95, k)
+  const tx = mix(mix(40, 22 + drift, k), SC + 3, dip)
+  o[0] = mix(40, ex, k), o[1] = mix(46, riverY(ex + 8) + 9 - 4 * dip, k), o[2] = mix(riverZ(40) + 3, riverZ(ex + 8) - orbit, k)
+  o[3] = tx, o[4] = mix(0, riverY(tx), k), o[5] = riverZ(tx), o[6] = mix(1.15, 0.95, k)
 }
 // After the valley: down the river to the lip, over it, and out into the air to face the falls.
 const T_GO = 22, d22: number[] = [], cur: number[] = []
