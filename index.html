@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>River Dowdy · KJ5SCH</title>
+    <meta name="description" content="River Dowdy: signals, silicon, light and orbit." />
+    <style>
+      html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+      canvas { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
+      p { display: none; position: fixed; inset: 0; margin: auto; height: 1em; color: #5f9;
+          font: 14px ui-monospace, monospace; text-align: center; }
+      .no-gpu p { display: block; }
+    </style>
+  </head>
+  <body>
+    <canvas></canvas>
+    <p>this scope needs WebGPU · try a current Chrome, Edge or Safari</p>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
