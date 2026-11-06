@@ -71,7 +71,7 @@ const WORLDS: World[] = [
     eq: 'p\\to s\\frac{B(p)}{\\min(|p|^2,1)}+c',
     ink: [1, 0.78, 0.4],
     set(p, t, fall, kick) {
-      aim(p, set3(eye, 0.15 * Math.sin(0.2 * t), 0.2 + 0.1 * Math.cos(0.3 * t), -4.6 + 0.5 * fall), set3(fwd, 0.15 * Math.sin(0.25 * t), 0.1, 1), set3(up, Math.sin(0.15 * t), 1, 0), 1.3 + kick)
+      aim(p, set3(eye, -1.6 + 0.35 * fall, 0.3 + 0.2 * Math.sin(0.3 * t), -2.75), set3(fwd, 1, -0.25, 0.75), set3(up, 0, 1, 0), 1.3 + kick)
       p[16] = -1.5 - 0.04 * Math.sin(0.3 * t), p[17] = 1
     },
     bend(_, o) {
