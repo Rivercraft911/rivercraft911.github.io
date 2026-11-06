@@ -139,7 +139,7 @@ export class Raster {
     const ink = f.ink ?? [0.35, 1, 0.55]
     uf[8] = ink[0], uf[9] = ink[1], uf[10] = ink[2], uf[11] = gain * f.k
     uf[12] = TILE[0], uf[13] = TILE[1], uf[14] = ATLAS_COLS, uf[15] = this.chars.length
-    uf[16] = f.lift ?? 2, uf[17] = 0.35
+    uf[16] = f.lift ?? 2, uf[17] = 0.2
     d.queue.writeBuffer(this.u, 0, uf)
 
     const pass = (view: GPUTextureView, p: GPURenderPipeline, g: GPUBindGroup) => {
