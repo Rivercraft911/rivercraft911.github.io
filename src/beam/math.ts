@@ -3,6 +3,8 @@
 // TransformMatchingTex does, and roll() turns a live number over like an odometer.
 // Syntax: x^2  x_{n+1}  \frac{a}{b}  \sum_{n=0}^{N}  \int_a^b  \omega …  \, \; \quad  and @id{…}
 // (or \id{id}{…}) to name a term, so it keeps its identity when the equation around it changes.
+// \num{k}{-00.00} holds a live number: room for that many digits, filled at draw time from vals[k]
+// on odometer wheels, so an equation can carry the values it is running on.
 import { font, glyph, type Face, type Glyph } from './font'
 import type { Path } from './path'
 
@@ -101,6 +103,13 @@ function layout(src: string, face: Face): Eq {
       const t = tag(/^[^}]*/)
       w = (i++, arg(x, y, s, t))
     }
+    else if (ch === 'num') {
+      const k = tag(/^\{\d+\}/).slice(1, -1), f = tag(/^\{[^}]*\}/).slice(1, -1), dot = f.indexOf('.')
+      const dec = dot < 0 ? 0 : f.length - dot - 1, n = f.replace(/[^0]/g, '').length
+      w = (n * (face.g['0']?.[0] ?? 0.6) + (dec ? (face.g['.']?.[0] ?? 0.3) : 0) + (f[0] === '-' ? (face.g['−']?.[0] ?? 0.6) : 0)) * s
+      g.push({ id: `${k}:${dec}`, ch: '#', x, y, s, w, a: 1 })
+      op = false
+    }
     else if (ch === 'frac') {
       const k = s * 0.8, gap = 0.16 * s, ax = y + axis(face) * s
       const n0 = g.length, wn = arg(x, y, k, id), n1 = g.length, wd = arg(x, y, k, id), wb = Math.max(wn, wd) + 0.3 * s
@@ -111,7 +120,10 @@ function layout(src: string, face: Face): Eq {
     }
     if (w < 0 && ch.length > 1 && !SYM[ch]) {
       w = 0.15 * s // \sin, \log: an operator name, upright, a little apart
-      for (const c of ch) w += put(id, c, x + w - 0.15 * s, y, s)
+      for (const c of ch) {
+        const up = String.fromCharCode(0xe000 + c.charCodeAt(0)) // a math face's upright letter
+        w += put(id, face.g[up] ? up : c, x + w - 0.15 * s, y, s)
+      }
     }
     if (w < 0) {
       if (ch === '-') ch = '−'
@@ -149,8 +161,10 @@ function layout(src: string, face: Face): Eq {
 // The math axis: the height of the minus sign, where fraction bars sit.
 const axis = (f: Face) => ext(f.g['−'])[1] || 0.4
 
+// The face equations are set in unless told otherwise: a math face once one is loaded.
+export const mathFont: { face?: Face } = {}
 const cache = new WeakMap<Face, Map<string, Eq>>()
-export function tex(src: string, f = font.face) {
+export function tex(src: string, f = mathFont.face ?? font.face) {
   let c = cache.get(f), e = c?.get(src)
   if (!c) cache.set(f, (c = new Map()))
   if (!e) c.set(src, (e = layout(src, f)))
@@ -158,14 +172,17 @@ export function tex(src: string, f = font.face) {
 }
 
 // Traces e with its baseline at y; align as for text. Returns the width.
-export function draw(p: Path, e: Eq, x: number, y: number, size: number, align = 0, i = 1) {
+export function draw(p: Path, e: Eq, x: number, y: number, size: number, align = 0, i = 1, vals?: ArrayLike<number>) {
   const ox = x - e.w * size * align
   for (let j = 0; j < e.n; j++) {
     const q = e.g[j]
     if (q.a < 0.005) continue
     p.intensity(i * q.a)
     const gx = ox + q.x * size, gy = y + q.y * size
-    if (q.ch) glyph(p, q.ch, gx, gy, q.s * size, e.face)
+    if (q.ch === '#') {
+      const c = q.id.indexOf(':')
+      roll(p, vals?.[+q.id.slice(0, c)] ?? 0, gx + q.w * size, gy, q.s * size, +q.id.slice(c + 1), 1, i * q.a, e.face)
+    } else if (q.ch) glyph(p, q.ch, gx, gy, q.s * size, e.face)
     else p.moveTo(gx, gy).lineTo(gx + q.w * size, gy)
   }
   p.intensity(i)
@@ -212,12 +229,12 @@ export function morphEq(a: Eq, b: Eq, k: number, out: Eq) {
   out.face = b.face
   return out
 }
-export const eq = (): Eq => ({ g: [], n: 0, w: 0, face: font.face })
+export const eq = (): Eq => ({ g: [], n: 0, w: 0, face: mathFont.face ?? font.face })
 
 // v written with dec decimals, every digit on its own wheel: the lowest turns over as v crosses
 // each step, and each higher one turns with the carry. Tabular figures, so align = 1 keeps it still.
 const wheels = new Float64Array(24)
-export function roll(p: Path, v: number, x: number, y: number, size: number, dec = 0, align = 0, i = 1, f = font.face) {
+export function roll(p: Path, v: number, x: number, y: number, size: number, dec = 0, align = 0, i = 1, f = mathFont.face ?? font.face) {
   const adv = (f.g['0']?.[0] ?? 0.6) * size, dot = (f.g['.']?.[0] ?? 0.3) * size, u = Math.abs(v) * 10 ** dec
   const n = Math.min(20, Math.max(dec + 1, Math.floor(Math.log10(Math.max(1, u))) + 1))
   const sign = v < 0 && u >= 0.5 ? (f.g['−']?.[0] ?? 0.6) * size : 0

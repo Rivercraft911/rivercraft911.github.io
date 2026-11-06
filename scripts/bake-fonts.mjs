@@ -145,3 +145,25 @@ const math = fill(svg('relief/ReliefSingleLineSVG-Regular.svg'), svg('greek.svg'
 const futural = hersheyFont('futural')
 write('hershey', 'Hershey Simplex', fill({ g: { ...futural, ...hersheyFont('greek', greekOf) }, xh: r(top(futural.x)) }, math))
 for (const [id, [name, file]] of Object.entries(FACES)) write(id, name, id === 'relief' ? math : fill(svg(file), math))
+
+// Math faces, set the way typeset math is: italic variables, upright digits and operators, Hershey's own
+// math symbols. Upright letters, for function names like sin and log, live at U+E000 + their code.
+const SYM = { '!': '±', '#': '×', $: '·', '&': '≤', "'": '≥', '-': '−', ':': '∏', ';': '∑', '?': '≠', '^': '∝', _: '∞', h: '∈', i: '→', k: '←', m: '∂', n: '∇', p: '∫' }
+const symbols = hersheyFont('mathlow', (c) => SYM[c] ?? '')
+const HS = '../../node_modules/hersheytext/svg_fonts/'
+function mathFace(italic, roman, greek) {
+  const g = { ...italic.g }
+  for (const [ch, v] of Object.entries(roman.g)) {
+    if (/[A-Za-z]/.test(ch)) g[String.fromCharCode(0xe000 + ch.charCodeAt(0))] = v
+    else if (ch < '\x7f') g[ch] = v
+  }
+  Object.assign(g, greek, symbols)
+  return fill({ g, xh: italic.xh }, math)
+}
+const hface = (name) => { const g = hersheyFont(name); return { g, xh: r(top(g.x)) } }
+const MATH = {
+  mserif: ['Hershey Serif (math)', svg(HS + 'HersheySerifMedItalic.svg'), svg(HS + 'HersheySerifMed.svg'), hersheyFont('timesg', greekOf)],
+  mread: ['EMS Readability (math)', svg(HS + 'EMSReadabilityItalic.svg'), svg('ems/EMSReadability.svg'), hersheyFont('timesg', greekOf)],
+  msans: ['Hershey Sans (math)', hface('futural'), hface('futural'), hersheyFont('greek', greekOf)],
+}
+for (const [id, [name, it, rm, gk]] of Object.entries(MATH)) write(id, name, mathFace(it, rm, gk))

@@ -7,7 +7,7 @@
 import { Path } from '../beam/path'
 import { morph } from '../beam/morph'
 import { AMP, F, LAST, PERIODS, square } from './hook'
-import { M1, M2, MAP, PHI, W1, W2, glow, mapped } from './valley'
+import { M1, M2, MAP, PHI, RIVER_EQ, W1, W2, glow, mapped } from './valley'
 import { Say } from './say'
 import { TAU, clamp, lock, mix, smooth, view, type Scene } from './scene'
 
@@ -63,7 +63,6 @@ function trace(p: Path, A: number) {
 
 // The live equation: the square as a heading, then the two sines it leaves behind.
 const SQ = '\\theta(s) = \\omega\\, \\frac{4}{\\pi} \\sum_{k=0}^{N} \\frac{\\sin((2k+1)\\, 2\\pi s / M_1)}{2k+1}'
-const SINES = '\\theta(s) = \\omega_1 \\sin(2\\pi s / M_1) + \\omega_2 \\sin(2\\pi s / M_2 + \\phi)'
 // Sinuosity, channel length over valley length: 1/J₀(ω) for the sine-generated curve.
 const j0 = (x: number) => {
   let s = 0, term = 1
@@ -94,7 +93,7 @@ export const meander: Scene = {
 
     let n = 0
     for (let k = 0; k <= LAST; k++) if (W[k] > 0.5) n = k
-    eq.say(f, t, n > 0 || t < 1.8 ? SQ : SINES, WATER, n > 0 || t < 1.8
+    eq.say(f, t, n > 0 || t < 1.8 ? SQ : RIVER_EQ, WATER, n > 0 || t < 1.8
       ? [['\\omega', w, 2], ['N', n, 0], ['\\sigma', 1 / j0(w), 3]]
       : [['\\omega_1', w, 2], ['\\omega_2', w2, 2], ['M_1', M1, 0], ['M_2', M2, 0]])
 

@@ -1,15 +1,64 @@
 // The speakers hear what the beam draws: L = x, R = y of the audible channel. After the fall the scope
-// rule ends and scenes may also sing through mono voices placed in 3D (HRTF), Doppler and all.
+// rule ends: the first voices are the choir's bed, standing still in a hall, and the rest may sing as
+// mono voices placed in 3D (HRTF), Doppler and all.
 import url from './worklet.ts?worker&url'
+import { Hall } from '../dsp/hall'
 
 export const VOICES = 6
-export type Stereo = { l: number; r: number; s: Float64Array } // s: the spatial voices
+export const BED = 3 // voices 0 and 1 are the choir's left and right, 2 sings in the middle under them
+export type Stereo = { l: number; r: number; s: Float64Array } // s: the voices
 export type Voice = (t: number, o: Stereo) => void
 export const stereo = (): Stereo => ({ l: 0, r: 0, s: new Float64Array(VOICES) })
 
 const AHEAD = 0.1 // seconds of signal kept queued past the present
-const C = 2 + VOICES
+const C = 2 + VOICES - BED
 const GAIN = 0.22
+
+// The bed's room: rt seconds for its hall to fall 60 dB, how much of the hall is heard, and the level.
+// The choir sets it once a frame.
+export const room = { rt: 2.5, wet: 0.5, gain: 1 }
+
+// The bed: voices 0 and 1 straight to left and right, voice 2 in the middle and deeper in the hall, its
+// DC blocked (scenes bend the voices), then a gentle stereo-linked compressor, 2:1 over a knee with fast
+// attack and slow release, so the swell never clips.
+const KNEE = 1
+export class Bed {
+  private hall: Hall
+  private env = 0
+  private att: number
+  private rel: number
+  private dc: number
+  private x = [0, 0]
+  private y = [0, 0]
+  constructor(sr: number) {
+    this.hall = new Hall(sr)
+    this.att = 1 - Math.exp(-1 / (0.005 * sr))
+    this.rel = 1 - Math.exp(-1 / (0.4 * sr))
+    this.dc = 1 - (2 * Math.PI * 15) / sr
+  }
+
+  clear() {
+    this.hall.clear()
+  }
+
+  mix(o: Stereo) {
+    const s = o.s, a = s[0], b = s[1], c = s[2], h = this.hall
+    h.run(a + c, b + c, room.rt)
+    const l = this.block(0, room.gain * (a + 0.5 * c + room.wet * h.l)), r = this.block(1, room.gain * (b + 0.5 * c + room.wet * h.r))
+    const p = Math.max(Math.abs(l), Math.abs(r))
+    this.env += (p > this.env ? this.att : this.rel) * (p - this.env)
+    const g = this.env > KNEE ? Math.sqrt(KNEE / this.env) : 1
+    o.l += g * l
+    o.r += g * r
+    s[0] = s[1] = s[2] = 0
+  }
+
+  private block(i: number, x: number) {
+    const y = x - this.x[i] + this.dc * this.y[i]
+    this.x[i] = x
+    return (this.y[i] = y)
+  }
+}
 
 // What the speakers are about to play, summed to mono, as it is rendered: the last 2^15 samples, the
 // newest at time `end` (timeline seconds). Spectrograms of the soundtrack read it.
@@ -24,22 +73,24 @@ export class Audio {
   private t = 0
   private buf = new Float32Array(4096 * C)
   private o = stereo()
+  private bed = new Bed(48000)
 
   async start() {
     const ctx = (this.ctx = new AudioContext({ latencyHint: 'interactive' }))
     await ctx.audioWorklet.addModule(url)
     this.node = new AudioWorkletNode(ctx, 'beam-audio', {
-      numberOfOutputs: 1 + VOICES,
-      outputChannelCount: [2, ...Array<number>(VOICES).fill(1)],
-      processorOptions: { voices: VOICES },
+      numberOfOutputs: 1 + VOICES - BED,
+      outputChannelCount: [2, ...Array<number>(VOICES - BED).fill(1)],
+      processorOptions: { voices: VOICES - BED },
     })
+    this.bed = new Bed(ctx.sampleRate)
     const lp = new BiquadFilterNode(ctx, { type: 'lowpass', frequency: 16_000 })
     this.gain = new GainNode(ctx, { gain: GAIN })
     this.node.connect(lp, 0).connect(this.gain).connect(ctx.destination)
-    for (let i = 0; i < VOICES; i++) {
+    for (let i = BED; i < VOICES; i++) {
       const p = new PannerNode(ctx, { panningModel: 'HRTF', distanceModel: 'inverse', refDistance: 1, positionZ: -1 })
-      this.node.connect(p, 1 + i).connect(lp)
-      this.pan.push(p)
+      this.node.connect(p, 1 + i - BED).connect(lp)
+      this.pan[i] = p
     }
   }
 
@@ -69,6 +120,7 @@ export class Audio {
   feed(now: number, voice?: Voice) {
     if (Math.abs(this.t - now) > 0.3) {
       this.node?.port.postMessage(null)
+      this.bed.clear()
       this.t = now
     }
     const sr = (heard.sr = this.ctx?.sampleRate ?? 48000), n = Math.min(this.buf.length / C, Math.floor((now + AHEAD - this.t) * sr))
@@ -78,9 +130,10 @@ export class Audio {
       o.l = o.r = 0
       o.s.fill(0)
       voice?.(this.t + i / sr, o)
+      this.bed.mix(o)
       const j = i * C
       let m = (b[j] = o.l) + (b[j + 1] = o.r)
-      for (let v = 0; v < VOICES; v++) m += b[j + 2 + v] = o.s[v]
+      for (let v = BED; v < VOICES; v++) m += b[j + 2 + v - BED] = o.s[v]
       h[heard.n++ & mask] = m
     }
     this.t += n / sr
