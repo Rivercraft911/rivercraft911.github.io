@@ -77,6 +77,6 @@ const SHARP = 1.8;
   for (var i = 0; i < 4; i++) {
     ink += textureSampleLevel(atlas, smp, o + (vec2f(f32(i & 1), f32(i >> 1)) - 0.5) * 0.5 * scale, 0.0).r;
   }
-  let lit = mix(r.dim, 1.0, g.y);
+  let lit = mix(r.dim, 1.0, g.y) + 1.5 * pow(g.y, 6.0); // the fullest cells burn past white
   return vec4f(r.ink * (0.25 * ink * lit * r.gain), 0.0);
 }
