@@ -6,15 +6,18 @@
 import { heard } from '../audio/audio'
 import { fft, hann } from './fft'
 
-export const OCTAVES = 9, PER = 128, BINS = OCTAVES * PER // the axis: 128 bins an octave
+export const OCTAVES = 9, PER = 256, BINS = OCTAVES * PER // the axis: 256 bins an octave, 4.7 cents each
 export const F0 = 27.5 // A0: octave boundaries fall on A
-const N = 2048, HOP = 1 / 240
-const FLOOR = -72, RANGE = 56 // dBFS shown, black to white
+export const FLOOR = -72, RANGE = 56 // dBFS shown, black to white
+const N = 2048, HOP = 1 / 960 // a hop shorter than a row takes to print at any speed we fall
 const win = Float64Array.from({ length: N }, (_, i) => hann(i, N))
 const dwin = Float64Array.from({ length: N }, (_, i) => (Math.PI / N) * Math.sin((2 * Math.PI * i) / N)) // h′, per sample
-const re = new Float64Array(N), im = new Float64Array(N), dre = new Float64Array(N), dim = new Float64Array(N)
+const re = new Float64Array(N), im = new Float64Array(N)
 const acc = new Float64Array(BINS)
-const SPREAD = Float64Array.from({ length: 41 }, (_, i) => Math.exp(-0.5 * ((i / 8 - 2.5) / 0.8) ** 2) / (0.8 * Math.sqrt(2 * Math.PI)))
+// A line is a Gaussian of σ = 1 bin: the estimate's own jitter. It is a parabola in dB, which the
+// shader's cubic reconstructs exactly, out to where it meets the floor.
+const SIGMA = 1, REACH = 4
+const SPREAD = Float64Array.from({ length: 16 * 2 * REACH + 1 }, (_, i) => Math.exp(-0.5 * ((i / 16 - REACH) / SIGMA) ** 2) / (SIGMA * Math.sqrt(2 * Math.PI)))
 
 export class Waterfall {
   readonly last = new Float32Array(BINS) // the newest row, 0..1
@@ -29,22 +32,23 @@ export class Waterfall {
     const sr = heard.sr, b = heard.buf, mask = b.length - 1
     const c = Math.round(heard.n - (heard.end - j * HOP) * sr) - N / 2 // first sample of the window
     if (c < heard.n - b.length || c + N > heard.n) return out.fill(0)
+    // Both windows in one transform: x·h real and x·h′ imaginary, parted again by symmetry.
     for (let i = 0; i < N; i++) {
       const x = b[(c + i) & mask]
-      ;(re[i] = x * win[i]), (dre[i] = x * dwin[i]), (im[i] = dim[i] = 0)
+      ;(re[i] = x * win[i]), (im[i] = x * dwin[i])
     }
     fft(re, im)
-    fft(dre, dim)
     acc.fill(0)
     const norm = 16 / (N * N), k0 = PER * Math.log2(sr / (2 * Math.PI * F0)) // a full-scale sine reads 0 dB
     for (let k = 1; k < N / 2; k++) {
-      const p = re[k] * re[k] + im[k] * im[k]
+      const ar = re[k], ai = im[k], br = re[N - k], bi = im[N - k]
+      const hr = (ar + br) / 2, hi = (ai - bi) / 2, dr = (ai + bi) / 2, di = (br - ar) / 2 // X_h, X_h′
+      const p = hr * hr + hi * hi
       if (p < 1e-14) continue
-      const w = (2 * Math.PI * k) / N - (dim[k] * re[k] - dre[k] * im[k]) / p // reassigned, rad per sample
+      const w = (2 * Math.PI * k) / N - (di * hr - dr * hi) / p // reassigned, rad per sample
       if (w <= 0) continue
-      // spread over the nearest bins as a Gaussian of σ = 0.8 bin: the estimate's own jitter
       const m = k0 + PER * Math.log2(w) - 0.5, i = Math.round(m)
-      for (let j = Math.max(0, i - 2); j <= Math.min(BINS - 1, i + 2); j++) acc[j] += p * norm * SPREAD[Math.round((j - m + 2.5) * 8)]
+      for (let j = Math.max(0, i - REACH); j <= Math.min(BINS - 1, i + REACH); j++) acc[j] += p * norm * SPREAD[Math.round((j - m + REACH) * 16)]
     }
     for (let m = 0; m < BINS; m++) out[m] = Math.min(1, Math.max(0, (10 * Math.log10(acc[m] + 1e-20) - FLOOR) / RANGE))
     return out
