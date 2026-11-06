@@ -1,9 +1,12 @@
-// Screenshots of the scope at given scene times: node scripts/shot.mjs [outDir] t1 t2 ...
+// Screenshots of the scope at given scene times: node scripts/shot.mjs [outDir] t1 t2 ... [--q query]
+// --q adds query params to the page, e.g. --q specimen
 import { createServer } from 'vite'
 import { chromium } from 'playwright'
 import { mkdirSync } from 'node:fs'
 
-const [out = 'shots', ...times] = process.argv.slice(2)
+const args = process.argv.slice(2), qi = args.indexOf('--q')
+const extra = qi < 0 ? '' : `&${args.splice(qi, 2)[1]}`
+const [out = 'shots', ...times] = args
 mkdirSync(out, { recursive: true })
 const server = await createServer({ server: { port: 5199 }, logLevel: 'error' })
 await server.listen()
@@ -12,7 +15,7 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 720 }, dev
 page.on('console', (m) => console.log('[page]', m.type(), m.text()))
 page.on('pageerror', (e) => console.log('[error]', e.message))
 for (const t of times.length ? times : ['1']) {
-  await page.goto(`http://localhost:5199/?auto&pause&t=${t}`)
+  await page.goto(`http://localhost:5199/?auto&pause&t=${t}${extra}`)
   await page.waitForTimeout(1500)
   await page.screenshot({ path: `${out}/t${t}.png` })
   console.log(`${out}/t${t}.png`)
