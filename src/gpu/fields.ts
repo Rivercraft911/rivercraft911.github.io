@@ -18,6 +18,7 @@ import bulb from './fields/bulb.wgsl?raw'
 import kleinian from './fields/kleinian.wgsl?raw'
 import apollonian from './fields/apollonian.wgsl?raw'
 import sierpinski from './fields/sierpinski.wgsl?raw'
+import r01 from './fields/r01.wgsl?raw'
 import { BINS } from '../dsp/waterfall'
 
 export const ROWS = 4096 // the waterfall's ring of rows
@@ -49,3 +50,5 @@ export const INDRA = 2
 export const [KIFS, MANDALAY, KALISET, LYAPUNOV, NEWTON, HONEYCOMB, BULB, KLEINIAN, APOLLONIAN, SIERPINSKI, JULIA4, POLYTOPE, HOLE] = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 // The worlds of the fall, in the order we fell through them: the raster keeps a shot of each (raster.ts).
 export const WORLDS = [INDRA, KIFS, BULB, MANDALAY, KLEINIAN, KALISET, APOLLONIAN, LYAPUNOV, SIERPINSKI, NEWTON, HONEYCOMB, JULIA4]
+// The worlds after the fall, one a project: each appends its own.
+export const R01 = FIELDS.push({ code: camera + film + r01, data: [320, 120, 2] }) - 1
