@@ -24,7 +24,7 @@
 // into it runs as fast as the choir falls.
 //
 // p[0..3] camera   p[4] time, collapse, gain, horizon   p[5] a, r_in, disk light, nave light
-// p[6..9] the bulb's camera; .w its iterations, -, light   p[10] sky, edges, nave scale
+// p[6..9] the bulb's camera, p[7].w its iterations, p[9].w its light   p[10] sky, edges, nave scale
 
 const RV = 80.0; // past this, rays run straight
 const ROUT = 14.0; // the disk's outer edge
@@ -86,7 +86,7 @@ fn planck(T: f32) -> vec3f {
 var<private> col: vec3f;
 var<private> through: f32;
 fn gas(x0: vec3f, x1: vec3f, b: f32, j: f32) {
-  let H = 0.1 + 0.12 * max(length(x0.xy), length(x1.xy)); // three scale heights, at the chord's far end
+  let H = 0.1 + 0.12 * max(length(x0.xy), length(x1.xy)); // the slab the gas fills: three scale heights
   let dz = x1.z - x0.z;
   var s0 = 0.0;
   var s1 = 1.0;
@@ -118,7 +118,7 @@ fn gas(x0: vec3f, x1: vec3f, b: f32, j: f32) {
     if (rho < 0.01) { continue; }
     let ut = (rr * s + A) / (pow(rr, 0.75) * sqrt(max(rr * s - 3.0 * s + 2.0 * A, 1e-3)));
     let g = 1.0 / (ut * max(1.0 + om * b, 0.05));
-    let x = rin / rr;
+    let x = rin / rr; // 7000 K at the hottest, where r = 49/36 r_in
     let T = 7000.0 * 2.05 * pow(x, 0.75) * pow(max(1.0 - sqrt(x), 0.0), 0.25) + 1200.0;
     let o = 1.0 - exp(-0.8 * rho * ds); // what this sample hides, and so, being in equilibrium, emits
     col += through * o * planck(g * T) * u.p[5].z;
@@ -126,8 +126,8 @@ fn gas(x0: vec3f, x1: vec3f, b: f32, j: f32) {
   }
 }
 
-// The nave: R4's kaleidoscopic IFS, a Menger sponge bent by a turn at every fold, tiled through space, S
-// to a unit and laid along x, so the hole hangs in its aisle.
+// The nave: R4's kaleidoscopic IFS, a Menger sponge turned about its aisle at every fold, S to a unit,
+// laid along x so the hole hangs in the aisle, one cell thick and three long, open to the sky beyond.
 var<private> trap: f32;
 fn turn(v: vec2f, a: f32) -> vec2f { return vec2f(cos(a) * v.x - sin(a) * v.y, sin(a) * v.x + cos(a) * v.y); }
 fn hall(x: vec3f) -> f32 {
@@ -148,7 +148,7 @@ fn hall(x: vec3f) -> f32 {
     trap = min(trap, dot(p, p));
   }
   let e = abs(p) - 1.0;
-  return max(S * (length(max(e, vec3f(0.0))) + min(max(e.x, max(e.y, e.z)), 0.0)) / s, max(abs(x.x) - 3.0 * S, max(abs(x.y), abs(x.z)) - S)); // one cell thick
+  return max(S * (length(max(e, vec3f(0.0))) + min(max(e.x, max(e.y, e.z)), 0.0)) / s, max(abs(x.x) - 3.0 * S, max(abs(x.y), abs(x.z)) - S));
 }
 
 // Where the chord from x to x + v meets the nave, as a fraction of it, or −1; t0 is how far the ray had run.
@@ -323,9 +323,10 @@ fn field(q0: vec2f) -> vec3f {
   if (through >= 0.02) {
     if (hit) { c += through * stone(x, d, len); }
     else if (!fell) {
-      // past the hall's far end the rays run straight
+      // past r = RV the rays run straight
       let m = meet(x, 200.0 * d, len);
-      c += through * select(sky(d, lod), stone(x + 200.0 * m * d, d, len + 200.0 * m), m >= 0.0);
+      if (m >= 0.0) { c += through * stone(x + 200.0 * m * d, d, len + 200.0 * m); }
+      else { c += through * sky(d, lod); }
     }
     else if (u.p[4].w > 0.0) { c += through * u.p[4].w * inside(q); }
   }
