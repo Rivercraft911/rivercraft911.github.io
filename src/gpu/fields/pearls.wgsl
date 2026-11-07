@@ -67,16 +67,18 @@ fn dive(ro: vec3f, rd: vec3f, t0: f32, px: f32, H: f32, fog: f32, drift: f32, a:
   var hit = false;
   var steps = 0.0;
   var glow = 0.0;
-  for (var i = 0; i < 80; i++) {
+  for (var i = 0; i < 96; i++) {
     let d = pearls(ro + rd * t, a, b, n, m).x;
-    if (d < px * t) { hit = true; break; }
+    // thin chains of tiny pearls sit right at the edge of what a pixel resolves: step warily and call a
+    // pixel and a quarter a hit, so a chain is found on every frame, not on some and stepped over on others
+    if (d < 1.25 * px * t) { hit = true; break; }
     glow += exp(-d / (0.012 * t + 1e-4)) * 0.012;
-    t += d * 0.9;
+    t += d * 0.75;
     steps += 1.0;
     if (t > 40.0 * H) { break; }
     // a ray that grazes the packing runs out of steps a hair from a surface: that surface is what it sees,
     // or it would flicker to the background from frame to frame
-    if (i == 79 && d < 8.0 * px * t) { hit = true; }
+    if (i == 95 && d < 8.0 * px * t) { hit = true; }
   }
   let halo = vec3f(0.35, 0.5, 1.0) * glow;
   let deep = nebula(rd);
@@ -92,7 +94,7 @@ fn dive(ro: vec3f, rd: vec3f, t0: f32, px: f32, H: f32, fog: f32, drift: f32, a:
   let ct = sqrt(1.0 - (1.0 - ci * ci) / (1.33 * 1.33));
   // a film drains: thinner toward the top of each pearl, and thinner with time
   let thick = 220.0 + 380.0 * (0.5 + 0.5 * sin(2.2 * pearl.y + drift)) - 140.0 * nrm.z;
-  let ao = 1.0 - 0.7 * steps / 80.0;
+  let ao = 1.0 - 0.7 * steps / 96.0;
   let key = normalize(vec3f(0.4, 0.3, 1.0));
   let rim = normalize(vec3f(-0.5, -0.4, -0.6));
   let r = reflect(rd, nrm);

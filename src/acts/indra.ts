@@ -18,7 +18,7 @@ export const DUR = 4.5
 const HALF = -0.5 / Math.log(SHRINK) // ln |q|² to powers of λ
 const POWERS = Array.from({ length: 41 }, (_, i): [number, number] => [SHRINK ** (i - 20) * Math.cos(TURN * (i - 20)), SHRINK ** (i - 20) * Math.sin(TURN * (i - 20))]) // λⁿ, n = −20 … 20
 
-const field: Field = { shader: SHADER, k: 1, p: new Float32Array(28) }
+const field: Field = { shader: SHADER, k: 1, p: new Float32Array(28), res: 0.85 } // the films hide the softness; the march they paid for keeps the chains steady
 
 // The chaos game: a point of the limit set, walked by random words of the group.
 const z = { re: 0, im: 0, last: 0, seed: 1 }

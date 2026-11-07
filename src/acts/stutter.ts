@@ -56,6 +56,17 @@ const remember = (o: Stereo) => {
 }
 const past = (i: number, d: number) => lines[i][(w - d + LINE) & (LINE - 1)]
 const combs = [0, 1, 2].map(() => new Float32Array(LINE)) // the comb's own output, fed back
+const held = [0, 0, 0] // Newton's last decided symbol
+let sym = 0
+// After every bend: a soft clip and a gentle low-pass (about 6 kHz), so no corruption can turn into a
+// full-scale screech, however loud the choir has grown; each keeps its character under the ceiling.
+const tamed = new Float64Array(3)
+const tame = (o: Stereo) => {
+  for (let i = 0; i < 3; i++) {
+    const x = o.s[i]
+    o.s[i] = tamed[i] += (x / (1 + 2 * Math.abs(x)) - tamed[i]) * 0.55
+  }
+}
 
 const roots = new Path()
 const power = (t: number) => 7.5 + 1.5 * Math.sin(0.45 * t)
@@ -229,8 +240,10 @@ const WORLDS: World[] = [
       f.ch.push({ w: 0.3, path: roots })
     },
     bend(_, o) {
-      // each pair of voices as I and Q, hard-decided to the nearest point of 32APSK
+      // each pair of voices as I and Q, hard-decided to the nearest point of 32APSK, once a symbol (8
+      // samples) and held between, so it steps like a modem, not hisses like noise
       const s = 0.22
+      if (sym++ & 7) return void ((o.s[0] = held[0]), (o.s[1] = held[1]), (o.s[2] = held[2]))
       for (const [a, b] of [[0, 1], [2, 0]]) {
         const x = o.s[a] / s, y = o.s[b] / s
         let best = 0, bd = Infinity
@@ -241,6 +254,7 @@ const WORLDS: World[] = [
         o.s[a] = s * APSK32.pts[best]
         if (a === 0) o.s[b] = s * APSK32.pts[best + 1]
       }
+      held[0] = o.s[0], held[1] = o.s[1], held[2] = o.s[2]
     },
   },
   {
@@ -281,6 +295,7 @@ export const stutter: Scene = {
       sing(TT, o, smooth(0, 0.03, tt - from), V.shader === HONEYCOMB ? MIRROR(from + AT) : V.mood ?? GOLD)
       remember(o)
       V.bend(tt, o, from)
+      tame(o)
     }
   },
 }
