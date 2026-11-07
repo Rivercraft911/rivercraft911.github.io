@@ -171,7 +171,7 @@ fn field(q: vec2f) -> vec3f {
     var x = x0;
     var v = v0;
     var a = pull(x);
-    for (var i = 0; i < 40; i++) {
+    for (var i = 0; i < 80; i++) {
       let r = length(x);
       if (r < rh) { break; }
       let s = bend(r) + 1.0;
@@ -259,6 +259,10 @@ fn field(q: vec2f) -> vec3f {
     let glowing = burn(P, v) * smoothstep(1.2, 2.5, fallen) * 0.4 * (0.2 + smoothstep(0.6, 0.05, trap.w)); // stone heating as it falls
     let c = glowing + base * (0.01 + fire + key) * ao + gold * exp(-30.0 * trap.w) * (0.15 + fire) * (1.0 - smoothstep(1.0, 1.6, fallen)) + 0.1 * rim * vec3f(0.2, 0.3, 1.0) * ao;
     col = mix(haze, c, exp(-0.012 * len));
+    // light bent through more than about 100° has come round the photon sphere, and a pixel's worth of it
+    // spans more of the world than the pixel can show: its mean, the fire's own glow, stands for it
+    let bent = acos(clamp(dot(v0, v) * inverseSqrt(dot(v0, v0) * dot(v, v)), -1.0, 1.0));
+    col = mix(col, vec3f(0.3, 0.16, 0.08) * u.p[10].z, smoothstep(1.6, 2.6, bent));
   } else if (!fell) {
     col = haze;
   }
