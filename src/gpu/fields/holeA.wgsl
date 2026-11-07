@@ -75,7 +75,7 @@ fn de(x: vec3f) -> f32 {
   let y = vec3f(turn(x.xy * s, w), x.z * s);
   let c = smoothstep(1.1, 2.0, s) * u.p[5].z;
   fallen = s;
-  gas = max(smoothstep(1.5, 4.0, s), smoothstep(4.0, 3.0, r)) * u.p[5].z; // and nothing solid within the photon sphere
+  gas = smoothstep(1.5, 4.0, s) * u.p[5].z;
   let S = u.p[10].y;
   let hollow = min(length(y) - u.p[11].x, length(y.xz) - u.p[11].y); // the crossing and the nave, kept clear
   above = abs(x.z) - r * (0.08 + 2.0 * (1.0 - c)) - 0.05;
@@ -215,7 +215,7 @@ fn field(q: vec2f) -> vec3f {
     if (r < rh) { fell = true; break; }
     let dd = de(x);
     let g = gas;
-    if (dd < px * len + 1e-4 && g < 0.5) { hit = true; break; }
+    if (dd < px * len + 1e-4 && g < 0.5 && r > 3.5 * M) { hit = true; break; } // nothing solid near the photon sphere
     var s = min(abs(dd), bend(r));
     if (g > 0.0) {
       // the gas: as dense as the stone it was is near, glowing at its orbit's blackbody

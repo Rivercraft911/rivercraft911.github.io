@@ -165,7 +165,7 @@ export const finaleA: Scene = {
     }
     if (t > DOT) f.ch.push({ w: 1, fn: (_, s) => ((s.x = 0.004 * hash(Math.random() * 1e4)), (s.y = 0.004 * hash(Math.random() * 1e4)), (s.z = 0.6)) })
     if (t < TEAR) equation(f, "x''=-3M\\frac{h^2x}{r^5}", [1, 0.85, 0.6], 0.9)
-    else if (t < PEAK - 2.5) equation(f, 'r_0^{3/2}=r^{3/2}+K', [1, 0.8, 0.5], 0.9)
+    else if (t < PEAK - 2.5) (live[0] = infall(t)), equation(f, 'r_0=(r^{3/2}+K)^{2/3}\\qquad K=\\num{0}{000}', [1, 0.8, 0.5], 0.9, live)
     else if (t < PEAK) (live[0] = freq(t)), equation(f, 'f=f_0\\,(1-t/t_c)^{-3/8}=\\num{0}{0000}\\,Hz', [1, 0.85, 0.6], 0.9, live)
     f.rate = 2e6
     f.look ??= crisp
