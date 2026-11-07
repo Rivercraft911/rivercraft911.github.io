@@ -9,23 +9,26 @@
 // is exposed over a fraction of its interval, each pixel at its own instant in it, so a fast orbit smears.
 //
 // The remnant: one Kerr hole, M_f = 0.952, a = 0.653, every ray an exact null geodesic in Kerr–Schild
-// coordinates, g = η + f l l, f = 2Mr³ / (r⁴ + a²z²), H = ½ (|p|² − 1 − f (1 + l·p)²) = 0, by RK4. As it
-// rings down, its mass is rippled by the l = m = 2 quasinormal mode, sin²θ cos(2φ − ωt) (its gradient
-// neglected), so the shadow's edge wobbles in time with the ringdown that is heard. The chart is the
-// outgoing one, so once the horizon opens a ray traced back crosses r₊ cleanly and goes on, to the ring
-// singularity, r = 0 at x² + y² = a², z = 0, and through the disk inside it to r < 0: a second universe
-// where f < 0 and gravity repels. The ring glows (a singularity emits nothing: this light is the
-// curvature, drawn). The other universe is drawn in complementary colours.
+// coordinates, g = η + f c c, f = 2Mr³ / (r⁴ + a²z²), c = (1, −l), H = ½ (|p|² − E² − f (E − l·p)²) = 0,
+// by RK4. The chart is the hole's own time-reversed, so a ray traced forward in it is one traced back in
+// time in the hole: from outside, rays into the shadow pile up against r₊; from inside, they cross it
+// cleanly. The eye falls (its 4-velocity from singularity.ts), so a pixel's photon is built in its own
+// frame, aberrated and shifted by g as the eye sees it, and inside the horizon its energy E can be
+// negative. Past the inner horizon a ray can reach the ring singularity, r = 0 at x² + y² = a², z = 0, or
+// pass through the disk inside it to r < 0: a second universe where f < 0 and gravity repels, drawn in
+// complementary colours. The ring glows (a singularity emits nothing: this light is the curvature,
+// drawn). As the hole rings down, its mass is rippled by the l = m = 2 quasinormal mode,
+// sin²θ cos(2φ − ωt), its gradient neglected, so the shadow's edge wobbles with the ringdown heard.
 //
 // The horizon remembers: a ray that falls in finds a dodecahedron of tiles, each a world of the fall, in
-// the order they fell. Each is a sinking emitter, r = r_s (1 + ε 2^(k−11) e^(−t/T)): from outside it is
-// seen redshifted by g = dτ/dt = √(1 − r_s/r), its light shifted and dimmed by g³ and its picture slowed by
-// the same g, frozen the deeper it lies. From inside, light piles up against the horizon blueshifted.
+// the order they fell. Each is a static emitter lowered toward the horizon, r = r_s (1 + ε 2^((k−11)/2)
+// e^(−t/T)): from outside it is seen redshifted by g = dτ/dt = √(1 − r_s/r), its light shifted and dimmed
+// by g³ and its picture slowed by the same g, frozen the deeper it lies. From inside, the light piled up
+// against the horizon is blueshifted; and seen back through the ring from the other universe, it pours out.
 //
-// p[0..3] camera   p[4] time, collapse, gain, open
-// p[5] binary, orbit angle, separation, the angle swept while exposed   p[6] M, a, the eye's sheet, ring light
-// p[7] ripple, its phase, its sweep, stream   p[8] ε, t/T, memory light, blueshift   p[9] r_in, r_out, disk, nave light
-// p[10] sky, edges, nave scale, mirror
+// p[0..3] camera   p[4] time, collapse, gain, open   p[5] binary, orbit angle, separation, angle swept exposed
+// p[6] M, a, the eye's sheet, ring light   p[7] ripple, its phase, its sweep   p[8] ε, t/T, memory light, blue
+// p[9].w nave light   p[10] sky, edges, nave scale   p[11] the eye's 4-velocity   p[12..14] the falling Julia
 
 const RV = 80.0; // past this, rays run straight
 

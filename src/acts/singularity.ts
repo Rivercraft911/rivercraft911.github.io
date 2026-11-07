@@ -1,7 +1,8 @@
-// The singularity. A last jump, and two black holes are whirling round each other in the aisle of a
-// fractal nave (hole.wgsl), each bending the other's light and every arch into rings. On their horizons
-// is written everything that fell in, every world of the fall, redder and slower the longer ago it fell;
-// the choir, falling in last, slows with it, its pitch sinking by the same dτ/dt until time stands still.
+// The singularity. R5's Julia set, as its last frame showed it, falls away from us into the first of two
+// black holes whirling round each other in the aisle of a fractal nave (hole.wgsl), each bending the
+// other's light and every arch into rings. On their horizons is written everything that fell in, every
+// world of the fall, redder and slower the longer ago it fell; the choir, falling in last, slows with it,
+// its pitch sinking by the same dτ/dt until time stands still.
 // The two holes spiral together, and the beam draws what a gravitational-wave detector would hear: for a
 // binary seen at inclination ι, h₊ ∝ (1 + cos²ι)/2 cos φ and h× ∝ cos ι sin φ, φ the wave's phase and
 // twice the orbit's, so the holes on screen turn at exactly half the beam's rate, one signal. It sweeps up
@@ -61,7 +62,7 @@ function worlds() {
   }
   take(indra, 6)
   for (let t = 0; t < stutter.dur; t += 0.05) if ((stutter.build(t, f), !has(f.field))) take(stutter, t + 0.3)
-  take(ophanim, 2.5)
+  take(ophanim, 1.5) // the Julia set, before its cut
   return out
 }
 
@@ -73,7 +74,7 @@ const SHUTTER = 0.25 // of a frame's interval, each pixel exposed at its own ins
 const live = [0]
 let was = 0
 
-// The camera: in from 50 M, rising over the orbit; then down the remnant's axis, through the ring at TW,
+// The camera: in from 36 M, rising over the orbit; then down the remnant's axis, through the ring at TW,
 // turning over to look back at it as it is flung away.
 const D0 = 36, D1 = 13, EL0 = 0.3, EL1 = 0.75
 const ZM = D1 * Math.sin(EL1), RM = D1 * Math.cos(EL1), RI = MF - Math.sqrt(MF * MF - AF * AF) // and the inner horizon
