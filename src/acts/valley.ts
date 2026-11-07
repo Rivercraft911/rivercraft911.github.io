@@ -217,8 +217,9 @@ let heroN = 0, heroGain = 0.7, occlude = 1, landK = 1, lp = 0, hl = 0, hr = 0 //
 // The flight: one continuous path, eye, target and lens gliding through these without stopping. Straight
 // down on the map the meander drew; a crane up and back as the valley rises; downstream over the firs;
 // around the pool as its stones lock; low and fast down the river to the lip; over it and round in an
-// arc to face the falls; then down their face with the water into the plunge pool below (wrap.ts).
-export const DUR = 19.8, SING = -1.2 // the choirs begin to sing at SING
+// arc to face the falls, held there on the plot they have become; then up and over as it pours down into
+// the plunge pool below (wrap.ts).
+export const DUR = 21.3, SING = -1.2 // the choirs begin to sing at SING
 const MAP_FOV = 1.1, YL = riverY(LIP - 0.2), ZL = riverZ(LIP)
 const on = (x: number, h: number, dz: number, tx: number, fov: number) => [x, riverY(x) + h, riverZ(x) + dz, tx, riverY(tx), riverZ(tx), fov]
 const KEYS: number[][] = [
@@ -230,7 +231,8 @@ const KEYS: number[][] = [
   [10.6, ...on(43, 6.5, 0, 57, 1)],
   [12.6, LIP - 8, YL + 5, riverZ(LIP - 8) + 2, LIP + 6, YL - 4, ZL + 2, 1],
   [14.2, LIP + 10, YL + 4, ZL + 11, LIP + 2, YL - 8, ZL, 1],
-  [15.6, LIP + 14, YL - 4, ZL + 9, LIP + 1.5, YL - 11, ZL, 0.9],
+  [15.8, LIP + 62, YL - 7, ZL + 3, LIP + 6, YL - 12, ZL, 0.92], // pulled back to see the whole plot, its lip under the board
+  [17.6, LIP + 58, YL - 8, ZL + 0.5, LIP + 6, YL - 12.3, ZL, 0.9], // face to face with it, closing in
 ]
 // Straight down on the stretch the meander drew, framed as it framed it.
 function framed(k: number[]) {
@@ -402,22 +404,35 @@ function fallAt(tau: number, l: number, lift: number) {
   near = smooth(4, 14, Math.hypot(x - eye.x, y - eye.y, z - eye.z))
   return visible(p3.x, p3.y)
 }
-// Where lane l is on the pool, r from the drain: carried in on its streamline, turned as the water has.
-function poolAt(r: number, l: number) {
-  const a = AL[l] + turned(r)
-  if (!cam.project(PX + M * r * Math.cos(a), PY + M * surface(r), PZ + M * r * Math.sin(a), p3)) return false
-  near = 1
-  return true
+// The plot pours into the pool: a point of it m of the way from its place on the curtain (lane l, tau below
+// the lip) to its place wound round the drain (r out, turned as the water has turned there). The way runs
+// in the pool's cylinder, radius, angle and height, so the sheet winds round the drain as it comes down:
+// its rows bend into rings, its lanes fan out into angles, and the rectangle becomes the disc.
+const MORPH = [17.8, 19.8]
+function plotAt(tau: number, l: number, m: number, r: number) {
+  const x = fallX(tau, l), y = YL - 0.5 * FALL_G * tau * tau, z = fallZ(tau, l)
+  const rc = Math.hypot(x - PX, z - PZ) / M, ac = Math.atan2(z - PZ, x - PX)
+  let da = AL[l] + turned(r) - ac
+  da -= TAU * Math.round(da / TAU)
+  const a = ac + m * da, rr = mix(rc, r, m), X = PX + M * rr * Math.cos(a), Y = mix(y, PY + M * surface(r), m), Z = PZ + M * rr * Math.sin(a)
+  if (!cam.project(X, Y, Z, p3)) return false
+  near = smooth(4, 14, Math.hypot(X - eye.x, Y - eye.y, Z - eye.z))
+  return visible(p3.x, p3.y)
 }
 function falls(t: number, show: number) {
-  const rows = smooth(14.6, 15.6, t) * (1 - smooth(17, 18.2, t)), water = 0.15 * (1 - smooth(12.3, 14.3, t))
-  // face to face with it, the lanes give way to rows: the raster of a waterfall plot
+  const rows = smooth(14.6, 15.6, t) * (1 - smooth(19.4, 20.8, t)), water = 0.15 * (1 - smooth(12.3, 14.3, t))
+  const morph = smooth(MORPH[0], MORPH[1], t)
+  // face to face with it, the lanes give way to rows: the raster of a waterfall plot. Then it pours down
+  // into the pool, the rows nearest the water first, and lies on it as the whirlpool will: the newest at
+  // the rim, each older one an e-fold of the inflow further in. Each row's moment slides back by the time
+  // the water takes to fall, so it lands showing what the pool shows there.
   for (let j = 0; j < 130 && rows > 0; j++) {
-    const tau = (j / 129) * TAU_MAX, r = row ? rowAt(t - tau) : 0
+    const u = j / 129, tau = u * TAU_MAX, m = smooth(0, 1, 1.5 * morph - 0.5 * (1 - u)), rp = R * Math.exp(-pool.beta * tau)
+    const r = row ? rowAt(t - tau - m * FALL) : 0
     let pen = false
     for (let l = 0; l < LANES; l++) {
       const v = spec[r + l]
-      if (!fallAt(tau, l, 0)) {
+      if (!plotAt(tau, l, m, rp)) {
         pen = false
         continue
       }
@@ -427,7 +442,7 @@ function falls(t: number, show: number) {
     }
   }
   // the lip, heaving with the spectrum going over it now
-  const lip = smooth(13.3, 15.3, t) * (1 - smooth(16.5, 17.5, t))
+  const lip = smooth(13.3, 15.3, t) * (1 - smooth(MORPH[0] - 0.6, MORPH[0] + 0.2, t))
   let pen = false
   for (let l = 0; l < LANES && lip > 0; l++) {
     const v = past(t, l)
@@ -439,32 +454,29 @@ function falls(t: number, show: number) {
     pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
     pen = true
   }
-  // the lanes: down the curtain, and on round the pool in the current, the spectrum going with them, until
-  // the water itself carries it (wrap.ts). Seen obliquely they crowd together: keep the ink per unit of
-  // screen what it is face on.
-  const lanes = 1 - rows, swirl = smooth(15, 16.5, t) * (1 - smooth(18, DUR, t)), hand = 1 - smooth(18.5, DUR, t)
-  for (let l = 0; l < LANES && hand > 0; l++) {
+  // the lanes down the curtain, until face to face they give way to the rows. Seen obliquely they crowd
+  // together: keep the ink per unit of screen what it is face on.
+  const lanes = 1 - smooth(14.6, 15.6, t)
+  for (let l = 0; l < LANES && lanes > 0; l++) {
     let pen = false
-    for (let j = 0; j <= 44 + 40; j++) {
-      const fell = j <= 44, tau = fell ? (j / 44) ** 1.3 * TAU_MAX : TAU_MAX + ((j - 44) * 0.09) / pool.beta, r = R * Math.exp(-(j - 44) * 0.09)
-      if (!fell && swirl <= 0) break
-      if (!laneAt(fell, tau, r, l ? l - 1 : 1)) {
+    for (let j = 0; j <= 44; j++) {
+      const tau = (j / 44) ** 1.3 * TAU_MAX
+      if (!fallAt(tau, l ? l - 1 : 1, 0)) {
         pen = false
         continue
       }
       const nx = p3.x, ny = p3.y
-      if (!laneAt(fell, tau, r, l)) {
+      if (!fallAt(tau, l, 0)) {
         pen = false
         continue
       }
       const v = past(t - tau, l), gap = clamp(Math.hypot(p3.x - nx, p3.y - ny) / 0.025, 0.08, 1)
-      shade(v + water, 0.45 * near * gap * hand * show * (fell ? lanes : swirl) * (0.08 + 0.8 * v) * fog(p3.z) * smooth(0, 0.5, tau))
+      shade(v + water, 0.45 * near * gap * show * lanes * (0.08 + 0.8 * v) * fog(p3.z) * smooth(0, 0.5, tau))
       pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
       pen = true
     }
   }
 }
-const laneAt = (fell: boolean, tau: number, r: number, l: number) => (fell ? fallAt(tau, l, 0) : poolAt(r, l))
 
 export const valley: Scene = {
   dur: DUR,
@@ -518,7 +530,7 @@ export const valley: Scene = {
         if (cam.project(x, riverY(x), riverZ(x), p3)) (hx[heroN] = p3.x), (hy[heroN++] = p3.y)
     heroGain = t < SCAN ? 0.3 : t < 3 ? 0.22 : t < 6 ? 0.35 : 0.4 // ridgelines and firs are jagged: quieter
     // the pool's printer runs from early on, so the water has its history when it shows
-    const lit = smooth(16.3, 18.3, t)
+    const lit = smooth(19.2, 20.8, t)
     if (t > 11) {
       const fld = whirl(t - DUR, (f.at ?? 0) + t, f, lit), q = fld.p
       toPool(cur[0], cur[1], cur[2], WE), toPool(cur[3], cur[4], cur[5], WT)
@@ -564,10 +576,10 @@ export const valley: Scene = {
     WAVES.vals[0] = (7 * t) % TAU, WAVES.vals[1] = (5.3 * t) % TAU, WAVES.hot = FLOWS.hot = 0.4
     EYE.vals[0] = eye.x, EYE.vals[1] = eye.y, EYE.vals[2] = eye.z, EYE.hot = 0.3
     FALLS.vals[0] = YL, FALLS.hot = smooth(6.5, 8.5, t) * (1 - smooth(14.8, 16.8, t))
-    SPEC.vals[0] = t, SPEC.hot = smooth(14.3, 15.3, t) * (1 - smooth(16.5, 17.5, t))
-    POOL_EQ.vals[0] = pool.beta, POOL_EQ.hot = smooth(16, 17, t)
+    SPEC.vals[0] = t, SPEC.hot = smooth(14.3, 15.3, t) * (1 - smooth(MORPH[0], MORPH[0] + 1, t))
+    POOL_EQ.vals[0] = pool.beta, POOL_EQ.hot = smooth(MORPH[0], MORPH[0] + 1, t)
     // the board gives way to the whirlpool's one equation as we come down into it
-    const hand = smooth(18.6, DUR, t)
+    const hand = smooth(DUR - 1.2, DUR, t)
     ceil = board.show(f, t, smooth(0.2, 0.8, t) * (1 - hand))
     if (hand > 0) equation(f, VORTEX, VORTEX_INK, 0.9 * hand, live)
 

@@ -11,7 +11,7 @@ import { descent, place, sing } from './choir'
 import { AT as R1END } from './ascii'
 import { A, B, GROUP, GROUP_INK, H, LENS, MU, PER, SHRINK, TURN, ZM, ZP, div, eye, fall, fwd, mul, up } from './drain'
 import { aim, equation, project, seen } from './reality'
-import { smooth, type Scene } from './scene'
+import { mix, smooth, type Scene } from './scene'
 
 export const AT = R1END // the choir's clock when this reality begins: as we come through the drain
 export const DUR = 3
@@ -82,6 +82,7 @@ export const indra: Scene = {
     f.rate = 2.4e6
     place(T)
 
-    return (tt, o) => sing(tt + AT, o, 1, { gold: smooth(0, 1.5, tt) })
+    // trimmed as the multiverse's worlds are: the φ twin and the swell would carry it 6 dB over them
+    return (tt, o) => sing(tt + AT, o, mix(1, 0.55, smooth(0, 3, tt)), { gold: smooth(0, 1.5, tt) })
   },
 }

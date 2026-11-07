@@ -12,8 +12,8 @@ import { descent, place, rate, sing } from './choir'
 import { aim, equation } from './reality'
 import { TAU, glide, smooth, type Frame, type Scene } from './scene'
 
-export const LEAD = 21 // how long the choir has been falling when the wrap begins: valley.DUR − valley.SING
-export const DUR = 4
+export const LEAD = 22.5 // how long the choir has been falling when the wrap begins: valley.DUR − valley.SING
+export const DUR = 2.5
 const PER = 360 // rows printed per octave of the choir's descent
 const MAX = 256 // most rows printed in a frame
 const FRESH = 48 // history a fresh sheet back-fills at once: more costs a visible hitch
@@ -57,17 +57,17 @@ function print(T: number, now: number, f: Field) {
   return head
 }
 
-// The camera, in the pool's units: x across, y downstream, z up, the drain at the origin. It comes down
-// the face of the falls (the valley flies it until T = 0), low over the water where the lanes land and in
-// among them, then round with the current, clockwise from above, and down into the funnel. Keys: time,
-// eye, what it looks at, and the lens.
+// The camera, in the pool's units: x across, y downstream, z up, the drain at the origin. From face to
+// face with the falls (the valley flies it until T = 0) it rises up and over as the plot pours down into
+// the pool, looking down on the disc it makes, then swoops down round it with the current and into the
+// funnel. Keys: time, eye, what it looks at, and the lens.
 export const KEYS = [
-  [-2.8, 0, -0.05, 1.63, 0, -1.6, 1.54, 0.8],
-  [-1.4, 0.25, -0.35, 0.62, 0, -1.25, 0.25, 0.95],
-  [0, 0.5, -0.6, 0.1, 0.1, 0.1, -0.35, 1.05],
-  [1.5, -0.05, -0.6, -0.02, 0, 0, -0.55, 1.15],
-  [3, -0.4, -0.12, -0.12, 0, 0, -0.8, 1.2],
-  [4.5, -0.15, 0.12, -0.2, 0, 0, -0.95, 1.25],
+  [-1.6, 0.35, 0.75, 2.45, 0, -0.15, 0, 1.0],
+  [-0.4, 0.95, 0.15, 0.85, 0, -0.05, -0.2, 1.05],
+  [0.8, 0.45, -0.55, 0.1, 0.05, 0.1, -0.4, 1.1],
+  [1.6, -0.05, -0.6, -0.02, 0, 0, -0.55, 1.15],
+  [2.5, -0.4, -0.12, -0.12, 0, 0, -0.8, 1.2],
+  [4, -0.15, 0.12, -0.2, 0, 0, -0.95, 1.25],
 ]
 const key: number[] = [], up = [0, 0, 1]
 function look(T: number, p: Float32Array) {
@@ -90,7 +90,7 @@ export const turned = (r: number) => 0.5 * pool.K * Math.log((1 + pool.k / (r * 
 const field: Field = { shader: SHADER, k: 1, p: new Float32Array(52), res: 1.5 } // finer than the usual raster: its partials are filaments
 export const live = [0, 0] // the circulation and the inflow, for the equation
 export function vortex(T: number, now: number, f: Frame, gain = 1) {
-  const p = field.p, head = print(T, now, field), wet = (pool.wet = 0.25 + 0.75 * smooth(-1.5, 2.5, T))
+  const p = field.p, head = print(T, now, field), wet = (pool.wet = 0.25 + 0.75 * smooth(-2, 1.5, T))
   const beta = (pool.beta = BETA * rate(T + LEAD)), gamma = TAU * beta * RC * RC * K * wet // the inflow's rate and the circulation
   pool.H = (gamma * gamma) / (8 * Math.PI ** 2 * G * RC * RC), pool.K = K * wet
   look(T, p)

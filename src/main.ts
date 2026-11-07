@@ -31,8 +31,8 @@ const hole = finaleA // the finale: the cathedral falls in
 const SHORT = [
   edit(hook, [[0.9, 5.3, 2.2]]),
   edit(meander, [[0, 3.3, 1.65]]),
-  edit(valley, [[0, 11, 3.2], [15.3, 19.8, 2]]), // the opening and the flight, then straight to the falls landing
-  edit(wrap, [[0, 4, 1.6]]),
+  edit(valley, [[0, 11, 3.2], [15.3, 21.3, 2]]), // the opening and the flight, then straight to the falls landing
+  edit(wrap, [[0, 2.5, 1.6]]),
   edit(ascii, [[0, 3.5, 2]]),
   edit(stutter, [[2, 6, 1]]), // the cuts as they are: they land on beats
   edit(hole, [[1.6, 8.2, 1.8]]),

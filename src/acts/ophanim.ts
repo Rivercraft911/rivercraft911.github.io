@@ -139,7 +139,8 @@ export const ophanim: Scene = {
 
     return (tt, o) => {
       if (splice(tt, o) || splice(tt - CUT, o)) return
-      sing(tt + AT, o, 1, { dread: smooth(0, 3, tt), gold: 1 - smooth(0.5, 3.5, tt) })
+      // trimmed to sit with the multiverse's worlds, just over the last of them: it rang 6–9 dB over
+      sing(tt + AT, o, 0.55, { dread: smooth(0, 3, tt), gold: 1 - smooth(0.5, 3.5, tt) })
       // one fiber's field through the plate, E_x and E_y on a 110 Hz carrier
       plate(tt)
       fiber(0.785, 0.9 * tt, TAU * 110 * tt, pt)
