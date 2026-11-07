@@ -20,7 +20,7 @@ import { aim, equation, jump } from './reality'
 import { stutter } from './stutter'
 import { TAU, clamp, hash, mix, smooth, view, type Frame, type Scene } from './scene'
 
-export const AT = R5 + R5DUR // 50 on the choir's clock; the cut is AT + PEAK, with choir.END just past it
+export const AT = R5 + R5DUR // 47.5 on the choir's clock; the cut is AT + PEAK, with choir.END just past it
 export const PEAK = 7.2 // the crescendo: one flash, then silence
 const DOT = PEAK + 0.7 // and the dot
 

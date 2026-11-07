@@ -9,7 +9,7 @@ import { room, type Stereo } from '../audio/audio'
 import { Shepard, type Part } from '../dsp/shepard'
 import { clamp, smooth } from './scene'
 
-export const END = 50 + 7.5 // on the choir's clock: the cut to silence (singularity's AT + PEAK) and the 0.3 s sing() fades over, so it is cut at its loudest
+export const END = 47.5 + 7.5 // on the choir's clock: the cut to silence (singularity's AT + PEAK) and the 0.3 s sing() fades over, so it is cut at its loudest
 const GAIN = 1 // the choir's swing, root and all, about what the realities' bends expect
 const FALL = 13.5 // the falls flattening into the plot: the choir is silent before it, then fades in
 
