@@ -53,7 +53,7 @@ const touch = (k: number) =>
     ),
   )
 const RHOS = KAPPA.map(touch)
-// The flow we ride: −(A + B), the pearl at ab back to 1, shrinking 0.81 and turning 29° each step. In
+// The flow we ride: −(A + B), the pearl at ab back to 1, shrinking by 0.88 and turning 18° each step. In
 // e-folds of shrinking u, the eye turns TURN u.
 const FX = -(AX + BX), FY = -(AY + BY), TURN = FY / -FX
 // The eye falls freely from rest at infinity, dr/dt = −√(2M/r), so r^3/2 runs down linearly: from D0 to
@@ -79,7 +79,15 @@ const freq = (t: number) => K * (TC - t) ** -0.375
 const phase = (t: number) => (TAU * K * (TC ** 0.625 - (TC - t) ** 0.625)) / 0.625
 const amp = (t: number) => 1.5 * (freq(t) / freq(PEAK)) ** (1 / 3)
 
+// The world's constants, for the shader: the lattice and its inverse basis, the walls, a and b, P and Q.
 const field: Field = { shader: HOLEB, k: 1, p: new Float32Array(52) }
+{
+  const p = field.p, det = AX * BY - BX * AY
+  p.set([AX, AY, BX, BY, BY / det, -BX / det, -AY / det, AX / det, ...KAPPA], 20)
+  p.set(RHOS, 32)
+  p.set([Math.exp(AX) * Math.cos(AY), Math.exp(AX) * Math.sin(AY), Math.exp(BX) * Math.cos(BY), Math.exp(BX) * Math.sin(BY), TURN], 40)
+  p[46] = P, p[47] = Q
+}
 const eye = [0, 0, 0], fwd = [0, 0, 0], up = [0, 0, 1]
 const DREAD = { dread: 1, gold: 0 }
 let gain = 1
@@ -100,7 +108,7 @@ export const finaleB: Scene = {
     if (t >= PEAK) {
       // the one flash: a frame of white light, burnt out of the phosphor at once
       jump(t - PEAK, f, true, 0)
-      if (t < PEAK + 1 / 30) (p[50] = 1), (f.field = field)
+      if (t < PEAK + 1 / 30) (p[50] = 40), (f.field = field)
     } else {
       const az = 0.4 - TURN * u, el = elevation(t), ro = roll(u)
       eye[0] = D * Math.cos(el) * Math.cos(az), eye[1] = D * Math.cos(el) * Math.sin(az), eye[2] = D * Math.sin(el)
@@ -112,17 +120,13 @@ export const finaleB: Scene = {
       up[2] = Math.cos(ro) * Math.cos(el)
       aim(p, eye, fwd, up, FOV)
       const flare = Math.exp(-5 * ((u / -FX) % 1)) // a pulse each time the world comes round to itself
-      p[16] = t, p[17] = M, p[18] = 1, p[19] = M * (0.25 + 0.6 * smooth(1, PEAK, t) ** 2 + 0.3 * flare * smooth(1, 2, t))
-      p[20] = AX, p[21] = AY, p[22] = BX, p[23] = BY
-      const det = AX * BY - BX * AY
-      p[24] = BY / det, p[25] = -BX / det, p[26] = -AY / det, p[27] = AX / det
-      p[28] = KAPPA[0], p[29] = KAPPA[1], p[30] = KAPPA[2], p[31] = mix(-3.6, 0.2, smooth(0.3, 2, t)) // condensing inward
-      p[32] = RHOS[0], p[33] = RHOS[1], p[34] = RHOS[2], p[35] = 0.6 * t + 3 * u
+      p[17] = M, p[18] = 1, p[19] = M * (0.25 + 0.6 * smooth(1, PEAK, t) ** 2 + 0.3 * flare * smooth(1, 2, t))
+      p[31] = mix(-3.6, 0.2, smooth(0.3, 2, t)) // the world condensing, inward from far out
+      p[35] = 0.6 * t + 3 * u // the films drain, faster as we fall
       // the Julia set on its card, filling the view, then drained into the hole down the same flow
       p[36] = 8, p[37] = (D + 8) * TAN, p[38] = 2.5 * Math.max(0, t - 0.25) ** 2, p[39] = 1 - smooth(0.6, 1.5, t)
-      p[40] = Math.exp(AX) * Math.cos(AY), p[41] = Math.exp(AX) * Math.sin(AY), p[42] = Math.exp(BX) * Math.cos(BY), p[43] = Math.exp(BX) * Math.sin(BY)
-      p[44] = TURN, p[45] = 0.15 * D * D * (1 + 2 * smooth(1, PEAK, t)), p[46] = P, p[47] = Q
-      p[48] = 2 * u + 0.8 * t, p[49] = 2.5 * smooth(1.5, 3, t)
+      p[45] = 0.15 * D * D * (1 + 2 * smooth(1, PEAK, t)) // the exposure: brighter as we fall
+      p[48] = 2 * u + 0.8 * t, p[49] = 2.5 * smooth(1.5, 3, t) // the light falling in down the spirals
       field.res = 0.85 // the light is smeared by the fall anyway; the beam keeps the ring crisp
       f.field = field
     }

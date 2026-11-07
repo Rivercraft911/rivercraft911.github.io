@@ -10,7 +10,7 @@
 // round the shadow and piled up at the photon ring. The pearls are lit by the ring, as (3M / r)², each a
 // soap film whose thickness winds with its spiral arm, so the colours run down the spirals as we fall.
 //
-// p[0..3] camera   p[4] time, M, gain, ring light   p[5] A, B   p[6] the lattice's inverse basis
+// p[0..3] camera   p[4] —, M, gain, ring light   p[5] A, B   p[6] the lattice's inverse basis
 // p[7] κ of the three walls, bloom   p[8] ρ of the three walls, film drift   p[9] the card: depth past the
 // hole, half-height, σ, light   p[10] a = e^A, b = e^B   p[11] the flow's turn per e-fold, exposure, P, Q
 // p[12] the falling light's phase, strength, the flash
@@ -177,7 +177,7 @@ fn field(q: vec2f) -> vec3f {
   else if (cd.x <= 1.0) {
     let at = vec2f(3.0, 2.0); // R5's tile, the last of the worlds
     let e = exp2(lod) * vec2f(0.5 / 512.0, 0.5 / 320.0);
-    col += textureSampleLevel(data, smp, (at + clamp(uv, e, 1.0 - e)) / vec2f(4.0, 3.0), lod).rgb * u.p[9].w;
+    col += textureSampleLevel(data, smp, (at + clamp(uv, e, 1.0 - e)) / vec2f(4.0, 3.0), lod).rgb * u.p[9].w * smoothstep(1.0, 0.7, max(abs(cd.y), abs(cd.z))); // its edges let go
   }
   else if (!fell) { col += vec3f(0.002, 0.002, 0.008); }
   // the photon ring: rays with b near 3√3 M wind round the photon sphere, more often the nearer, and
