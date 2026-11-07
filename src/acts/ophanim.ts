@@ -19,7 +19,7 @@ import { AT as R4, DUR as R4DUR } from './stutter'
 import { TAU, mix, smooth, type Scene } from './scene'
 
 export const AT = R4 + R4DUR
-export const DUR = 3.5 // the quaternion Julia set; the polytope cage is cut
+export const DUR = 2.5 // the quaternion Julia set; the polytope cage is cut
 const CUT = 3.5 // the Julia set gives way to the polytopes
 
 // The binary icosahedral group, as flat x, y, z, w: the 24-cell first (its 16 tesseract vertices at 8),

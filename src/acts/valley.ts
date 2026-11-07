@@ -90,7 +90,7 @@ function fir(x: number, z: number, H: number, seed: number, t0: number) {
 for (let i = 0; i < 420; i++) {
   const x = 0.5 + 57 * rnd(i * 3) ** 1.2, side = i & 1 ? 1 : -1, z = riverZ(x) + side * (wide(x) + 0.5 + 9 * rnd(i * 5) ** 1.6)
   if (height(x, z) - riverY(x) > 6) continue // the tree line
-  fir(x, z, 0.6 + 1.3 * rnd(i * 7), i, 3 + x * 0.05)
+  fir(x, z, 0.6 + 1.3 * rnd(i * 7), i, 2.5 + x * 0.04)
 }
 
 // The line the meander drew opens into the river, a wave racing downstream: when it reaches x, and how
@@ -175,7 +175,7 @@ function peaks(seed: number, x: number, z0: number, z1: number, base: number, H:
     if (pts.length >= 18) item(pts[0], pts.slice(), WATER, opens(pts[0]), 0, FLOW)
   }
 }
-peaks(13, 104, riverZ(104) - 60, riverZ(104) + 60, riverY(LIP) - 4, 30, 6)
+peaks(13, 104, riverZ(104) - 60, riverZ(104) + 60, riverY(LIP) - 4, 30, 4.5)
 items.sort((a, b) => a.x - b.x)
 const VX = Float32Array.from(V)
 
@@ -192,8 +192,8 @@ const FIRS = L('x(y) = 0.3 H (1 - y / H)^{0.9}\\, tri(\\pi n y / H),\; N = \\num
 const PEAKS = L('h(z) = 20 \\log_{10} |S(e^{i \\omega})|', INK, 6)
 const SPRAY = L('(x, y) = (x_0 + v_x \\tau,\; y_0 + v_y \\tau - 3.5 \\tau^2)', WHITE, 2)
 const EYE = L('eye = (\\num{0}{-00.0}, \\num{1}{-00.0}, \\num{2}{-00.0})', WHITE, 5.2)
-const FALL = L('(x, y) = (62 + 1.6 \\tau,\; \\num{0}{-0.00} - 2.5 \\tau^2)', WHITE, 13.5)
-const SPEC = L('S(f, t) = |\\sum_n x[n]\\, w[n - tH]\\, e^{-i 2\\pi f n / 1024}|,\; t = \\num{0}{00.00}', CYAN, 16.5)
+const FALL = L('(x, y) = (62 + 1.6 \\tau,\; \\num{0}{-0.00} - 2.5 \\tau^2)', WHITE, 11.3)
+const SPEC = L('S(f, t) = |\\sum_n x[n]\\, w[n - tH]\\, e^{-i 2\\pi f n / 1024}|,\; t = \\num{0}{00.00}', CYAN, 14.3)
 const board = new Board([RIVER, OPEN, FLOWS, LAND, WALL, WAVES, SPRAY, FIRS, EYE, PEAKS, FALL, SPEC])
 const say = new Say()
 export const RIVER_EQ = '\\theta(s) = \\omega_1 \\sin(2\\pi s / M_1) + \\omega_2 \\sin(2\\pi s / M_2 + \\phi)'
@@ -214,20 +214,20 @@ let heroN = 0, heroGain = 0.7, occlude = 1, landK = 1, lp = 0, hl = 0, hr = 0 //
 // down on the map the meander drew; a crane up and back as the valley rises; downstream over the firs;
 // around the pool as its stones lock; low and fast down the river to the lip; over it and round in an
 // arc to face the falls; then back, the lens narrowing as we go, until the falls are flat as a plot.
-export const DUR = 22, SING = 1 // the choirs begin to sing at SING
+export const DUR = 19.8, SING = -1.2 // the choirs begin to sing at SING
 const MAP_FOV = 1.1, YL = riverY(LIP - 0.2), ZL = riverZ(LIP)
 const on = (x: number, h: number, dz: number, tx: number, fov: number) => [x, riverY(x) + h, riverZ(x) + dz, tx, riverY(tx), riverZ(tx), fov]
 const KEYS: number[][] = [
   [0, 0, 0, 0, 0, 0, 0, 0], // the map, framed each frame to the screen
   [1.2, 0, 0, 0, 0, 0, 0, 0], // held while the line opens into a river
-  [4.4, X0 - 5, riverY(0) + 15, riverZ(0) - 9, 22, riverY(22), riverZ(22), 1],
-  [7.4, ...on(1, 8.5, 6, 17, 0.95)],
-  [10, ...on(SC + 6, 11, 4, 38, 1)],
-  [12.8, ...on(43, 6.5, 0, 57, 1)],
-  [14.8, LIP - 8, YL + 5, riverZ(LIP - 8) + 2, LIP + 6, YL - 4, ZL + 2, 1],
-  [16.4, LIP + 10, YL + 4, ZL + 11, LIP + 2, YL - 8, ZL, 1],
-  [17.8, LIP + 14, YL - 4, ZL + 9, LIP + 1.5, YL - 11, ZL, 0.9],
-  [19.2, LIP + 18, YL - 11, ZL, LIP + 1, YL - 12, ZL, 0.8],
+  [3.6, X0 - 5, riverY(0) + 15, riverZ(0) - 9, 22, riverY(22), riverZ(22), 1],
+  [6, ...on(1, 8.5, 6, 17, 0.95)],
+  [8.2, ...on(SC + 6, 11, 4, 38, 1)],
+  [10.6, ...on(43, 6.5, 0, 57, 1)],
+  [12.6, LIP - 8, YL + 5, riverZ(LIP - 8) + 2, LIP + 6, YL - 4, ZL + 2, 1],
+  [14.2, LIP + 10, YL + 4, ZL + 11, LIP + 2, YL - 8, ZL, 1],
+  [15.6, LIP + 14, YL - 4, ZL + 9, LIP + 1.5, YL - 11, ZL, 0.9],
+  [17, LIP + 18, YL - 11, ZL, LIP + 1, YL - 12, ZL, 0.8],
   [DUR, LIP + 40, YL - 12, ZL, LIP + 1, YL - 12, ZL, 0.34],
 ]
 // Straight down on the stretch the meander drew, framed as it framed it.
@@ -391,7 +391,7 @@ function fallAt(tau: number, l: number, lift: number, flat: number) {
   return flat > 0.5 || visible(p3.x, p3.y)
 }
 function falls(t: number, show: number) {
-  const rows = smooth(17, 19, t), flat = smooth(17.5, 20, t), water = 0.15 * (1 - smooth(14.5, 16.5, t))
+  const rows = smooth(14.8, 16.8, t), flat = smooth(15.3, 17.8, t), water = 0.15 * (1 - smooth(12.3, 14.3, t))
   // as we come round to face it, the lanes give way to rows: the raster of a waterfall plot
   for (let j = 0; j < 130 && rows > 0; j++) {
     const tau = (j / 129) * TAU_MAX, r = row ? rowAt(t - tau) : 0
@@ -408,7 +408,7 @@ function falls(t: number, show: number) {
     }
   }
   // the lip, heaving with the spectrum going over it now
-  const lip = smooth(15.5, 17.5, t)
+  const lip = smooth(13.3, 15.3, t)
   let pen = false
   for (let l = 0; l < LANES && lip > 0; l++) {
     const v = past(t, l)
@@ -451,7 +451,7 @@ export const valley: Scene = {
     horizon.fill(-9)
     const next = { i: 0 }, heroKind = t < 3 ? -1 : TREE, behind = occlude > 0.5 ? eye.x + 0.3 : -Infinity
     let heroRow = -1
-    const land = (landK = 1 - smooth(14.2, 15.4, t)) // the valley falls away behind us as we go over
+    const land = (landK = 1 - smooth(12, 13.2, t)) // the valley falls away behind us as we go over
 
     // strokes too faint to see would still cost the beam its time: once the valley is gone, skip it
     for (let i = 0; i < NR && land > 0.06; i++) {
@@ -493,12 +493,12 @@ export const valley: Scene = {
     if (heroN < 2 && t >= SCAN && land > 0.06)
       for (let x = Math.max(X0, eye.x + 1); x < LIP && heroN < HERO; x += 0.3)
         if (cam.project(x, riverY(x), riverZ(x), p3)) (hx[heroN] = p3.x), (hy[heroN++] = p3.y)
-    heroGain = t < SCAN ? 0.3 : t < 3 ? 0.22 : t < 7 ? 0.35 : 0.4 // ridgelines and firs are jagged: quieter
-    if (t > 7) listen(t), falls(t, smooth(7, 9, t))
+    heroGain = t < SCAN ? 0.3 : t < 3 ? 0.22 : t < 6 ? 0.35 : 0.4 // ridgelines and firs are jagged: quieter
+    if (t > 6) listen(t), falls(t, smooth(6, 8, t))
     // over the edge: the speakers trace the lip, the spectrum going over it, until the choir takes over
-    if (heroN < 2 && t > 7)
+    if (heroN < 2 && t > 6)
       for (let l = 0; l < LANES && heroN < HERO; l++)
-        if ((fallAt(0, l, past(t, l), smooth(17.5, 20, t)), p3.z)) (hx[heroN] = p3.x), (hy[heroN++] = p3.y) // heard even where the board hides it
+        if ((fallAt(0, l, past(t, l), smooth(15.3, 17.8, t)), p3.z)) (hx[heroN] = p3.x), (hy[heroN++] = p3.y) // heard even where the board hides it
     // exposure: the ink is energy per length, so as the valley fills in it would burn brighter and
     // brighter; past a reference length, stop down, as an eye or a camera would
     const stop = Math.min(1, (EXPOSE / Math.max(1, ink.len)) ** 0.7)
@@ -525,15 +525,15 @@ export const valley: Scene = {
     }
     // the equations: the meander's carries on a moment, then the board of everything takes over
     if (t < 0.6) say.say(f, t, RIVER_EQ, WATER, [['\\omega_1', W1, 2], ['\\omega_2', W2, 2], ['M_1', M1, 0], ['M_2', M2, 0]], 1 - smooth(0, 0.6, t))
-    const hero = t < SCAN ? 0 : heroKind < 0 ? 1 : t < 8 ? 2 : 3 // what the speakers are tracing: river, land, firs, falls
+    const hero = t < SCAN ? 0 : heroKind < 0 ? 1 : t < 6.5 ? 2 : 3 // what the speakers are tracing: river, land, firs, falls
     RIVER.vals[0] = W1, RIVER.vals[1] = W2, RIVER.hot = +(hero === 0)
     OPEN.vals[0] = clamp(X0 + (t - 0.25) / 0.03, X0, LIP), OPEN.hot = 1 - smooth(2, 3.5, t)
     LAND.vals[0] = rowX(Math.max(0, heroRow)), LAND.hot = +(hero === 1)
     FIRS.vals[0] = grown, FIRS.hot = +(hero === 2)
     WAVES.vals[0] = (7 * t) % TAU, WAVES.vals[1] = (5.3 * t) % TAU, WAVES.hot = FLOWS.hot = 0.4
     EYE.vals[0] = eye.x, EYE.vals[1] = eye.y, EYE.vals[2] = eye.z, EYE.hot = 0.3
-    FALL.vals[0] = YL, FALL.hot = smooth(8, 10, t) * (1 - smooth(17, 19, t))
-    SPEC.vals[0] = t, SPEC.hot = smooth(16.5, 18.5, t)
+    FALL.vals[0] = YL, FALL.hot = smooth(6.5, 8.5, t) * (1 - smooth(14.8, 16.8, t))
+    SPEC.vals[0] = t, SPEC.hot = smooth(14.3, 16.3, t)
     ceil = board.show(f, t, smooth(0.2, 0.8, t))
 
     f.rate = mix(2.4e6, 7.2e6, smooth(1, 8, t))
@@ -544,15 +544,15 @@ export const valley: Scene = {
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, fit = 1.8 / Math.max(0.3, x1 - x0, y1 - y0)
     return (tt, o) => {
       // over the edge the scope rule ends: the falls roar
-      if (tt > 8) { // on through the crossfade: the whirlpool takes the choir over smoothly (sing caches a repeated t)
+      if (tt > 6.5) { // on through the crossfade: the whirlpool takes the choir over smoothly (sing caches a repeated t)
         lp += (hash(tt * 48_000) - lp) * 0.04
-        const roar = 0.5 * lp * smooth(8, 13, tt) * (1 - 0.6 * smooth(16, 20, tt))
+        const roar = 0.5 * lp * smooth(6.5, 11, tt) * (1 - 0.6 * smooth(13.8, 17.8, tt))
         o.l += roar, o.r += roar
         if (tt > SING) sing(tt - SING, o) // silent until the falls flatten, then fading in
       }
-      if (heroN < 2 || tt > 21) return
+      if (heroN < 2 || tt > 18.8) return
       const ph = ((tt * 55) % 1) * 2, u = (ph < 1 ? ph : 2 - ph) * (heroN - 1), i = Math.min(heroN - 2, Math.floor(u)), a = u - i
-      const k = heroGain * (1 - smooth(17, 21, tt))
+      const k = heroGain * (1 - smooth(14.8, 18.8, tt))
       // a gentle low-pass (about 4 kHz) takes the edge off the traced corners
       hl += (k * fit * (hx[i] + (hx[i + 1] - hx[i]) * a - cx) - hl) * 0.4
       hr += (k * fit * (hy[i] + (hy[i + 1] - hy[i]) * a - cy) - hr) * 0.4

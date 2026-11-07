@@ -14,7 +14,7 @@ import { aim, equation, jump, project, seen, splice } from './reality'
 import { mix, smooth, type Scene } from './scene'
 
 export const AT = LEAD + WRAP + ascii.dur // the choir's clock when this reality begins
-export const DUR = 5.5
+export const DUR = 4.5
 const A = 1.95859, B = 0.0112 // the trace of a: a pearl necklace that spirals as it shrinks
 const MU = { re: -B, im: A } // a(z) = μ + 1/z
 const PER = 0.5 // periods of w per octave of descent
@@ -76,7 +76,7 @@ function walk() {
 export const indra: Scene = {
   dur: DUR,
   build(t, f) {
-    const T = t + AT, kick = jump(t, f, true, 0.6), p = field.p
+    const T = t + AT, kick = jump(t, f, false, 0.3), p = field.p // no flash: we fall through the drain
     const s0 = PER * (descent(T) - descent(AT)), f0 = s0 - Math.floor(s0)
     const k = SHRINK ** f0, c = Math.cos(TURN * f0), sn = Math.sin(TURN * f0), H = 1.2
     const ex = H * (0.12 + 0.06 * Math.sin(0.4 * t)), ey = H * 0.06 * Math.sin(0.3 * t), ez = H * mix(1.6, 1, smooth(0, 3, t))
@@ -86,7 +86,7 @@ export const indra: Scene = {
     up[0] = c, up[1] = sn, up[2] = 0
     aim(p, eye, fwd, up, 1.25 + kick)
     p[16] = A, p[17] = B, p[18] = Math.min(12, 1 + Math.floor(t * 6)), p[19] = smooth(0, 0.3, t)
-    p[20] = 0.4 * t, p[21] = 0.06, p[22] = k * H
+    p[20] = 0.4 * t, p[21] = 0.06, p[22] = k * H, p[23] = 2.6 * smooth(0, 0.9, t) ** 1.5
     p[24] = ZM[0], p[25] = ZM[1], p[26] = ZM[0] - ZP[0], p[27] = ZM[1] - ZP[1]
     f.field = field
 

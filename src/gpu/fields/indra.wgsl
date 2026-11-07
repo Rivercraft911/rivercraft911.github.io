@@ -52,6 +52,13 @@ fn pearls(p: vec3f, a: f32, b: f32, n: i32) -> vec3f {
   return vec3f(k.x * back, k.y, a / k.z * back);
 }
 
+// We come through the drain: the world opens as a widening iris from the vortex's eye, its edge a ring of
+// light, the lip we fall over. p[5].w is the iris's radius in scope units.
+fn iris(q: vec2f, c: vec3f) -> vec3f {
+  let d = length(q) - u.p[5].w;
+  return c * (1.0 - smoothstep(-0.06, 0.02, d)) + vec3f(0.35, 0.6, 1.0) * 0.8 * exp(-d * d / 0.0004) * step(u.p[5].w, 2.4);
+}
+
 fn field(q: vec2f) -> vec3f {
   let a = u.p[4].x;
   let b = u.p[4].y;
@@ -72,7 +79,7 @@ fn field(q: vec2f) -> vec3f {
   }
   let fog = exp(-t / H * u.p[5].y);
   let sky = vec3f(0.003, 0.004, 0.014);
-  if (!hit) { return sky * u.p[4].w; }
+  if (!hit) { return iris(q, sky * u.p[4].w); }
   let P = ro + rd * t;
   let e = 0.5 * px * t;
   let k = vec2f(1.0, -1.0);
@@ -90,5 +97,5 @@ fn field(q: vec2f) -> vec3f {
   let spec = pow(max(dot(reflect(rd, nrm), key), 0.0), 300.0);
   let fres = 0.06 + 0.94 * pow(1.0 - ci, 2.5);
   let col = (8.0 * film(thick, ct) * fres * small + 0.6 * spec + vec3f(0.003, 0.004, 0.01)) * ao * ao;
-  return mix(sky, col, fog) * u.p[4].w;
+  return iris(q, mix(sky, col, fog) * u.p[4].w);
 }
