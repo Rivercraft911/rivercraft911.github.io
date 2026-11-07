@@ -121,6 +121,7 @@ export const wrap: Scene = {
     vortex(t, (f.at ?? 0) + t, f, 0, clamp(t / 1.2))
     if (t > 1.2) equation(f, 'z=-\\frac{\\Gamma^2}{8\\pi^2g\\,(r^2+r_c^2)}\\qquad\\Gamma=\\num{0}{000}\\qquad\\frac{dr}{dt}=-\\num{1}{0.00}\\,r', EQ, 0.9 * clamp(t - 1.2), live)
     place(t + LEAD)
-    return (tt, o) => sing(tt + LEAD, o)
+    // the crossfade scales this voice by its fade; the choir must not dip, so it sings against it
+    return (tt, o) => sing(tt + LEAD, o, 1 / Math.max(0.05, clamp(tt / 1.2)))
   },
 }
