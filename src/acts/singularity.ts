@@ -1,15 +1,15 @@
-// The singularity. A last jump, and a black hole hangs among every world we fell through (hole.wgsl): twelve
-// rings, each the raster's own last frame of a world, lit in the order we fell, orbiting in planes of
-// their own, lensed over and under the shadow and piled up in the photon ring; and the worlds again in
-// the faces of a dodecahedral sky that the hole bends round itself. The beam draws light: a ray in each
-// world's colour, solutions of the equation on screen, u″ + u = 3u², bent round the hole, the closest
-// winding into it. Then the horizon opens: inside the shadow the whole picture repeats, shrunk and turned,
-// and inside its shadow again, and we fall through it level by level as fast as the choir falls, a fractal
-// with no bottom. Then the whole picture collapses into one point, and the beam draws what a
-// gravitational-wave detector would hear from two bodies falling together: for a binary seen face-on
-// the two polarizations h₊ and h× are a circle, its frequency sweeping up as (t_c − t)^−3/8 and its
-// amplitude as f^2/3. That is the only rising sound in the whole piece. At merger it rings down, a damped
-// sinusoid, into the dot the oscilloscope powered on with, and the speakers fall silent.
+// The singularity. A last jump, and a spinning black hole hangs in the aisle of a fractal nave (hole.wgsl),
+// turning a disk of glowing gas, every ray of light bent as Kerr's metric bends it: the arches wrapped
+// into rings round a D-shaped shadow, the far side of the disk lensed over the top of the hole and under
+// it, and through the holes in the walls, bent into view, every world we fell through. The beam draws
+// light too: a ray in each world's colour, solutions of the equation on screen, coming in from the left
+// in the plane of the disk and bent round the hole, the closest winding into it, closer on the side that
+// goes with the spin. Then we fall in: the horizon opens onto a Mandelbulb, and we fall into it as fast
+// as the choir falls, a fractal with no bottom. Then the whole picture collapses into one point, and the
+// beam draws what a gravitational-wave detector would hear from two bodies falling together: for a binary
+// seen face-on the two polarizations h₊ and h× are a circle, its frequency sweeping up as (t_c − t)^−3/8
+// and its amplitude as f^2/3. That is the only rising sound in the whole piece. At merger it rings down, a
+// damped sinusoid, into the dot the oscilloscope powered on with, and the speakers fall silent.
 import { Path } from '../beam/path'
 import { HOLE } from '../gpu/fields'
 import type { Field } from '../gpu/raster'
@@ -123,16 +123,17 @@ const field: Field = { shader: HOLE, k: 1, p: new Float32Array(44) }
 const eye = [0, 0, 0], fwd = [0, 0, 0], up = [0, 0, 1]
 const look = { tau: 0.08 }
 const DREAD = { dread: 1 }
-// The bulb's camera closes on a point of its surface, a crevice, along the ray that found it.
+// The bulb's camera closes on a point of its surface that stays rough at every scale (found by a search),
+// along the ray that found it.
 const AIM = [0.694737, 0.389077, 0.596482], INTO = [-0.7621, -0.1682, -0.6252], beye = [0, 0, 0], bup = [0, 0, 0]
-const PER = 1.3 // octaves of the bulb's zoom per octave of the choir's descent
+const PER = 1.7 // octaves of the bulb's zoom per octave of the choir's descent
 
 export const singularity: Scene = {
   dur: TC + 2,
   build(t, f) {
     field.bake ??= worlds() // before anything of ours: the other scenes' builds share the equation's path
     const T = t + AT, kick = jump(t, f, true, 0.6), p = field.p
-    // a spiral in, dragged round with the spin, from 30 M down to 4, rising off the disk as it nears
+    // a spiral in, round with the spin, from 22 M down to 4, rising off the disk as it nears
     const D = mix(22, 4, smooth(0.5, OPEN + 2.5, t) ** 1.3), az = 0.4 + 0.09 * t + 0.6 * smooth(3, OPEN + 3, t)
     const el = mix(0.12, 0.55, smooth(2, OPEN + 2.5, t))
     eye[0] = D * Math.cos(el) * Math.cos(az), eye[1] = D * Math.cos(el) * Math.sin(az), eye[2] = D * Math.sin(el)
@@ -146,8 +147,8 @@ export const singularity: Scene = {
     for (let i = 0; i < 3; i++) beye[i] = AIM[i] - d * INTO[i]
     bup[0] = Math.cos(w), bup[1] = -Math.cos(w), bup[2] = Math.sin(w) // rolling as it goes
     aim(p.subarray(24), beye, INTO, bup, 0.95 + kick)
-    p[31] = 12, p[39] = 0.5
-    p[40] = 2, p[41] = 0.3, p[42] = 50, p[43] = 0
+    p[31] = 10, p[39] = 0.35
+    p[40] = 2, p[41] = 0.3, p[42] = 50
     if (p[18] > 0) f.field = field
 
     const lit = smooth(0.6, 1.5, t) * (1 - smooth(OPEN - 1, OPEN + 0.3, t))

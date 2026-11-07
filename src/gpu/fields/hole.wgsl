@@ -1,28 +1,32 @@
-// The singularity · A spinning black hole (G = c = M = 1, spin a along z) in a hall of a fractal cathedral.
-// Every ray is a null geodesic of the Kerr metric, traced back from the eye in Kerr–Schild coordinates,
-// g = η + f l l with f = 2r³ / (r⁴ + a²z²): the Hamiltonian H = ½ (|p|² − 1 − f (1 + l·p)²) = 0, integrated
-// by RK4 in steps a quarter of the way to the horizon. No approximation is made inside the hall; past its
-// walls (r > 40, where the bend still to come is under 4M/r ≈ 6°) the rays run straight. The chart is the
-// outgoing one, so a ray traced back into the hole crosses r₊ cleanly: that is the shadow, flattened on
-// the side whose light orbits with the spin, since that light can circle closer in before it is lost.
-// Everything near the hole is turned with it: frame dragging.
+// The singularity · A spinning black hole, G = c = M = 1, spin a = 0.94 along z, hanging in the aisle of a
+// fractal nave. Every ray is a null geodesic of the Kerr metric traced back from the eye, in Kerr–Schild
+// coordinates: g = η + f l l, f = 2r³ / (r⁴ + a²z²), l = ((rx + ay) / (r² + a²), (ry − ax) / (r² + a²), z/r),
+// so the Hamiltonian is H = ½ (|p|² − 1 − f (1 + l·p)²) = 0, integrated by RK4 in steps 0.3 (r − r₊). No
+// approximation is made: the chart is the outgoing one, where a ray traced back into the hole crosses r₊
+// cleanly, and that is the shadow, flattened like a D on the side whose light orbits with the spin, since
+// that light can wind in closer before it is lost (to b = 2.6, against the spin 6.9). Everything near the
+// hole is turned with it, frame dragging; past r = 80 the bend still to come is under 2M/r and rays run
+// straight. Each step of the ray is a chord, and the nave is sphere-traced along every chord it might
+// reach, so its arches are seen where the bent light finds them: wrapped into Einstein rings round the
+// shadow and piled up in the photon ring.
 //
-// The gas: a disk from the innermost stable orbit out to r = 14, in Keplerian orbits Ω = 1 / (r^3/2 + a)
-// whose shear winds domain-warped turbulence into spirals, flaring as it goes out, marched as a volume
-// where the rays cross it, over the top and under the hole and again in the photon ring. Each parcel
-// glows as a blackbody at Novikov–Thorne's T ∝ r^−3/4 (1 − √(r_in/r))^1/4, and since I_ν/ν³ is conserved
-// along a ray it is seen as a blackbody at gT, g = 1 / (uᵗ (1 − Ω b)) for b the photon's angular momentum
-// about the spin: brighter and bluer where it comes toward us, dim and red where it goes away and deep in
-// the well. The hall: a pseudo-Kleinian (as R4's), forty M across, lit by the disk; through its gaps, the
-// worlds of the fall, one in each face of a dodecahedral sky (raster.ts keeps their shots).
+// The gas: a disk from the innermost stable orbit out to r = 14, flaring as it goes, in Kepler's orbits
+// Ω = 1 / (r^3/2 + a), whose shear winds domain-warped turbulence into spirals. It is marched as a volume
+// along every chord that crosses it, over the top of the hole and under it and in the photon ring. Each
+// parcel is a blackbody at Novikov–Thorne's T ∝ r^−3/4 (1 − √(r_in / r))^1/4, and since I_ν/ν³ is
+// conserved along a ray it is seen as a blackbody at gT, g = 1 / (uᵗ (1 − Ω b)), b the photon's angular
+// momentum about the spin: bluer and far brighter where it comes toward us, dull red where it goes away
+// and deep in the well. The nave is lit by it. It is one cell of R4's Menger nave thick, and through the
+// holes in its walls shine the worlds of the fall, one in each face of a dodecahedral sky (the raster
+// keeps their shots), seen only as the hole bends them into view.
 //
-// The horizon: once it opens, the rays that fall in find a Mandelbulb on the other side, lit, and the
-// zoom into it runs as fast as the choir falls.
+// The horizon: once it opens, the rays that fall in find a lit Mandelbulb on the other side, and the zoom
+// into it runs as fast as the choir falls.
 //
-// p[0..3] camera   p[4] time, collapse, gain, horizon   p[5] a, r_in, disk light, hall light
-// p[6..9] the bulb's camera, its .w iterations, -, light   p[10] sky, edges, hall scale, hall radius
+// p[0..3] camera   p[4] time, collapse, gain, horizon   p[5] a, r_in, disk light, nave light
+// p[6..9] the bulb's camera; .w its iterations, -, light   p[10] sky, edges, nave scale
 
-const RV = 80.0; // past this, the bend still to come is under 4M/r ≈ 3°, and rays run straight
+const RV = 80.0; // past this, rays run straight
 const ROUT = 14.0; // the disk's outer edge
 
 fn hash3(p: vec3f) -> f32 { return fract(sin(dot(p, vec3f(127.1, 311.7, 74.7))) * 43758.5453); }
@@ -94,9 +98,9 @@ fn gas(x0: vec3f, x1: vec3f, b: f32, j: f32) {
   } else if (abs(x0.z) > H) { return; }
   if (s1 <= s0) { return; }
   let rin = u.p[5].y;
-  let ds = (s1 - s0) * length(x1 - x0) / 5.0;
-  for (var i = 0; i < 5; i++) {
-    let P = mix(x0, x1, s0 + (s1 - s0) * (f32(i) + j) / 5.0);
+  let ds = (s1 - s0) * length(x1 - x0) / 4.0;
+  for (var i = 0; i < 4; i++) {
+    let P = mix(x0, x1, s0 + (s1 - s0) * (f32(i) + j) / 4.0);
     let r = rad(P);
     if (r > ROUT || r < 0.8 * rin) { continue; }
     let h = 0.02 + 0.04 * r;
@@ -287,7 +291,7 @@ fn field(q0: vec2f) -> vec3f {
     let dp1 = flow(x, p, &dx);
     if (R < rh + 0.02) { fell = true; break; }
     if (R > RV && dot(x, dx) > 0.0) { break; }
-    let h = min(0.25 * (R - rh), 0.5 * R);
+    let h = min(0.3 * (R - rh), 0.5 * R);
     let dx1 = dx;
     var dx2: vec3f;
     var dx3: vec3f;
