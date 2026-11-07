@@ -48,7 +48,7 @@ export function project(p: Float32Array, x: number, y: number, z: number) {
 // The live equation, top left, in the reality's colour, its \num{k} slots filled from vals.
 const eqp = new Path()
 export function equation(f: Frame, src: string, c: readonly number[], i = 0.9, vals?: ArrayLike<number>) {
-  eqp.clear().color(c[0], c[1], c[2], i)
-  draw(eqp, tex(src), -view.a * 0.9, 0.86, 0.055, 0, 1, vals)
+  eqp.clear().color(c[0], c[1], c[2])
+  draw(eqp, tex(src), -view.a * 0.9, 0.86, 0.055, 0, i, vals)
   f.ch.push({ w: 0.15, path: eqp })
 }

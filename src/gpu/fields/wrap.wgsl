@@ -1,6 +1,6 @@
-// The whirlpool. The waterfall plot is a sheet: nine octaves of log-frequency across, the soundtrack's
+// The whirlpool. The waterfall plot is a sheet: 80 Hz to 8 kHz of log-frequency across, the soundtrack's
 // history along it, newest at the lip. It curls conformally, z ↦ (e^{cz} − 1)/c: c → 0 is the flat plot,
-// and at c = 2π / (nine octaves) the sheet closes into a disc, the lip its rim, angle for log-frequency and
+// and at c = 2π / its width the sheet closes into a disc, the lip its rim, angle for log-frequency and
 // log-radius for age, so the rows run inward at the rate the choir falls. Then it spins up into a Scully
 // vortex: u_θ = Γr / 2π(r² + r_c²), which ties its free surface to z = −Γ² / 8π²g(r² + r_c²) (the Rankine
 // −Γ²/8π²gr² outside the core, a bowl within), and with the Burgers inflow u_r = −βr each parcel has turned
@@ -48,7 +48,7 @@ fn noise(x: vec2f, n: vec2f) -> f32 {
 const MOON = vec3f(-0.42, 0.55, 0.72);
 fn sky(r: vec3f) -> vec3f {
   let m = max(dot(r, normalize(MOON)), 0.0);
-  return mix(vec3f(0.02, 0.05, 0.07), vec3f(0.002, 0.004, 0.012), sqrt(max(r.z, 0.0))) + vec3f(1.0, 0.86, 0.66) * (12.0 * pow(m, 3000.0) + 0.02 * pow(m, 30.0));
+  return mix(vec3f(0.02, 0.05, 0.07), vec3f(0.002, 0.004, 0.012), sqrt(max(r.z, 0.0))) + vec3f(1.0, 0.86, 0.66) * (12.0 * pow(m, 3000.0) + 0.004 * pow(m, 30.0));
 }
 
 fn field(q: vec2f) -> vec3f {

@@ -1,7 +1,7 @@
 // R0 · The whirlpool. The fall begins on an SDR waterfall of the soundtrack itself: the falling choir's real
 // short-time spectrum, log-frequency across, rows printing at the top. It opens where the valley's falls
 // flattened into a plot, at the same scale and in the same place, looking straight down on it as on water.
-// The sheet curls until its nine octaves close into a disc round a drain: the lip is the rim, where the
+// The plot curls until its edges meet, 8 kHz on 80 Hz, a disc round a drain: the lip is the rim, where the
 // present is printed, angle is pitch and log-radius is age, so the rows run inward exactly as fast as the
 // choir falls, and the Shepard choir's partials, octaves apart, are spokes round the wheel. Then the water
 // spins up into a vortex and drinks the spectrum down in log spirals, and we are pulled down after it.
@@ -22,17 +22,16 @@ const MAX = 256 // most rows printed in a frame
 // at y = 0.42 and 3.4 s of history in the 1.55 below it. Seen from S0 away through a lens 0.9 rad wide, the
 // sheet in its plane lies exactly there, and scrolls as fast: L of it to each octave the choir falls.
 const LIP = 0.42, S0 = 1 / Math.tan(0.45), L = 1.55 / 3.4 / rate(LEAD)
-// The vortex, in the units of the plot: its depth, its core, and how many radians its water turns for
-// every e-fold it is drawn in. g sets the scale of the circulation the equation shows: a metre a unit.
-const H = 0.9, RC = 0.18, K = 10, G = 9.81
-let aspect = 0, W = 1, X0 = 0, C1 = 1 // the plot's width, where 80 Hz is on it, and the curl that closes it
+// The vortex: its core, and how many radians its water turns for every e-fold it is drawn in, K = Γ / 2πβr_c².
+// So its circulation follows the inflow β, and its depth the circulation. A unit of the plot is 11 m.
+const RC = 0.18, K = 10, M = 11, G = 9.81 / M
+let aspect = 0, W = 1, C1 = 1 // the plot's width, and the curl that closes it
 const U0 = (PER_BIN * Math.log2(80 / F0)) / BINS, DU = (PER_BIN * Math.log2(100)) / BINS // and where they are on the rows
 function chart() {
   if (view.a === aspect) return
   aspect = view.a
   W = 2.3 * aspect
-  X0 = -W / 2
-  C1 = TAU / W // the curl that closes the sheet
+  C1 = TAU / W
 }
 
 // When the choir's descent passed D, near T: Newton on the descent, whose slope is its rate.
@@ -71,8 +70,8 @@ const KEYS = [
   [1, Math.PI / 2, 0, S0, 0.1, 0, 0.9],
   [3.2, Math.PI / 2, 0.3, 0.62 * S0, 1, 0, 0.95],
   [5.2, 0.8, 1, 1, 1, -0.2, 1.1],
-  [7, 1.1, 1.8, 0.7, 1, -0.45, 1.2],
-  [12, 1.45, 3.4, 0.28, 1, -0.8, 1.2],
+  [7, 1.15, 1.8, 0.75, 1, -0.4, 1.2],
+  [12, 1.4, 3, 0.55, 1, -0.55, 1.2],
 ]
 const key = [0, 0, 0, 0, 0, 0], eye = [0, 0, 0], fwd = [0, 0, -1], up = [0, 1, 0]
 function look(T: number, p: Float32Array, kick: number) {
@@ -96,20 +95,20 @@ const live = [0, 0]
 export function vortex(T: number, now: number, f: Frame, kick = 0, gain = 1) {
   chart()
   const p = field.p, head = print(T, now, field), c = Math.max(1e-3, C1 * smooth(0.6, 3.4, T) ** 1.5), wet = smooth(2.6, 5.2, T)
+  const beta = c * L * rate(T + LEAD), gamma = TAU * beta * RC * RC * K * wet // the inflow's rate and the circulation
   look(T, p, kick)
-  p[16] = c, p[17] = LIP, p[18] = c * X0, p[19] = c * W
+  p[16] = c, p[17] = LIP, p[18] = (-c * W) / 2, p[19] = c * W
   p[20] = head % ROWS, p[21] = PER / L, p[22] = head - printer.from, p[23] = gain
   p[24] = 0.3 * (1 - smooth(0.6, 2.2, T)) // the plot opens with its black lifted, as the valley's is; it sinks as it curls
   p[25] = clamp(printer.ref - 0.8, -0.15, 0.3) // the reference level, as an offset in the rows' units
-  p[26] = H * wet, p[27] = RC
+  p[26] = (gamma * gamma) / (8 * Math.PI ** 2 * G * RC * RC), p[27] = RC
   p[28] = K * wet, p[29] = 1 / C1, p[30] = U0, p[31] = DU
   p[7] = wet
   field.cell = undefined
   f.field = field
   f.look = { tau: TAU_RASTER }
-  // the surface's circulation, from its depth, and the rate the rows are drawn in
-  live[0] = Math.PI * RC * Math.sqrt(8 * G * H * wet)
-  live[1] = c * L * rate(T + LEAD)
+  live[0] = gamma * M * M // m²/s
+  live[1] = beta
   return field
 }
 
@@ -119,7 +118,7 @@ export const wrap: Scene = {
   fade: 1.2, // the valley's flattened falls hand over to this sheet, printing the same plot
   build(t, f) {
     vortex(t, (f.at ?? 0) + t, f, 0, clamp(t / 1.2))
-    equation(f, 'z=-\\frac{\\Gamma^2}{8\\pi^2g\\,(r^2+r_c^2)}\\qquad\\Gamma=\\num{0}{0.00}\\qquad\\frac{dr}{dt}=-\\num{1}{0.00}\\,r', EQ, 0.9 * clamp(t - 0.5), live)
+    if (t > 1.2) equation(f, 'z=-\\frac{\\Gamma^2}{8\\pi^2g\\,(r^2+r_c^2)}\\qquad\\Gamma=\\num{0}{000}\\qquad\\frac{dr}{dt}=-\\num{1}{0.00}\\,r', EQ, 0.9 * clamp(t - 1.2), live)
     place(t + LEAD)
     return (tt, o) => sing(tt + LEAD, o)
   },
