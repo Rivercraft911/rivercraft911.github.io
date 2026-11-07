@@ -33,6 +33,9 @@ fn palette(s: f32) -> vec3f {
   return mix(c[i], c[i + 1u], x - f32(i));
 }
 
+// The funnel's slope at r: the free surface's dz/dr.
+fn wall(r: f32, H: f32, k: f32) -> f32 { return 2.0 * H * k * r / ((r * r + k) * (r * r + k)); }
+
 fn wrap(i: vec2f, n: vec2f) -> vec2f { return i - n * floor(i / n); }
 fn hash(p: vec2f) -> f32 { return fract(sin(dot(p, vec2f(127.1, 311.7))) * 43758.547); }
 // Value noise on a lattice that tiles every n cells, so it is seamless round the pool and round the ring.
@@ -95,15 +98,23 @@ fn field(q: vec2f) -> vec3f {
   let lid = -H * k / (hole * hole + k); // the drain's mouth
   if (ro.z < lid) { return infect(q, 4.0 * q, drain(ro, rd, 0.0)) * u.p[4].w; } // through it
 
-  // Down to the surface: Newton on the height above it, with the step shortened by the wall's slope, so
-  // it slides down the funnel without passing through. Never breaking off keeps the derivatives below.
+  // Down to the surface: Newton on the height above it, each step shortened by the steepest the wall gets
+  // along it (the slope 2Hk r / (r² + k)² falls off outside its peak at r_c/√3, so that is where the step
+  // comes nearest the axis), so it slides down the funnel and across its throat without passing through,
+  // and never creeps along a lip it grazes. Never breaking off keeps the derivatives below.
   var t = select(0.0, ro.z / -rd.z, ro.z > 0.0 && rd.z < 0.0);
-  for (var i = 0; i < 40; i++) {
+  let lat = max(length(rd.xy), 1e-6);
+  let peak = u.p[6].w * 0.57735;
+  for (var i = 0; i < 48; i++) {
     let p = ro + rd * t;
     let r2 = dot(p.xy, p.xy);
     let g = p.z + H * k / (r2 + k);
-    let slope = 2.0 * H * k * sqrt(r2) / ((r2 + k) * (r2 + k));
-    t = clamp(t + 0.9 * g / (abs(rd.z) + 1.5 * slope * length(rd.xy) + 1e-3), 0.0, 60.0);
+    var dt = 0.9 * g / (abs(rd.z) + wall(max(sqrt(r2), peak), H, k) * lat + 1e-3);
+    if (g > 0.0) {
+      let near = length(p.xy + rd.xy * clamp(-dot(p.xy, rd.xy) / (lat * lat), 0.0, dt));
+      dt = max(0.9 * g / (abs(rd.z) + wall(max(near, peak), H, k) * lat + 1e-3), 2e-3 * (1.0 + t));
+    }
+    t = clamp(t + dt, 0.0, 60.0);
   }
   let P = ro + rd * t;
   let d = P.xy;
@@ -164,7 +175,7 @@ fn field(q: vec2f) -> vec3f {
   // The surface's normal from the vortex, roughened by the ripples and the foam.
   let gh = 2.0 * H * k / ((r2 + k) * (r2 + k)) * d;
   let n0 = normalize(vec3f(-gh, 1.0));
-  let bump = 0.003 * (0.3 + 0.7 * wet) * (ripple + foam);
+  let bump = 0.001 * (0.3 + 0.7 * wet) * (ripple + foam);
   let bx = dpdx(bump);
   let by = dpdy(bump);
   let s1 = cross(dPy, n0);
