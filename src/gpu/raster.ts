@@ -124,8 +124,8 @@ export class Raster {
     const text = !!f.cell && this.chars.length > 0
     const ch = Math.round((f.cell ?? 20) * dpr), cw = Math.round(ch * 0.6)
     const cols = Math.floor(w / cw), rows = Math.floor(h / ch), sc = Math.min(1, this.scale * (f.res ?? 1))
-    const m = text ? (f.fine ?? 1) : 1
-    const fw = text ? cols * GRID[0] * m : Math.max(1, Math.round(w * sc)), fh = text ? rows * GRID[1] * m : Math.max(1, Math.round(h * sc))
+    const fine = text ? (f.fine ?? 1) : 1
+    const fw = text ? cols * GRID[0] * fine : Math.max(1, Math.round(w * sc)), fh = text ? rows * GRID[1] * fine : Math.max(1, Math.round(h * sc))
     if (this.tex?.width !== fw || this.tex.height !== fh || this.mode !== +text || (text && this.cells?.width !== cols)) {
       this.tex?.destroy(), this.cells?.destroy()
       const tex = (w: number, h: number, format: GPUTextureFormat) =>
@@ -185,7 +185,7 @@ export class Raster {
     const ink = f.ink ?? [0.35, 1, 0.55]
     uf[8] = ink[0], uf[9] = ink[1], uf[10] = ink[2], uf[11] = gain * f.k
     uf[12] = TILE[0], uf[13] = TILE[1], uf[14] = ATLAS_COLS, uf[15] = this.chars.length
-    uf[16] = f.lift ?? 2, uf[17] = 0.2, uf[18] = m
+    uf[16] = f.lift ?? 2, uf[17] = 0.2, uf[18] = fine
     d.queue.writeBuffer(this.u, 0, uf)
 
     sweep(f, this.views[0], fw, fh, aspect)

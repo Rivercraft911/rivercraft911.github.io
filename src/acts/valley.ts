@@ -440,24 +440,31 @@ function falls(t: number, show: number) {
     pen = true
   }
   // the lanes: down the curtain, and on round the pool in the current, the spectrum going with them, until
-  // the water itself carries it (wrap.ts)
+  // the water itself carries it (wrap.ts). Seen obliquely they crowd together: keep the ink per unit of
+  // screen what it is face on.
   const lanes = 1 - rows, swirl = smooth(15, 16.5, t) * (1 - smooth(18, DUR, t)), hand = 1 - smooth(18.5, DUR, t)
   for (let l = 0; l < LANES && hand > 0; l++) {
     let pen = false
     for (let j = 0; j <= 44 + 40; j++) {
-      const fell = j <= 44, tau = fell ? (j / 44) ** 1.3 * TAU_MAX : TAU_MAX + (j - 44) * 0.09 / pool.beta, r = R * Math.exp(-(j - 44) * 0.09)
+      const fell = j <= 44, tau = fell ? (j / 44) ** 1.3 * TAU_MAX : TAU_MAX + ((j - 44) * 0.09) / pool.beta, r = R * Math.exp(-(j - 44) * 0.09)
       if (!fell && swirl <= 0) break
-      const v = past(t - tau, l)
-      if (!(fell ? fallAt(tau, l, 0) : poolAt(r, l))) {
+      if (!laneAt(fell, tau, r, l ? l - 1 : 1)) {
         pen = false
         continue
       }
-      shade(v + water, 0.45 * near * hand * show * (fell ? lanes : swirl) * (0.08 + 0.8 * v) * fog(p3.z) * smooth(0, 0.5, tau))
+      const nx = p3.x, ny = p3.y
+      if (!laneAt(fell, tau, r, l)) {
+        pen = false
+        continue
+      }
+      const v = past(t - tau, l), gap = clamp(Math.hypot(p3.x - nx, p3.y - ny) / 0.025, 0.08, 1)
+      shade(v + water, 0.45 * near * gap * hand * show * (fell ? lanes : swirl) * (0.08 + 0.8 * v) * fog(p3.z) * smooth(0, 0.5, tau))
       pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
       pen = true
     }
   }
 }
+const laneAt = (fell: boolean, tau: number, r: number, l: number) => (fell ? fallAt(tau, l, 0) : poolAt(r, l))
 
 export const valley: Scene = {
   dur: DUR,
