@@ -76,6 +76,7 @@ const SLOW = [[0, -4.68], [6, -4.68], [11, -2.1], [19, -2.1], [25, 0], [45, 0], 
 const LOOP = 25, PERIOD = 40
 const CUM = [0]
 for (let k = 1; k < SLOW.length; k++) CUM.push(CUM[k - 1] + span(k, SLOW[k][0]))
+const CYCLE = CUM[CUM.length - 1] - CUM[SLOW.findIndex((s) => s[0] === LOOP)] // projector seconds a loop
 function span(k: number, t: number) {
   const [t0, l0] = SLOW[k - 1], [t1, l1] = SLOW[k], s0 = 10 ** l0, b = (Math.LN10 * (l1 - l0)) / (t1 - t0)
   return b ? (s0 * (Math.exp(b * (t - t0)) - 1)) / b : s0 * (t - t0)
@@ -90,8 +91,7 @@ function scan(t: number) {
   while (k < last && u >= SLOW[k][0]) k++
   const [t0, l0] = SLOW[k - 1], [t1, l1] = SLOW[k]
   speed.s = 10 ** (l0 + ((l1 - l0) * Math.min(1, Math.max(0, (u - t0) / (t1 - t0)))))
-  const loop = CUM[last] - CUM[SLOW.findIndex((s) => s[0] === LOOP)]
-  return Q0 + (CUM[k - 1] + span(k, Math.min(u, t1)) + n * loop) / LINE
+  return Q0 + (CUM[k - 1] + span(k, Math.min(u, t1)) + n * CYCLE) / LINE
 }
 
 // Where the beam is at scan q: on the facet (H), on the wall (W), its colour, and whether it is on.
@@ -157,15 +157,17 @@ const fan: Fn = (_, s, u) => {
 
 // The fixed beams, lasers to facet, each at its power averaged over this frame.
 const optics = new Path()
-function seg(c: readonly number[], ...ps: number[][]) {
-  if (!(c[0] + c[1] + c[2] > 0.002)) return // dark, or not a number
-  optics.color(c[0], c[1], c[2], 1)
-  for (let i = 1; i < ps.length; i++) {
-    const [ax, ay, az] = ps[i - 1], [bx, by, bz] = ps[i]
-    if (clip(ax, ay, az, bx, by, bz)) optics.moveTo(C[0], C[1]).lineTo(C[2], C[3])
-  }
+function seg(r: number, g: number, b: number, ps: readonly number[]) {
+  if (!(r + g + b > 0.002)) return // dark, or not a number
+  optics.color(r, g, b, 1)
+  for (let i = 3; i < ps.length; i += 3)
+    if (clip(ps[i - 3], ps[i - 2], ps[i - 1], ps[i], ps[i + 1], ps[i + 2])) optics.moveTo(C[0], C[1]).lineTo(C[2], C[3])
 }
 const avg = [0, 0, 0]
+// The beams' paths: red through both dichroics, green and blue joining at theirs, then all three to the
+// galvo and on to wherever the facet is (its last point, set each frame).
+const RED = [GX, 0, -0.85, GX, 0, -0.62], GREEN = [GX + 0.12, 0, -0.62, GX, 0, -0.62], BLUE = [GX + 0.12, 0, -0.42, GX, 0, -0.42]
+const RG = [GX, 0, -0.62, GX, 0, -0.42], RGB = [GX, 0, -0.42, GX, 0, 0, 0, 0, 0]
 
 // The camera: [t, eye xyz, target xyz, fov]. The intro, then the loop's own path.
 const INTRO = [
@@ -269,11 +271,12 @@ export const r01: Scene = {
 
     // the light in the air
     optics.clear()
-    seg([avg[0], 0, 0], [GX, 0, -0.85], [GX, 0, -0.62])
-    seg([0, avg[1], 0], [GX + 0.12, 0, -0.62], [GX, 0, -0.62])
-    seg([avg[0], avg[1], 0], [GX, 0, -0.62], [GX, 0, -0.42])
-    seg([0, 0, avg[2]], [GX + 0.12, 0, -0.42], [GX, 0, -0.42])
-    seg(avg, [GX, 0, -0.42], [GX, 0, 0], [b.hx, b.hy, 0])
+    seg(avg[0], 0, 0, RED)
+    seg(0, avg[1], 0, GREEN)
+    seg(avg[0], avg[1], 0, RG)
+    seg(0, 0, avg[2], BLUE)
+    RGB[6] = b.hx, RGB[7] = b.hy
+    seg(avg[0], avg[1], avg[2], RGB)
     f.ch.push({ w: 0.35, path: optics }, { w: 1, fn: fan, gain: 1.2 })
 
     // the equation of the moment
