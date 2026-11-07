@@ -1,18 +1,19 @@
-// The waterfall as a sheet: nine octaves of log-frequency across, the soundtrack's history along y, newest
-// at the head. The sheet is rolled about an axis parallel to y: curvature 0 is the flat SDR display, and at
-// full curl one octave is exactly once around, so the nine octaves lie on top of each other and their power
-// adds: the wall is the chromagram. The choir's partials are octaves apart, so as the circumference closes
-// on an octave they fall into register and become barber-pole helices: angle is pitch class, depth is time.
+// The whirlpool. The waterfall plot is a sheet: 80 Hz to 8 kHz of log-frequency across, the soundtrack's
+// history along it, newest at the lip. It curls conformally, z ↦ (e^{cz} − 1)/c: c → 0 is the flat plot,
+// and at c = 2π / its width the sheet closes into a disc, the lip its rim, angle for log-frequency and
+// log-radius for age, so the rows run inward at the rate the choir falls. Then it spins up into a Scully
+// vortex: u_θ = Γr / 2π(r² + r_c²), which ties its free surface to z = −Γ² / 8π²g(r² + r_c²) (the Rankine
+// −Γ²/8π²gr² outside the core, a bowl within), and with the Burgers inflow u_r = −βr each parcel has turned
+// Φ(r) = (K/2) ln((1 + r_c²/r²) / (1 + r_c²/R²)) since it crossed the rim at R, K = Γ / 2πβr_c². Inside the
+// core that is K radians every e-fold: a log spiral, the same at every scale, an endless zoom.
 //
-// p[0] eye, 1/tan(fov/2)     p[1] right, radius of the roll    p[2] up, z of the roll's axis
-// p[3] forward, an octave's width on the sheet                  p[4] head y, y per row, head's ring row, rows
-// p[5] gain, rows printed so far, sheet per second, spot      p[6] brightness: the black level's lift,
-//                                                             the reference level's offset
+// p[0..3] camera, and p[1].w how far the water has spun up        p[4] curl, lip y, 80 Hz's angle, 80 Hz to 8 kHz's angle
+// p[5] head row (ring), rows per unit of sheet, rows printed, gain   p[6] black lift, reference offset, depth H, core r_c
+// p[7] winding K, rim R, 80 Hz and 8 kHz's span on the rows
 
 const TAU = 6.2831853;
-const PI = 3.1415927;
-const OCT = 9.0;
 const DB = 56.0 * 0.33219281; // the rows' range, 56 dB, in doublings of power
+const ROWS = 4096.0;
 
 // A row's level is dB over the floor, in 16 bits as two bytes (filtering is linear, so it filters them
 // apart and they add back exactly); power and back again, with the floor as zero.
@@ -29,107 +30,121 @@ fn palette(s: f32) -> vec3f {
   return mix(c[i], c[i + 1u], x - f32(i));
 }
 
-// Magnified, the four bins around x at sheet height v (rows between are linear) are read twice over.
-// As a glow: Catmull-Rom on dB. A reassigned line is a Gaussian, a parabola in dB, and the cubic
-// reproduces parabolas exactly, so a partial stays the curve it was, not a string of tents. As lines,
-// drawn as the beam draws one, with a spot sized in pixels: each local peak is fitted with its parabola,
-// which gives where the partial truly is, how loud, and how wide the estimate made it, and it is drawn
-// there at that width, but never wider than the spot (p[5].w raster pixels), and as bright as its energy,
-// narrowed, makes it (up to 4 times). Crests wider than 8 bins are too flat to place; they stay glow.
-const NEPER = 0.07755; // a Gaussian's curvature in row units: 10 log10(e) / 56 dB
-fn ridge(x: f32, v: f32, w: f32, fx: f32) -> f32 {
-  let c = floor(x - 0.5);
-  var s: array<f32, 4>;
-  for (var j = 0; j < 4; j++) { s[j] = at(vec2f((c + f32(j) - 0.5) / w, v)); }
-  let f = x - 0.5 - c;
-  let cubic = s[0] * f * (-0.5 + f * (1.0 - 0.5 * f)) + s[1] * (1.0 + f * f * (-2.5 + 1.5 * f))
-            + s[2] * f * (0.5 + f * (2.0 - 1.5 * f)) + s[3] * f * f * (-0.5 + 0.5 * f);
-  var p = power(cubic) * fx;
-  for (var j = 1; j < 3; j++) {
-    let a = s[j - 1];
-    let b = s[j];
-    let d = s[j + 1];
-    let k = a - 2.0 * b + d;
-    if (b >= a && b >= d && k < -NEPER / 64.0) {
-      let at = 0.5 * (a - d) / k;
-      let wide = sqrt(NEPER / -k) / fx;
-      let sig = min(wide, u.p[5].w);
-      let dx = (x - (c + f32(j) - 0.5 + at)) / (fx * sig);
-      p = max(p, power(b - 0.25 * (a - d) * at) * min(wide / sig, 4.0) * exp(-0.5 * dx * dx));
-    }
-  }
-  return p;
+fn wrap(i: vec2f, n: vec2f) -> vec2f { return i - n * floor(i / n); }
+fn hash(p: vec2f) -> f32 { return fract(sin(dot(p, vec2f(127.1, 311.7))) * 43758.547); }
+// Value noise on a lattice that tiles every n cells, so it is seamless round the disc and round the ring.
+fn noise(x: vec2f, n: vec2f) -> f32 {
+  let i = floor(x);
+  let f = x - i;
+  let w = f * f * (3.0 - 2.0 * f);
+  let a = hash(wrap(i, n));
+  let b = hash(wrap(i + vec2f(1.0, 0.0), n));
+  let c = hash(wrap(i + vec2f(0.0, 1.0), n));
+  let d = hash(wrap(i + 1.0, n));
+  return mix(mix(a, b, w.x), mix(c, d, w.x), w.y);
 }
 
-// The sheet's power at bin x, ring row r, over a footprint of fx bins by fy rows: lines drawn sharp where
-// a bin spans pixels, with the field's own glow beneath, and averaged as power where pixels span bins.
-// The taps along the rows start at e, a per-pixel dither, so a few of them read as grain, not as copies.
-fn sheet(x: f32, r: f32, fx: f32, fy: f32, e: f32) -> f32 {
-  let size = vec2f(textureDimensions(data));
-  let ny = i32(clamp(ceil(fy * 0.25), 1.0, 4.0));
-  let nx = i32(clamp(ceil(fx), 1.0, 3.0));
-  var p = 0.0;
-  for (var j = 0; j < ny; j++) {
-    let v = (r + 0.5 + ((f32(j) + e) / f32(ny) - 0.5) * fy) / size.y;
-    if (fx < 1.0) { p += ridge(x, v, size.x, fx); continue; }
-    for (var i = 0; i < nx; i++) {
-      p += power(at(vec2f((x + ((f32(i) + 0.5) / f32(nx) - 0.5) * fx) / size.x, v)));
-    }
-  }
-  return p / f32(ny * select(nx, 1, fx < 1.0));
+// The night the water mirrors: a low moon, and a sky only just lighter than black, palest at the horizon.
+const MOON = vec3f(-0.42, 0.55, 0.72);
+fn sky(r: vec3f) -> vec3f {
+  let m = max(dot(r, normalize(MOON)), 0.0);
+  return mix(vec3f(0.02, 0.05, 0.07), vec3f(0.002, 0.004, 0.012), sqrt(max(r.z, 0.0))) + vec3f(1.0, 0.86, 0.66) * (12.0 * pow(m, 3000.0) + 0.004 * pow(m, 30.0));
 }
 
 fn field(q: vec2f) -> vec3f {
-  let eye = u.p[0].xyz;
-  let s = u.p[0].w;
-  let R = u.p[1].xyz;
-  let U = u.p[2].xyz;
-  let dir = u.p[3].xyz * s + R * q.x + U * q.y;
-  let rho = u.p[1].w;
-  let cz = u.p[2].w;
-  let W = u.p[3].w;
-  // Where the ray leaves the roll (we are always inside it): the far root, in its stable form.
-  let o = vec2f(eye.x, eye.z - cz);
-  let d = dir.xz;
-  let a = dot(d, d);
-  let b = dot(o, d);
-  let c = dot(o, o) - rho * rho;
-  if (a < 1e-10) { return vec3f(0.0); }
-  let disc = sqrt(max(b * b - a * c, 0.0));
-  let t = select((-b + disc) / a, -c / (b + disc), b > 0.0);
-  let P = eye + dir * t;
-  let back = u.p[4].x - P.y; // behind the head: older
-  let dy = u.p[4].y;
-  let ring = u.p[4].w;
-  let oldest = min(u.p[5].y, ring - 8.0) * dy;
-  if (back < 0.0 || back > oldest) { return vec3f(0.0); }
-  let r = u.p[4].z - back / dy;
-  // A pixel's footprint on the wall (ray differentials: the hit slides along the wall as the ray turns),
-  // in bins around the roll and rows along it.
-  let n = vec3f(P.x, 0.0, P.z - cz) / rho;
-  let tc = vec3f(-n.z, 0.0, n.x);
-  let nd = dot(n, dir);
-  let dx = (R - dir * (dot(n, R) / nd)) * (t * u.px);
-  let dz = (U - dir * (dot(n, U) / nd)) * (t * u.px);
-  let per = f32(textureDimensions(data).x) / (OCT * W);
-  let fx = max(abs(dot(dx, tc)), abs(dot(dz, tc))) * per;
-  // and the camera's shutter, open a 60th of a second as we fall, sweeps it along the tube.
-  let fy = (max(abs(dx.y), abs(dz.y)) + u.p[5].z / 60.0) / dy;
-  // Every turn of the sheet that passes through this point adds its power.
-  let phi = atan2(P.x, cz - P.z);
-  let span = 0.5 * OCT * W;
-  let m = ceil((span / rho + PI) / TAU);
-  let e = fract(52.9829189 * fract(dot(q / u.px, vec2f(0.06711056, 0.00583715)))); // interleaved gradient noise
-  var pw = 0.0;
-  for (var k = -m; k <= m; k += 1.0) {
-    let x = rho * (phi + TAU * k);
-    if (abs(x) <= span) { pw += sheet((x + span) * per, r, fx, fy, e); }
+  let ro = eye();
+  let rd = ray(q);
+  let c = u.p[4].x;
+  let C = vec2f(0.0, u.p[4].y - 1.0 / c); // the drain
+  let H = u.p[6].z;
+  let k = u.p[6].w * u.p[6].w;
+
+  // Down to the surface: Newton on the height above it, with the step shortened by the wall's slope, so
+  // it slides down the funnel without passing through. Never breaking off keeps the derivatives below.
+  var t = select(0.0, ro.z / -rd.z, ro.z > 0.0 && rd.z < 0.0);
+  for (var i = 0; i < 40; i++) {
+    let p = ro + rd * t;
+    let d = p.xy - C;
+    let r2 = dot(d, d);
+    let g = p.z + H * k / (r2 + k);
+    let slope = 2.0 * H * k * sqrt(r2) / ((r2 + k) * (r2 + k));
+    t = clamp(t + 0.9 * g / (abs(rd.z) + 1.5 * slope * length(rd.xy) + 1e-3), 0.0, 60.0);
   }
-  // The newest rows are still hot from the printing, and the rows fade as they age, the way a long
-  // persistence screen's do; a pinhole's light falls off as cos⁴ off axis.
-  let age = back / max(u.p[5].z, 1e-3);
-  let cs = s * s / dot(dir, dir);
-  let lv = level(pw) * (1.0 - u.p[6].x) + u.p[6].x;
-  let edges = smoothstep(0.0, 0.15, back) * (1.0 - smoothstep(oldest - 1.5, oldest, back));
-  return palette(lv * (1.0 + 0.3 * exp(-age / 0.12))) * (u.p[5].x * cs * cs * exp(-age / 2.0) * edges);
+  let P = ro + rd * t;
+  let d = P.xy - C;
+  let r2 = max(dot(d, d), 1e-12);
+  let rho = sqrt(r2);
+  let depth = H * k / (r2 + k);
+  let miss = P.z + depth > 1e-3 * (1.0 + t);
+
+  // Where on the sheet: angle round the drain, less the turn the water has made since the rim, is
+  // frequency; log-radius is age, in rows behind the head.
+  let K = u.p[7].x;
+  let R = u.p[7].y;
+  let A = u.p[4].w;
+  let a = atan2(d.x, d.y) - 0.5 * K * log((1.0 + k / r2) / (1.0 + k / (R * R))) - u.p[4].z;
+  let b = (a - TAU * floor(a / TAU)) / A; // across the nine octaves, 0..1; beyond 1 the sheet is not there
+  // Water older than the sheet carries the oldest row on down to the drain.
+  let oldest = min(u.p[5].z, ROWS - 8.0);
+  let rows = log(c * rho) / c * u.p[5].y; // ≤ 0 behind the lip
+  let ring = u.p[5].x + rows;
+  let row = u.p[5].x + max(rows, -oldest);
+
+  // A pixel's footprint, in bins and rows: how far it reaches across the spiral and down it.
+  let dPx = dpdx(P);
+  let dPy = dpdy(P);
+  let turn = -K * k / (rho * (r2 + k)); // dΦ/dr
+  let fa = vec2f(d.y * dPx.x - d.x * dPx.y, d.y * dPy.x - d.x * dPy.y) / r2 - turn * vec2f(dot(d, dPx.xy), dot(d, dPy.xy)) / rho;
+  let fr = vec2f(dot(d, dPx.xy), dot(d, dPy.xy)) / (rho * c * rho) * u.p[5].y;
+  let size = vec2f(textureDimensions(data));
+  let fx = min(max(abs(fa.x), abs(fa.y)) / A * u.p[7].w * size.x, 64.0);
+  let fy = min(max(abs(fr.x), abs(fr.y)), 256.0);
+
+  // The rows' power over that footprint, taps dithered per pixel so a few of them read as grain.
+  let e = fract(52.9829189 * fract(dot(q / u.px, vec2f(0.06711056, 0.00583715))));
+  let ny = i32(clamp(ceil(fy * 0.5), 1.0, 4.0));
+  let nx = i32(clamp(ceil(fx * 0.5), 1.0, 3.0));
+  var pw = 0.0;
+  for (var j = 0; j < ny; j++) {
+    let v = (row + 0.5 + ((f32(j) + e) / f32(ny) - 0.5) * fy) / size.y;
+    for (var i = 0; i < nx; i++) {
+      pw += power(at(vec2f(u.p[7].z + b * u.p[7].w + ((f32(i) + e) / f32(nx) - 0.5) * fx / size.x, v)));
+    }
+  }
+  pw /= f32(nx * ny);
+  let sheet = select(0.0, 1.0, b < 1.0 && rows <= 0.0 && !miss);
+  let lv = (level(pw) * (1.0 - u.p[6].x) + u.p[6].x) * sheet;
+
+  // Foam and ripples in the water's own coordinates (the angle it entered at, the row it entered with), so
+  // they ride the spiral in and wind up with it. Lace where the spectrum is loud, ripples everywhere, each
+  // let go where it would be finer than a pixel.
+  let wet = u.p[1].w;
+  let fine = vec2f(fx, fy);
+  let lace = 1.0 - abs(2.0 * noise(vec2f(b * 384.0, ring / 192.0), vec2f(384.0, ROWS / 192.0)) - 1.0);
+  let clump = noise(vec2f(b * 48.0, ring / 192.0), vec2f(48.0, ROWS / 192.0));
+  let foam = smoothstep(0.93, 0.995, lace) * smoothstep(0.35, 0.75, clump + 0.5 * lv) * (0.2 + 0.8 * smoothstep(0.1, 0.6, lv)) * wet * (1.0 - smoothstep(-20.0, 20.0, rows)) * (1.0 - smoothstep(4.0, 24.0, fine.x + fine.y / 4.0));
+  let ripple = noise(vec2f(b * 768.0, ring / 6.0), vec2f(768.0, ROWS / 6.0)) * (1.0 - smoothstep(1.0, 6.0, fine.x + fine.y));
+
+  // The surface's normal from the vortex, roughened by the ripples and the foam.
+  let gh = 2.0 * H * k / ((r2 + k) * (r2 + k)) * d;
+  let n0 = normalize(vec3f(-gh, 1.0));
+  let bump = 0.003 * wet * (ripple + foam);
+  let bx = dpdx(bump);
+  let by = dpdy(bump);
+  let s1 = cross(dPy, n0);
+  let s2 = cross(n0, dPx);
+  let det = dot(dPx, s1);
+  let n = normalize(abs(det) * n0 - sign(det) * (bx * s1 + by * s2) + 1e-9);
+
+  // Water: the night mirrored at grazing angles (Schlick, n = 1.33), the dyed water seen into elsewhere,
+  // and the light failing with depth toward the eye.
+  let cosi = clamp(dot(-rd, n), 0.0, 1.0);
+  let fres = 0.02 + 0.98 * pow(1.0 - cosi, 5.0);
+  let dark = exp(-1.8 * depth);
+  let hot = 1.0 + 0.3 * exp(rows / 40.0);
+  let dye = palette(lv * hot) * (1.0 - wet * fres) * mix(1.0, dark, wet);
+  let body = vec3f(0.0, 0.004, 0.008) * wet * dark * (1.0 - fres);
+  let lit = vec3f(0.3, 0.4, 0.5) * foam * (0.15 + 0.85 * max(dot(n, normalize(MOON)), 0.0)) * dark;
+  let mirror = sky(reflect(rd, n)) * fres * wet * (0.3 + 0.7 * dark);
+  return select(dye + body + lit + mirror, sky(rd) * wet, miss) * u.p[5].w;
 }
