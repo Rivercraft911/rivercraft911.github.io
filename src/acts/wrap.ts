@@ -90,7 +90,7 @@ function look(T: number, p: Float32Array, kick: number) {
 const TAU_RASTER = 0.006
 
 // The whirlpool at fall time T into the frame: the raster's field and its new rows.
-const field: Field = { shader: SHADER, k: 1, p: new Float32Array(32) }
+const field: Field = { shader: SHADER, k: 1, p: new Float32Array(32), res: 1.5 } // finer than the usual raster: its partials are filaments
 const live = [0, 0]
 export function vortex(T: number, now: number, f: Frame, kick = 0, gain = 1) {
   chart()
