@@ -83,12 +83,16 @@ fn field(q: vec2f) -> vec3f {
   let R = u.p[7].y;
   let A = u.p[4].w;
   let a = atan2(d.x, d.y) - 0.5 * K * log((1.0 + k / r2) / (1.0 + k / (R * R))) - u.p[4].z;
-  let b = (a - TAU * floor(a / TAU)) / A; // across the nine octaves, 0..1; beyond 1 the sheet is not there
+  let b = (a - TAU * floor(a / TAU)) / A; // across the nine octaves, 0..1; beyond 1 the sheet is not there yet
+  // Until the sheet closes, the gap it has not reached is filled with its own spectrum run backwards, so the
+  // water meets itself at both edges instead of ending in black.
+  let span = max(TAU / A, 1.001);
+  let bb = select(b, (span - b) / (span - 1.0), b > 1.0);
   // Water older than the sheet carries the oldest row on down to the drain.
   let oldest = min(u.p[5].z, ROWS - 8.0);
   let rows = log(c * rho) / c * u.p[5].y; // ≤ 0 behind the lip
   let ring = u.p[5].x + rows;
-  let row = u.p[5].x + max(rows, -oldest);
+  let row = u.p[5].x + clamp(rows, -oldest, 0.0); // outside the rim: the newest row, fading out
 
   // A pixel's footprint, in bins and rows: how far it reaches across the spiral and down it.
   let dPx = dpdx(P);
@@ -108,11 +112,11 @@ fn field(q: vec2f) -> vec3f {
   for (var j = 0; j < ny; j++) {
     let v = (row + 0.5 + ((f32(j) + e) / f32(ny) - 0.5) * fy) / size.y;
     for (var i = 0; i < nx; i++) {
-      pw += power(at(vec2f(u.p[7].z + b * u.p[7].w + ((f32(i) + e) / f32(nx) - 0.5) * fx / size.x, v)));
+      pw += power(at(vec2f(u.p[7].z + bb * u.p[7].w + ((f32(i) + e) / f32(nx) - 0.5) * fx / size.x, v)));
     }
   }
   pw /= f32(nx * ny);
-  let sheet = select(0.0, 1.0, b < 1.0 && rows <= 0.0 && !miss);
+  let sheet = select(0.0, select(0.55, 1.0, b < 1.0) * exp(-max(rows, 0.0) / 30.0), !miss);
   let lv = (level(pw) * (1.0 - u.p[6].x) + u.p[6].x) * sheet;
 
   // Foam and ripples in the water's own coordinates (the angle it entered at, the row it entered with), so

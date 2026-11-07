@@ -16,7 +16,7 @@ import { aim, equation, jump, splice } from './reality'
 import { stutter } from './stutter'
 import { TAU, clamp, mix, smooth, type Frame, type Scene } from './scene'
 
-export const AT = R5 + R5DUR // 57.5 on the choir's clock; the collapse, AT + FALL, is choir.END
+export const AT = R5 + R5DUR // 52 on the choir's clock; the collapse, AT + FALL, is choir.END
 const OPEN = 6.5 // the horizon opens
 const FALL = 10.5 // the picture starts to collapse
 const TC = 13 // merger

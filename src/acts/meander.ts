@@ -13,19 +13,19 @@ import { TAU, clamp, lock, mix, smooth, view, type Scene } from './scene'
 
 const N = 900 // points along the reach
 const ONES = new Float64Array(LAST + 1).fill(1)
-const END = 3.5 // the valley picks up its current's phase from here
+const END = 2.8 // the valley picks up its current's phase from here
 const FLOW = 55 // Hz: how fast the speakers run the river, there and back
 export const WATER = [0.5, 0.78, 1] as const // Coe's lidar blue
 
 // Harmonic k lets go of the heading, the highest first, quickening down to the fundamental.
-const DROP = (k: number) => 0.4 + 1.6 * (1 - k / LAST) ** 2.2
+const DROP = (k: number) => 0.3 + 1.3 * (1 - k / LAST) ** 2.2
 const W = new Float64Array(LAST + 1)
 function heading(t: number) {
   W[0] = 1
   for (let k = 1; k <= LAST; k++) W[k] = 1 - lock([[0, 0], [DROP(k), 1]], t, 12, 0.6)
 }
-const omega = (t: number) => lock([[0, 0.9], [1, 1.45], [2.1, W1]], t, 4.5, 0.75)
-const second = (t: number) => W2 * smooth(1.8, 2.7, t)
+const omega = (t: number) => lock([[0, 0.9], [0.8, 1.45], [1.7, W1]], t, 5.5, 0.75)
+const second = (t: number) => W2 * smooth(1.45, 2.15, t)
 
 // The reach: integrate the heading over the first MAP metres, then fit it to the screen.
 const xs = new Float64Array(N), ys = new Float64Array(N)
@@ -84,7 +84,7 @@ export const meander: Scene = {
   dur: END,
   build(t, f) {
     const A = view.a * 0.9, fold = clamp(lock([[0, 0], [0.05, 1]], t, 8, 0.7), 0, 1.15)
-    const w = omega(t), w2 = second(t), land = clamp(lock([[0, 0], [2.5, 1]], t, 7, 0.85), 0, 1.05)
+    const w = omega(t), w2 = second(t), land = clamp(lock([[0, 0], [2, 1]], t, 8, 0.85), 0, 1.05)
     heading(t)
     reach(w, w2, A)
     let r = river(b, t)
@@ -93,7 +93,7 @@ export const meander: Scene = {
 
     let n = 0
     for (let k = 0; k <= LAST; k++) if (W[k] > 0.5) n = k
-    eq.say(f, t, n > 0 || t < 1.8 ? SQ : RIVER_EQ, WATER, n > 0 || t < 1.8
+    eq.say(f, t, n > 0 || t < 1.8 ? SQ : RIVER_EQ, WATER, n > 0 || t < 1.45
       ? [['\\omega', w, 2], ['N', n, 0], ['\\sigma', 1 / j0(w), 3]]
       : [['\\omega_1', w, 2], ['\\omega_2', w2, 2], ['M_1', M1, 0], ['M_2', M2, 0]])
 

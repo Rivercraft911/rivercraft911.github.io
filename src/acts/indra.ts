@@ -14,7 +14,7 @@ import { aim, equation, jump, project, seen, splice } from './reality'
 import { mix, smooth, type Scene } from './scene'
 
 export const AT = LEAD + WRAP + ascii.dur // the choir's clock when this reality begins
-export const DUR = 9
+export const DUR = 5.5
 const A = 1.95859, B = 0.0112 // the trace of a: a pearl necklace that spirals as it shrinks
 const MU = { re: -B, im: A } // a(z) = μ + 1/z
 const PER = 0.5 // periods of w per octave of descent
@@ -79,7 +79,7 @@ export const indra: Scene = {
     const T = t + AT, kick = jump(t, f, true, 0.6), p = field.p
     const s0 = PER * (descent(T) - descent(AT)), f0 = s0 - Math.floor(s0)
     const k = SHRINK ** f0, c = Math.cos(TURN * f0), sn = Math.sin(TURN * f0), H = 1.2
-    const ex = H * (0.12 + 0.06 * Math.sin(0.4 * t)), ey = H * 0.06 * Math.sin(0.3 * t), ez = H * mix(1.6, 1, smooth(0, 4, t))
+    const ex = H * (0.12 + 0.06 * Math.sin(0.4 * t)), ey = H * 0.06 * Math.sin(0.3 * t), ez = H * mix(1.6, 1, smooth(0, 3, t))
     eye[0] = k * (c * ex - sn * ey), eye[1] = k * (sn * ex + c * ey), eye[2] = k * ez
     const fx = -0.12, fy = 0.08 * Math.sin(0.27 * t)
     fwd[0] = c * fx - sn * fy, fwd[1] = sn * fx + c * fy, fwd[2] = -1
@@ -94,7 +94,7 @@ export const indra: Scene = {
     const near = k * H
     let lit = false, ok = false
     f.ch.push({
-      w: 0.45 * smooth(1.5, 3, t),
+      w: 0.45 * smooth(1, 2.2, t),
       fn: (_, s) => {
         if ((lit = !lit)) {
           walk()

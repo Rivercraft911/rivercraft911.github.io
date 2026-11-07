@@ -14,7 +14,7 @@ import { aim, equation } from './reality'
 import { TAU, clamp, glide, smooth, view, type Frame, type Scene } from './scene'
 
 export const LEAD = 21 // how long the choir has been falling when the wrap begins: valley.DUR − valley.SING
-export const DUR = 7
+export const DUR = 5
 const PER = 360 // rows printed per octave of the choir's descent
 const MAX = 256 // most rows printed in a frame
 const FRESH = 48 // history a fresh sheet back-fills at once: more costs a visible hitch
@@ -68,11 +68,11 @@ function print(T: number, now: number, f: Field) {
 // azimuth, distance, how far it has moved over the drain, how deep it looks, and the lens.
 const KEYS = [
   [0, Math.PI / 2, 0, S0, 0, 0, 0.9],
-  [1, Math.PI / 2, 0, S0, 0.1, 0, 0.9],
-  [3.2, Math.PI / 2, 0.3, 0.62 * S0, 1, 0, 0.95],
-  [5.2, 0.8, 1, 1, 1, -0.2, 1.1],
-  [7, 1.15, 1.8, 0.75, 1, -0.4, 1.2],
-  [12, 1.4, 3, 0.55, 1, -0.55, 1.2],
+  [0.7, Math.PI / 2, 0, S0, 0.1, 0, 0.9],
+  [2.2, Math.PI / 2, 0.3, 0.62 * S0, 1, 0, 0.95],
+  [3.6, 0.8, 1, 1, 1, -0.2, 1.1],
+  [5, 1.15, 1.8, 0.75, 1, -0.4, 1.2],
+  [10, 1.4, 3, 0.55, 1, -0.55, 1.2],
 ]
 const key = [0, 0, 0, 0, 0, 0], eye = [0, 0, 0], fwd = [0, 0, -1], up = [0, 1, 0]
 function look(T: number, p: Float32Array, kick: number) {
@@ -95,12 +95,12 @@ const field: Field = { shader: SHADER, k: 1, p: new Float32Array(32), res: 1.5 }
 const live = [0, 0]
 export function vortex(T: number, now: number, f: Frame, kick = 0, gain = 1) {
   chart()
-  const p = field.p, head = print(T, now, field), c = Math.max(1e-3, C1 * smooth(0.6, 3.4, T) ** 1.5), wet = smooth(2.6, 5.2, T)
+  const p = field.p, head = print(T, now, field), c = Math.max(1e-3, C1 * smooth(0.4, 2.2, T) ** 1.5), wet = smooth(1.7, 3.5, T)
   const beta = c * L * rate(T + LEAD), gamma = TAU * beta * RC * RC * K * wet // the inflow's rate and the circulation
   look(T, p, kick)
   p[16] = c, p[17] = LIP, p[18] = (-c * W) / 2, p[19] = c * W
   p[20] = head % ROWS, p[21] = PER / L, p[22] = head - printer.from, p[23] = gain
-  p[24] = 0.3 * (1 - smooth(0.6, 2.2, T)) // the plot opens with its black lifted, as the valley's is; it sinks as it curls
+  p[24] = 0.3 * (1 - smooth(0.4, 1.5, T)) // the plot opens with its black lifted, as the valley's is; it sinks as it curls
   p[25] = clamp(printer.ref - 0.8, -0.15, 0.3) // the reference level, as an offset in the rows' units
   p[26] = (gamma * gamma) / (8 * Math.PI ** 2 * G * RC * RC), p[27] = RC
   p[28] = K * wet, p[29] = 1 / C1, p[30] = U0, p[31] = DU
