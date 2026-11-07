@@ -134,7 +134,12 @@ export const ident: Scene = {
 // The relay, the call keyed in CW, and the name itself as x and y, its Fourier sum traced at 50 Hz.
 const o3 = { x: 0, y: 0, z: 0 }
 function voice(tt: number, o: { l: number; r: number }) {
-  if (tt > KEY - 0.35 && tt < KEY - 0.3) o.l = o.r = 0.4 * hash(tt * 48_000) // the relay
+  // the relay closing: a small tick and the softer tick of its contact bouncing, not a burst of noise
+  const r = tt - (KEY - 0.35)
+  if (r > 0 && r < 0.03) {
+    const tick = (u: number) => (u > 0 ? Math.exp(-u / 0.0015) * Math.sin(TAU * 1700 * u) : 0)
+    o.l = o.r = 0.12 * tick(r) + 0.05 * tick(r - 0.007)
+  }
   const tone = 0.3 * keyed(tt) * Math.sin(TAU * TONE * tt)
   o.l += tone, o.r += tone
   if (tt < KEY) return
