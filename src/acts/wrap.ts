@@ -97,7 +97,7 @@ export function vortex(T: number, now: number, f: Frame, gain = 1) {
   p[7] = wet, p[15] = 0
   p[16] = R, p[17] = A0, p[18] = ARC, p[19] = gain
   p[20] = head % ROWS, p[21] = PER / BETA, p[22] = head - printer.from, p[23] = PER * (descent(T + LEAD) - descent(T + LEAD - FALL))
-  p[24] = 0.4, p[25] = Math.min(0.3, Math.max(-0.15, printer.ref - 0.8)) // the landing's white water; the reference level, as an offset in the rows' units
+  p[24] = 0.15, p[25] = Math.min(0.3, Math.max(-0.15, printer.ref - 0.8)) // the landing's white water; the reference level, as an offset in the rows' units
   p[26] = pool.H, p[27] = RC
   p[28] = pool.K, p[30] = U0, p[31] = DU
   p[46] = p[47] = 0

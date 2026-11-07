@@ -9,7 +9,7 @@ import { INDRA as SHADER } from '../gpu/fields'
 import type { Field } from '../gpu/raster'
 import { descent, place, sing } from './choir'
 import { AT as R1END } from './ascii'
-import { B, H, LENS, MU, PER, SHRINK, TURN, ZM, ZP, A, div, eye, fall, fwd, mul, up } from './drain'
+import { A, B, GROUP, GROUP_INK, H, LENS, MU, PER, SHRINK, TURN, ZM, ZP, div, eye, fall, fwd, mul, up } from './drain'
 import { aim, equation, project, seen } from './reality'
 import { smooth, type Scene } from './scene'
 
@@ -19,7 +19,6 @@ const HALF = -0.5 / Math.log(SHRINK) // ln |q|² to powers of λ
 const POWERS = Array.from({ length: 41 }, (_, i): [number, number] => [SHRINK ** (i - 20) * Math.cos(TURN * (i - 20)), SHRINK ** (i - 20) * Math.sin(TURN * (i - 20))]) // λⁿ, n = −20 … 20
 
 const field: Field = { shader: SHADER, k: 1, p: new Float32Array(28) }
-const EQ = [0.85, 0.78, 1]
 
 // The chaos game: a point of the limit set, walked by random words of the group.
 const z = { re: 0, im: 0, last: 0, seed: 1 }
@@ -76,7 +75,7 @@ export const indra: Scene = {
         s.r = 0.85, s.g = 0.8, s.b = 1
       },
     })
-    equation(f, 'a(z)=\\mu+\\frac{1}{z}\\quad b(z)=z+2', EQ)
+    equation(f, GROUP, GROUP_INK)
     f.rate = 2.4e6
     place(T)
 

@@ -9,6 +9,7 @@ import { mix, smooth } from './scene'
 export const A = 1.95859, B = 0.0112 // the trace of a: a pearl necklace that spirals as it shrinks
 export const MU = { re: -B, im: A } // a(z) = μ + 1/z
 export const PER = 0.5 // periods of w per octave of descent
+export const GROUP = 'a(z)=\\mu+\\frac{1}{z}\\quad b(z)=z+2', GROUP_INK = [0.85, 0.78, 1] // its equation, and its colour
 
 // w = ab = [[−iμ, −i(2μ + 1)], [−i, −2i]]: its fixed points z = (p − s ± √(tr² − 4)) / 2r, and the multiplier
 // λ = 1/(r z + s)² at the attracting one, z₊.

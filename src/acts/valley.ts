@@ -576,7 +576,7 @@ export const valley: Scene = {
         lp += (hash(tt * 48_000) - lp) * 0.04
         const roar = 0.5 * lp * smooth(6.5, 11, tt) * (1 - 0.6 * smooth(13.8, 17.8, tt)) * (1 - smooth(18, DUR, tt))
         o.l += roar, o.r += roar
-        if (tt > SING && tt < DUR) sing(tt - SING, o) // silent until the falls flatten, then fading in
+        if (tt > SING) sing(tt - SING, o) // silent until we go over, then fading in; on past the end, as the speakers run ahead
       }
       if (heroN < 2 || tt > 18.8) return
       const ph = ((tt * 55) % 1) * 2, u = (ph < 1 ? ph : 2 - ph) * (heroN - 1), i = Math.min(heroN - 2, Math.floor(u)), a = u - i

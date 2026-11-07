@@ -5,7 +5,7 @@
 // 2295 Hz, Baudot with its shifts), while the choir is held and crushed at the cell clock to five bits.
 import type { Stereo } from '../audio/audio'
 import { descent, place, sing } from './choir'
-import { hang, PER, plunge, SHRINK } from './drain'
+import { GROUP, GROUP_INK, hang, PER, plunge, SHRINK } from './drain'
 import { equation } from './reality'
 import { DUR as WRAP, LEAD, VORTEX, VORTEX_INK, live, surface, vortex } from './wrap'
 import { TAU, clamp, mix, smooth, type Scene } from './scene'
@@ -92,7 +92,9 @@ export const ascii: Scene = {
     fld.ink = ink
     fld.lift = 14
     fld.read = row
-    equation(f, VORTEX, VORTEX_INK, 0.9 * (1 - smooth(0, SPREAD, t)), live)
+    // the vortex's equation until the drain opens onto the pearls, then theirs
+    const eq = smooth(1.2, 2, t)
+    eq < 1 ? equation(f, VORTEX, VORTEX_INK, 0.9 * (1 - eq), live) : equation(f, GROUP, GROUP_INK, 0.9 * smooth(2, 2.6, t))
     place(T + LEAD)
     return (tt, o) => {
       const x = text(tt)
