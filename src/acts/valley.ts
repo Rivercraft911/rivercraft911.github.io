@@ -544,7 +544,7 @@ export const valley: Scene = {
     const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, fit = 1.8 / Math.max(0.3, x1 - x0, y1 - y0)
     return (tt, o) => {
       // over the edge the scope rule ends: the falls roar
-      if (tt > 8 && tt < DUR) {
+      if (tt > 8) { // on through the crossfade: the whirlpool takes the choir over smoothly (sing caches a repeated t)
         lp += (hash(tt * 48_000) - lp) * 0.04
         const roar = 0.5 * lp * smooth(8, 13, tt) * (1 - 0.6 * smooth(19, 24, tt))
         o.l += roar, o.r += roar

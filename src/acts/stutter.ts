@@ -255,7 +255,6 @@ const WORLDS: World[] = [
   },
 ]
 
-export const INKS = WORLDS.map((w) => w.ink)
 const field: Field = { shader: KIFS, k: 1, p: new Float32Array(28) }
 const GOLD = { gold: 1 }, mirrored = { gold: 1, mirror: 0 }
 const MIRROR = (at: number) => ((mirrored.mirror = at), mirrored)

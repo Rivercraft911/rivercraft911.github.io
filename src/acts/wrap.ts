@@ -17,6 +17,7 @@ export const LEAD = 21 // how long the choir has been falling when the wrap begi
 export const DUR = 7
 const PER = 360 // rows printed per octave of the choir's descent
 const MAX = 256 // most rows printed in a frame
+const FRESH = 48 // history a fresh sheet back-fills at once: more costs a visible hitch
 
 // The valley's falls end flat as a plot: 80 Hz to 8 kHz across 2.3 half-widths, 800 Hz centred, the lip
 // at y = 0.42 and 3.4 s of history in the 1.55 below it. Seen from S0 away through a lens 0.9 rad wide, the
@@ -50,7 +51,7 @@ function print(T: number, now: number, f: Field) {
   const head = descent(T) * PER, top = Math.floor(head), pr = printer, dt = T - pr.T
   if (dt < 0 || dt > 0.5 || top - pr.k > MAX) {
     // a jump: start a fresh sheet, as far back as the speakers remember
-    pr.k = pr.from = top - Math.min(MAX, Math.floor((heard.buf.length / heard.sr - 0.05) * rate(T) * PER))
+    pr.k = pr.from = top - Math.min(FRESH, Math.floor((heard.buf.length / heard.sr - 0.05) * rate(T) * PER))
     pr.ref = -1
   }
   pr.T = T

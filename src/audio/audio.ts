@@ -10,7 +10,7 @@ export type Stereo = { l: number; r: number; s: Float64Array } // s: the voices
 export type Voice = (t: number, o: Stereo) => void
 export const stereo = (): Stereo => ({ l: 0, r: 0, s: new Float64Array(VOICES) })
 
-const AHEAD = 0.1 // seconds of signal kept queued past the present
+const AHEAD = 0.15 // seconds of signal kept queued past the present: enough to ride out a slow frame
 const C = 2 + VOICES - BED
 const GAIN = 0.22
 
