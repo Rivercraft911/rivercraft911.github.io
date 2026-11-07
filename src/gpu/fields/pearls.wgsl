@@ -7,6 +7,8 @@
 // derivative it gathered, is its distance to the pearls (Jos Leys, Knighty); the half-spaces themselves are
 // cut away. Each pearl is a soap film.
 
+// It folds deep (40) so the packing is as complete at every depth the endless zoom brings up to full size:
+// too few folds and whole clusters of pearls exist only nearer the camera, popping in as the zoom loops.
 fn kleinian(p: vec3f, a: f32, b: f32, n: i32) -> vec3f {
   var z = p;
   var df = 1.0;
@@ -14,6 +16,7 @@ fn kleinian(p: vec3f, a: f32, b: f32, n: i32) -> vec3f {
   let f = sign(b);
   let c = vec3f(-0.5 * b, 0.5 * a, 0.0);
   var last = z + 1.0;
+  var before = z + 2.0; // two folds back: a settled point bounces between two places
   // the same every fold, so worked out once
   let shear = f * b / a;
   let bend = f * (2.0 * a - 1.95) / 4.0;
@@ -32,7 +35,10 @@ fn kleinian(p: vec3f, a: f32, b: f32, n: i32) -> vec3f {
     z.y = a + z.y;
     df *= ir;
     trap = min(trap, length(z - c));
-    if (dot(z - last, z - last) < 1e-6) { break; } // settled into a cycle
+    // settled into a cycle: a settled point alternates, so compare two folds back (as Jos Leys does), not
+    // before a few folds, when a point can pass near its old place by chance and stop on a false surface
+    if (i > 5 && (dot(z - before, z - before) < 1e-8 || dot(z - last, z - last) < 1e-8)) { break; }
+    before = last;
     last = z;
   }
   let y = min(z.y, a - z.y);
@@ -50,8 +56,8 @@ fn pearls(p: vec3f, a: f32, b: f32, n: i32, m: vec4f) -> vec3f {
   let w = vec3f(v.x, -v.y, v.z) / r2;
   let c = m.zw;
   let z = vec3f(c.x * w.x - c.y * w.y + m.x, c.x * w.y + c.y * w.x + m.y, length(c) * w.z);
-  let k = kleinian(z, a, b, n);
   let back = r2 / length(c);
+  let k = kleinian(z, a, b, n);
   return vec3f(k.x * back, k.y, a / k.z * back);
 }
 

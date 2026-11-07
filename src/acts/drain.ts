@@ -58,7 +58,7 @@ export const S = 22, PSI = 0, MOUTH = 3
 // fall above, carried up into the whirlpool, as its camera.
 export function hang(p: Float32Array, lid: number, k: number, t: number) {
   p[32] = S, p[33] = Math.cos(PSI), p[34] = Math.sin(PSI), p[35] = lid - MOUTH / S
-  p[36] = A, p[37] = B, p[38] = 12, p[39] = 0.4 * t
+  p[36] = A, p[37] = B, p[38] = 40, p[39] = 0.4 * t // as deep as indra folds, so the pearls down the drain are the same
   p[40] = ZM[0], p[41] = ZM[1], p[42] = ZM[0] - ZP[0], p[43] = ZM[1] - ZP[1]
   p[44] = k * H, p[45] = 0.06
 }

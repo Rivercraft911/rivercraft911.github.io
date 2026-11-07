@@ -51,7 +51,7 @@ export const indra: Scene = {
     const T = t + AT, p = field.p // no jump: we come through the drain, on the camera that brought us
     const s0 = PER * (descent(T) - descent(AT)), k = fall(s0 - Math.floor(s0), t)
     aim(p, eye, fwd, up, LENS)
-    p[16] = A, p[17] = B, p[18] = 14, p[19] = 1.2 // deeper: more of the limit set resolves
+    p[16] = A, p[17] = B, p[18] = 40, p[19] = 1.2 // deep enough that every pearl big enough to see exists at every depth of the zoom; settled points bail out early
     p[20] = 0.4 * t, p[21] = 0.06, p[22] = k * H
     p[24] = ZM[0], p[25] = ZM[1], p[26] = ZM[0] - ZP[0], p[27] = ZM[1] - ZP[1]
     f.field = field
