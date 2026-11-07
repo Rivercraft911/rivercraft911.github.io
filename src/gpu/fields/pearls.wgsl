@@ -14,12 +14,16 @@ fn kleinian(p: vec3f, a: f32, b: f32, n: i32) -> vec3f {
   let f = sign(b);
   let c = vec3f(-0.5 * b, 0.5 * a, 0.0);
   var last = z + 1.0;
+  // the same every fold, so worked out once
+  let shear = f * b / a;
+  let bend = f * (2.0 * a - 1.95) / 4.0;
+  let sharp = -(7.2 - (1.95 - a) * 15.0);
   for (var i = 0; i < n; i++) {
-    z.x += f * b / a * z.y;
+    z.x += shear * z.y;
     z.x -= 2.0 * floor(0.5 * (z.x + 1.0));
-    z.x -= f * b / a * z.y;
+    z.x -= shear * z.y;
     let s = z.x + 0.5 * b;
-    if (z.y >= 0.5 * a + f * (2.0 * a - 1.95) / 4.0 * sign(s) * (1.0 - exp(-(7.2 - (1.95 - a) * 15.0) * abs(s)))) {
+    if (z.y >= 0.5 * a + bend * sign(s) * (1.0 - exp(sharp * abs(s)))) {
       z = vec3f(-b, a, 0.0) - z;
     }
     let ir = 1.0 / dot(z, z);
@@ -67,18 +71,31 @@ fn dive(ro: vec3f, rd: vec3f, t0: f32, px: f32, H: f32, fog: f32, drift: f32, a:
   var hit = false;
   var steps = 0.0;
   var glow = 0.0;
-  for (var i = 0; i < 96; i++) {
+  // Over-relaxed sphere tracing (Keinert et al. 2014): stride ω times the distance bound through open
+  // space, and when two successive bounds no longer overlap the stride overshot, so step back and go
+  // carefully from there on. Thin chains of tiny pearls sit right at the edge of what a pixel resolves:
+  // a pixel and a quarter counts as a hit, so a chain is found on every frame, not stepped over on some.
+  var w = 1.5;
+  var last = 0.0;
+  var stride = 0.0;
+  for (var i = 0; i < 72; i++) {
     let d = pearls(ro + rd * t, a, b, n, m).x;
-    // thin chains of tiny pearls sit right at the edge of what a pixel resolves: step warily and call a
-    // pixel and a quarter a hit, so a chain is found on every frame, not on some and stepped over on others
+    if (w > 1.0 && d + last < stride) {
+      t -= stride - last; // the bound spheres don't touch: back to where the last one ended
+      stride = last;
+      w = 1.0;
+      continue;
+    }
     if (d < 1.25 * px * t) { hit = true; break; }
     glow += exp(-d / (0.012 * t + 1e-4)) * 0.012;
-    t += d * 0.75;
+    stride = d * select(0.75, w, w > 1.0);
+    last = d;
+    t += stride;
     steps += 1.0;
-    if (t > 40.0 * H) { break; }
+    if (t > 34.0 * H) { break; }
     // a ray that grazes the packing runs out of steps a hair from a surface: that surface is what it sees,
     // or it would flicker to the background from frame to frame
-    if (i == 95 && d < 8.0 * px * t) { hit = true; }
+    if (i == 71 && d < 8.0 * px * t) { hit = true; }
   }
   let halo = vec3f(0.35, 0.5, 1.0) * glow;
   let deep = nebula(rd);
@@ -94,7 +111,7 @@ fn dive(ro: vec3f, rd: vec3f, t0: f32, px: f32, H: f32, fog: f32, drift: f32, a:
   let ct = sqrt(1.0 - (1.0 - ci * ci) / (1.33 * 1.33));
   // a film drains: thinner toward the top of each pearl, and thinner with time
   let thick = 220.0 + 380.0 * (0.5 + 0.5 * sin(2.2 * pearl.y + drift)) - 140.0 * nrm.z;
-  let ao = 1.0 - 0.7 * steps / 96.0;
+  let ao = 1.0 - 0.7 * steps / 72.0;
   let key = normalize(vec3f(0.4, 0.3, 1.0));
   let rim = normalize(vec3f(-0.5, -0.4, -0.6));
   let r = reflect(rd, nrm);
@@ -102,5 +119,5 @@ fn dive(ro: vec3f, rd: vec3f, t0: f32, px: f32, H: f32, fog: f32, drift: f32, a:
   let fres = 0.06 + 0.94 * pow(1.0 - ci, 2.5);
   let col = (11.0 * film(thick, ct) * fres * small + 0.8 * spec + 1.8 * nebula(r) * fres + vec3f(0.004, 0.005, 0.012)) * ao;
   // gone into the haze before the march gives up on it, so far pearls never pop in
-  return mix(deep, col, exp(-t / H * fog) * smoothstep(40.0 * H, 28.0 * H, t)) + halo;
+  return mix(deep, col, exp(-t / H * fog) * smoothstep(34.0 * H, 24.0 * H, t)) + halo;
 }
