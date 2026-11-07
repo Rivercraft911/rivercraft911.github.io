@@ -8,7 +8,7 @@
 // Under them, a root: the same fall a twelfth below, so every angel is its third harmonic, one steady
 // singer to a tone in the middle, under its own bell around 80 Hz. It sings its own second and third
 // harmonics, so a speaker too small for the fundamental still implies it (the missing fundamental).
-// Around them, breath: white noise through a band at each tone two octaves up, a sixth of an octave wide,
+// Around them, breath: white noise through a band at each tone two octaves up, a quarter octave wide,
 // left and right from different noise, so it surrounds without standing anywhere. Its own bell moves
 // with `air`: low, it is a cloud in the choir; high, it is the shimmer of the climax, airy and never a
 // partial. Quietly, a dread choir sings a septimal tritone, a minor second and a low tritone that crawl
@@ -21,7 +21,7 @@ const SINGERS = 4 // per section: the beating pair, then two who join with the c
 const CENTS = [0, 0, -9, 7], SPREAD = [-0.6, 0.6, -0.9, 0.9] // the beating pair stands left and right
 const ROOT = 20 // Hz, the bottom of the root's four octaves
 const H2 = 0.45, H3 = 0.3 // the root's harmonics
-const Q = 6 // the breath's bands: a sixth of an octave
+const Q = 6 // the breath's bands: a sixth of their centre wide, about a quarter octave
 const TOP = 18_000 // nothing sings above this, so nothing folds back past Nyquist
 const QUIET = 1e-3 // a singer this far down (−60 dB) is lost in the mass and the hall: skip them
 const BLOCK = 64 // samples per control step
