@@ -85,7 +85,7 @@ const Q0 = W0 + (WIN * 86) / NX // we tune in on the first line, at pixel 86
 const speed = { s: 0 }
 // Facets swept by scene time t (float64 throughout), and the speed then, in speed.s.
 function scan(t: number) {
-  const u = at(t), n = Math.floor((t - u) / PERIOD), last = SLOW.length - 1
+  const u = at(t), n = Math.round((t - u) / PERIOD), last = SLOW.length - 1
   let k = 1
   while (k < last && u >= SLOW[k][0]) k++
   const [t0, l0] = SLOW[k - 1], [t1, l1] = SLOW[k]
@@ -179,10 +179,11 @@ const INTRO = [
 ]
 const ORBIT = [
   [LOOP, 1.3, -0.35, 0.3, 0.05, 0.15, 1.6, 1.0],
-  [LOOP + 10, 0.4, 0.15, 2.0, 0, 0.3, 3, 1.1],
-  [LOOP + 19, -0.9, 0.4, 0.6, 0.15, 0.1, 0.4, 0.9],
-  [LOOP + 25, 0.2, 0.07, 0.24, 0.03, 0.03, 0.4, 0.8],
-  [LOOP + 31, -0.3, 0.5, -1.4, 0.2, 0.3, 2.5, 0.85],
+  [LOOP + 9, 0.5, 0.2, 2.0, -0.1, 0.3, 3, 1.1],
+  [LOOP + 17, -1.0, 0.5, 0.8, 0.1, 0.1, 0.5, 0.9],
+  [LOOP + 24, 0.32, 0.12, 0.3, 0.02, 0.02, 0.04, 0.65],
+  [LOOP + 29, 0.05, 0.25, 1.0, 0, 0.4, 3, 0.9],
+  [LOOP + 34, -0.4, 0.6, -1.2, 0.2, 0.3, 2.5, 0.85],
   [LOOP + PERIOD, 1.3, -0.35, 0.3, 0.05, 0.15, 1.6, 1.0],
 ]
 const cam = [0, 0, 0, 0, 0, 0, 0], fwd = [0, 0, 0], up = [0, 1, 0]
@@ -313,12 +314,12 @@ const voice = (tt: number, o: { l: number; r: number }) => {
   aq = q, aT = tt
   ch[0] = pw[0] + 0.5 * pw[1], ch[1] = pw[2] + 0.5 * pw[1]
   const age = ((q % 1) * LINE) / s // seconds since the facet sensor fired
-  const tick = 0.12 * Math.exp(-age / 0.002) * Math.sin(TAU * 2200 * age) * (1 - smooth(25, 60, rate))
-  const tone = 0.05 * smooth(25, 200, rate) * (Math.sin(TAU * q) + 0.4 * Math.sin((TAU * q) / 4))
+  const tick = 0.3 * Math.exp(-Math.max(0, age) / 0.002) * Math.sin(TAU * 2200 * age) * (1 - smooth(25, 60, rate))
+  const tone = 0.16 * smooth(25, 200, rate) * (Math.sin(TAU * q) + 0.4 * Math.sin((TAU * q) / 4))
   for (let c = 0; c < 2; c++) {
     const y = ch[c] - x1[c] + 0.995 * y1[c]
     x1[c] = ch[c], y1[c] = y
   }
-  o.l += 0.09 * y1[0] + tick + tone
-  o.r += 0.09 * y1[1] + tick + tone
+  o.l += 0.35 * y1[0] + tick + tone
+  o.r += 0.35 * y1[1] + tick + tone
 }
