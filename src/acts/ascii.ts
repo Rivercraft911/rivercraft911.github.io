@@ -74,7 +74,7 @@ function crush(T: number, o: Stereo, x: number) {
 // the world below as it opens, and is eaten back through by it as we fall in.
 export const DUR = 3.5, AT = LEAD + WRAP + DUR // the choir's clock when the world below begins
 const HOLE = 0.08 // the drain's mouth
-const SPREAD = 0.8, EAT = [DUR - 1, DUR - 0.15] // how long the infection takes; when the world eats it back
+const SPREAD = 0.9, EAT = [DUR - 1.1, DUR - 0.1] // how long the infection takes; when the world eats it back
 const text = (t: number) => smooth(0, SPREAD, t) * (1 - smooth(EAT[0], EAT[1], t)) // how much of the sound is text
 export const ascii: Scene = {
   dur: DUR,

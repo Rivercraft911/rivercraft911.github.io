@@ -76,17 +76,17 @@ fn fbm(x: vec2f) -> f32 {
   for (var i = 0; i < 4; i++) { s += exp2(-f32(i + 1)) * noise(y, vec2f(65536.0)); y = 2.03 * y + 17.0; }
   return s;
 }
+fn vein(x: vec2f) -> f32 { return abs(2.0 * fbm(x) - 1.0); } // 0 along branching curves
 fn infect(q: vec2f, flow: vec2f, c: vec3f) -> vec3f {
-  let a = vec2f(-1.1, 0.6);
-  let b = vec2f(1.3, -0.5);
-  let near = min(min(length(q - a), length(q - b)), length(q - vec2f(0.2, 0.9)));
-  let come = 0.45 * near / 1.6 + 0.55 * fbm(flow);
-  let go = 0.35 * length(q) / 1.8 + 0.4 * fbm(5.0 * q + 3.0) + 0.25 * exp(-12.0 * dot(c, vec3f(0.23, 0.69, 0.08)));
-  let pi = u.p[11].z;
-  let po = u.p[11].w;
-  text = step(come, pi) * step(po, go);
-  let edge = select(0.0, exp(-(pi - come) * (pi - come) / 0.003), pi > 0.0 && pi < 1.3) + select(0.0, exp(-(po - go) * (po - go) / 0.003), po > 0.0 && po < 1.1);
-  return c + edge * (2.0 * c + vec3f(0.3, 0.12, 0.03));
+  let near = min(min(length(q - vec2f(-1.1, 0.6)), length(q - vec2f(1.3, -0.5))), length(q - vec2f(0.2, 0.9)));
+  let come = 0.4 * near / 1.6 + 0.6 * vein(flow);
+  let go = 0.3 * length(q) / 1.8 + 0.5 * vein(4.0 * q + 3.0) + 0.2 * exp(-12.0 * dot(c, vec3f(0.23, 0.69, 0.08)));
+  let pi = u.p[11].z - come; // how long ago it was taken, and given back
+  let po = u.p[11].w - go;
+  text = step(0.0, pi) * step(po, 0.0);
+  // the fronts burn: the newest glyphs, and the world just broken through
+  let edge = select(0.0, exp(-pi / 0.05), pi >= 0.0 && u.p[11].z < 1.3) + select(0.0, exp(-po / 0.05), po >= 0.0 && u.p[11].w < 1.1);
+  return c + edge * (3.0 * c + vec3f(0.25, 0.1, 0.02));
 }
 
 fn field(q: vec2f) -> vec3f {
