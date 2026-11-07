@@ -10,6 +10,7 @@ import { meander } from './acts/meander'
 import { valley } from './acts/valley'
 import { ident } from './acts/ident'
 import { singularity } from './acts/singularity'
+import { finaleB } from './acts/finaleB'
 import { wrap } from './acts/wrap'
 import { indra } from './acts/indra'
 import { stutter } from './acts/stutter'
@@ -25,6 +26,7 @@ const beam = new Beam()
 const audio = new Audio()
 // ?fall plays only the fall, from the lip of the falls on (the pool needs their history); ?ident and ?end the last stretch. ?band and deep
 // links (/<project>, /qsl) skip the intro and land in the band.
+const hole = q.get('hole') === 'b' ? finaleB : singularity // ?hole=b: the finale's take B
 const scenes = q.has('specimen')
   ? [specimen]
   : q.get('world') === 'r01'
@@ -32,12 +34,12 @@ const scenes = q.has('specimen')
     : direct()
       ? [band]
       : q.has('fall')
-        ? [valley, wrap, ascii, indra, stutter, ophanim, singularity]
+        ? [valley, wrap, ascii, indra, stutter, ophanim, hole]
         : q.has('ident')
           ? [ident]
           : q.has('end')
             ? [singularity, ident, band]
-            : [hook, meander, valley, wrap, ascii, indra, stutter, ophanim, singularity, ident, band]
+            : [hook, meander, valley, wrap, ascii, indra, stutter, ophanim, hole, ident, band]
 const timeline = new Timeline(scenes)
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }
