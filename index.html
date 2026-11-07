@@ -16,11 +16,18 @@
       dt { color: #9fc; } dd { margin: 0; }
       a { color: inherit; } small { display: block; margin-top: 4em; color: #285; font-size: inherit; }
       @media (max-width: 34rem) { dl { grid-template-columns: 1fr; } dd { margin-bottom: 1em; } }
+      #skip { position: fixed; left: 0; right: 0; bottom: 1.4rem; display: flex; justify-content: center; gap: 2.2rem;
+              font: 12px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.04em; animation: in 1.2s 3s both; }
+      #skip[hidden] { display: none; }
+      #skip a, #skip button { all: unset; cursor: pointer; color: #2d5f43; transition: color 0.3s; }
+      #skip a:hover, #skip button:hover, #skip :focus-visible { color: #8fd; text-shadow: 0 0 6px #5f96; }
+      @keyframes in { from { opacity: 0; } }
       .no-gpu { overflow: auto; } .no-gpu canvas { display: none; } .no-gpu main { display: block; }
     </style>
   </head>
   <body>
     <canvas aria-hidden="true"></canvas>
+    <nav id="skip" hidden><a href="/how/">how does this work?</a><button>I hate fun (skip)</button></nav>
     <main>
       <h1>River Dowdy · KJ5SCH</h1>
       <p>signals, silicon, light, orbit</p>

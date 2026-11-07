@@ -79,6 +79,12 @@ function power() {
 
 addEventListener('pointerdown', power)
 
+// The way out, for whoever has somewhere to be: straight to the band, past everything before it.
+const out = scenes.length > 1 && scenes.at(-1) === band ? timeline.starts[scenes.length - 1] : 0
+const skip = document.querySelector<HTMLElement>('#skip')!, leave = skip.querySelector('button')!
+leave.textContent = Math.random() < 0.5 ? 'I hate fun (skip)' : 'I have important things to do (skip)'
+leave.onclick = () => (t = Math.max(t, out))
+
 // ?rec=<seconds>: record what the canvas shows and the speakers play; scripts/clip.mjs collects it.
 if (q.has('rec')) {
   const w = window as unknown as { __chunk(b64: string): void; __done(): void }
@@ -103,6 +109,7 @@ addEventListener('keydown', (e) => {
   else if (k === 'ArrowRight') t += 5
   else if (k === 'ArrowLeft') t = Math.max(0, t - 5)
   else if (k === 'm') audio.mute()
+  else if (k === 'Escape') t = Math.max(t, out)
   else if (k >= '1' && k <= '9') t = timeline.starts[+k - 1] ?? t
 })
 
@@ -142,6 +149,8 @@ function tick(now: number) {
   const dt = hz || Math.min(0.1, Math.max(1e-3, (now - last) / 1000))
   last = now
   if (on) t += dt * speed
+  const away = on && t < out
+  if (skip.hidden === away) skip.hidden = !away
 
   const Q = TIERS[tier]
   const dpr = Math.min(2, devicePixelRatio) * Q.scale, w = Math.round(innerWidth * dpr), h = Math.round(innerHeight * dpr)

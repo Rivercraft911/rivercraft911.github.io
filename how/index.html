@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>One Beam · River Dowdy</title>
+    <meta name="description" content="How the intro to River Dowdy's site works: one simulated oscilloscope beam, and every line of it a signal." />
+    <style>
+      :root {
+        --paper: #f8f6f1; --ink: #1c1c1c; --soft: #6b6b6b; --rule: #ddd8cc; --link: #3f6f5c;
+        --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+        --sans: "Gill Sans", "Gill Sans MT", "Segoe UI", Calibri, sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { --paper: #121413; --ink: #dcdcd6; --soft: #8c918d; --rule: #2b302d; --link: #8fc9ae; }
+      }
+      html { background: var(--paper); color: var(--ink); }
+      body { margin: 0; font: 1.2rem/1.62 var(--serif); font-variant-numeric: oldstyle-nums; -webkit-font-smoothing: antialiased; }
+      canvas#lace { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; }
+      article {
+        box-sizing: border-box; max-width: 44rem; margin: 0 auto; padding: 14vh 3rem 6rem;
+        /* the paper lies a little thicker under the words than in the margins, so the lace stays out of them */
+        background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--paper) 88%, transparent) 3rem,
+          color-mix(in srgb, var(--paper) 88%, transparent) calc(100% - 3rem), transparent);
+      }
+      header p, nav, figcaption, .note, footer { font-family: var(--sans); }
+      h1 { margin: 0 0 0.3em; font: 400 2.6rem/1.15 var(--serif); letter-spacing: -0.01em; }
+      header p { margin: 0 0 3.5rem; color: var(--soft); font-size: 1rem; }
+      h2 { margin: 3rem 0 0.6rem; font: 600 1.25rem/1.3 var(--sans); letter-spacing: 0.01em; }
+      p { margin: 0 0 1.1em; }
+      a { color: var(--link); text-decoration-thickness: 1px; text-underline-offset: 0.18em; }
+      .eq { display: block; margin: 1.2em 0 1.3em; text-align: center; font-style: italic; font-size: 1.15rem; }
+      .eq i { font-style: normal; }
+      .note { color: var(--soft); font-size: 0.95rem; border-left: 2px solid var(--rule); padding-left: 1rem; }
+      hr { border: 0; border-top: 1px solid var(--rule); margin: 3.5rem 0; }
+      ol.refs { padding-left: 1.2em; color: var(--soft); font-size: 0.95rem; }
+      footer { display: flex; flex-wrap: wrap; gap: 0.8rem 1.6rem; justify-content: space-between; margin-top: 4rem; font-size: 1rem; }
+      footer a { text-decoration: none; border: 1px solid var(--rule); border-radius: 2px; padding: 0.5em 0.9em; }
+      footer a:hover { border-color: var(--link); }
+      @media (max-width: 40rem) {
+        body { font-size: 1.08rem; }
+        article { padding: 9vh 1rem 4rem; background: color-mix(in srgb, var(--paper) 88%, transparent); }
+        h1 { font-size: 2rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="lace" aria-hidden="true"></canvas>
+    <article>
+      <header>
+        <h1>One beam</h1>
+        <p>How the intro works, and why every line of it is a signal · River Dowdy</p>
+      </header>
+
+      <p>
+        The minute before my projects is drawn by a single simulated oscilloscope beam. There is no video
+        in it, no sprites and no images. One spot of light moves across a phosphor screen a couple of
+        million times a second, and wherever it has been, the screen glows and slowly fades. Everything you
+        saw is wherever that spot went.
+      </p>
+      <p>
+        The rule I held myself to: <em>nothing on screen is fake</em>. If something claims to be a signal, it
+        is one. The equation in the top corner is live, drawn by the same beam, and its numbers are the ones
+        drawing the picture. And for the first half, the sound you hear <em>is</em> the picture: the left
+        speaker is the beam's x and the right is its y, so a real oscilloscope plugged into the headphone
+        jack would draw the site.
+      </p>
+
+      <h2>The phosphor</h2>
+      <p>
+        A beam moving across a tube lays down energy along its path, so each step of the beam deposits a
+        Gaussian spot integrated along the segment (an error function, in closed form). The screen keeps
+        that energy and lets it decay exponentially, the way phosphor does. A few percent of it scatters in
+        the glass as a faint halo that falls off as <i>r</i><sup>−2.5</sup>. Brightness is energy per
+        second, so it looks the same at 60 Hz and 120 Hz, and on displays that can show it, the core of the
+        trace is brighter than white.
+      </p>
+
+      <h2>A square wave</h2>
+      <p>
+        It opens on the oldest trick in signal processing: a square wave is a sum of sines, and you can
+        watch it assemble.
+      </p>
+      <span class="eq">x(t) = <i>4</i>⁄π · Σ<sub>k</sub> sin((2k+1)ωt) ⁄ (2k+1)</span>
+      <p>
+        Each harmonic arrives like a control loop locking: it overshoots, rings and settles. That is why
+        the corners flicker as they sharpen. Those are the Gibbs ears, and you can hear each harmonic come
+        in.
+      </p>
+
+      <h2>The wave becomes a river</h2>
+      <p>
+        Then the square wave stops being a height and becomes a <em>heading</em>. A river turns as it
+        runs, and the curve real meandering rivers follow is the sine-generated curve of Langbein and
+        Leopold:
+      </p>
+      <span class="eq">θ(s) = ω sin(2πs ⁄ M)</span>
+      <p>
+        Fed the square wave, θ makes a zigzag; as its harmonics let go, the elbows round off into meanders.
+        The river's direction e<sup>iθ</sup> is phase modulation, so as the bends swell you can hear Bessel
+        sidebands bloom. That line lands exactly on the river in the valley.
+      </p>
+
+      <h2>The valley</h2>
+      <p>
+        The ground is a power-law random field, random phases under |k|<sup>−β</sup>, the same spectral
+        trick behind most synthetic terrain, carved into a valley. It is drawn the way the famous pulsar
+        plot on <em>Unknown Pleasures</em> was drawn: cross-section after cross-section, each hidden behind
+        the ones in front of it, recomputed every frame. The firs are triangle waves under a tapering
+        envelope. The water is streamlines of a flow field. The stones in the shallows are a 16APSK
+        constellation, the kind a satellite modem uses.
+      </p>
+      <p>
+        At the end of the river is a waterfall, and the falling water carries the real short-time spectrum
+        of what you are hearing at that moment. Water becomes a waterfall plot, the scrolling spectrogram
+        every radio engineer has stared at. That is where we fall.
+      </p>
+
+      <h2>The fall</h2>
+      <p>
+        From the fall on, the tube becomes a raster CRT too: full-screen fields, rendered on the GPU, swept
+        into the same phosphor under the beam. The falls land in a plunge pool that is already turning, a
+        Burgers vortex, and the pool is itself a waterfall plot of the soundtrack: angle is log-frequency,
+        log-radius is age. The soundtrack's octaves become its spiral arms.
+      </p>
+      <p>
+        Text then spreads over the whirlpool like an infection. Every cell becomes the teleprinter glyph
+        whose ink best matches the light behind it, and the centre row is transmitted as real RTTY: 45.45
+        baud, Baudot, 170 Hz shift. You could decode it.
+      </p>
+      <p>
+        Down the drain is Indra's net: the limit set of a Kleinian group (Maskit's slice, from
+        <em>Indra's Pearls</em>), every pearl a soap bubble lit by thin-film interference. On the floor the
+        beam plays the chaos game, applying random words of the group, so the dust it leaves is the same limit
+        set.
+      </p>
+
+      <h2>The multiverse</h2>
+      <p>
+        Then come cuts through ten worlds, accelerating: a kaleidoscopic IFS, the Mandelbulb, an Apollonian
+        packing, a Lyapunov fractal grown from the DVB-S2 start-of-frame word, Newton's method run on the
+        roots of a 32APSK constellation, the {4,3,5} hyperbolic honeycomb and others. Every world keeps
+        running while you are elsewhere, and every world bends the music its own way. Last is a quaternion
+        Julia set, a four-dimensional fractal, sliced by a plane turning through 4D.
+      </p>
+
+      <h2>The choir</h2>
+      <p>
+        The music under the fall is a Shepard tone: octaves sliding down forever under a fixed bell-shaped
+        loudness, so it always seems to fall and never arrives. Its partials are pure octaves from 40 Hz to
+        5 kHz, played in a small feedback-delay-network hall. The visual rule is the same: each world is an
+        endless zoom, and the zoom rate <em>is</em> the choir's rate of descent. You are falling as fast
+        as you hear yourself falling.
+      </p>
+
+      <h2>The black hole</h2>
+      <p>
+        At the end, the Julia set falls into a black hole set in a pseudo-Kleinian cathedral. The light
+        rays are bent by the Schwarzschild metric on their way through the scene, so its arches wrap into
+        Einstein rings around the shadow:
+      </p>
+      <span class="eq">x″ = −3M h² x ⁄ r⁵</span>
+      <p>
+        Then the cathedral itself is torn in, spaghettified and wound into a maelstrom by the shear of its
+        orbits. We fall with angular momentum 3.5M, just short of the 4M that would have let us escape, so we
+        spiral in. The ring the beam draws over it is a gravitational-wave chirp, h₊ and h×, its frequency
+        rising as (t<sub>c</sub> − t)<sup>−3/8</sup>. Then a flash, silence, and the single dot the
+        oscilloscope powered on with.
+      </p>
+
+      <h2>The name</h2>
+      <p>
+        It ends the way it began. The square wave was built from its Fourier series; my name is too,
+        spinning phasors chained tip to tail whose last tip writes RIVER DOWDY, sharpening as terms arrive.
+        Under it my callsign goes out in Morse at 35 words per minute, and the speakers play the name's
+        own Fourier sum, so that scope on the headphone jack reads it too.
+      </p>
+
+      <hr />
+
+      <p class="note">
+        Built with TypeScript, raw WebGPU and WGSL shaders, and an AudioWorklet: no engine and no graphics
+        libraries. The source is on <a href="https://github.com/Rivercraft911/rivercraft911.github.io">GitHub</a>.
+        The lace behind this page is an Apollonian packing, the gasket Indra's pearls pack into.
+      </p>
+
+      <ol class="refs">
+        <li>W. B. Langbein and L. B. Leopold, “River meanders: theory of minimum variance,” USGS Prof. Paper 422-H, 1966.</li>
+        <li>D. Mumford, C. Series and D. Wright, <em>Indra's Pearls: The Vision of Felix Klein</em>, 2002.</li>
+        <li>R. N. Shepard, “Circularity in judgments of relative pitch,” JASA 36, 1964.</li>
+        <li>ETSI EN 302 307, DVB-S2.</li>
+      </ol>
+
+      <footer>
+        <a href="/">↺ watch it again</a>
+        <a href="/?band">take me to the work →</a>
+      </footer>
+    </article>
+    <script type="module" src="/src/how/lace.ts"></script>
+  </body>
+</html>
