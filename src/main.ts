@@ -2,16 +2,14 @@ import { Beam } from './beam/beam'
 import { Audio } from './audio/audio'
 import { LOOK, Phosphor } from './gpu/phosphor'
 import { Timeline } from './acts/timeline'
-import { input, space, view, type Frame, type Scene } from './acts/scene'
+import { input, space, view, type Frame } from './acts/scene'
 import { idle } from './acts/idle'
 import { specimen } from './acts/specimen'
 import { hook } from './acts/hook'
 import { meander } from './acts/meander'
 import { valley } from './acts/valley'
 import { ident } from './acts/ident'
-import { singularity } from './acts/singularity'
 import { finaleA } from './acts/finaleA'
-import { finaleB } from './acts/finaleB'
 import { wrap } from './acts/wrap'
 import { indra } from './acts/indra'
 import { stutter } from './acts/stutter'
@@ -27,7 +25,7 @@ const beam = new Beam()
 const audio = new Audio()
 // ?fall plays only the fall, from the lip of the falls on (the pool needs their history); ?ident and ?end the last stretch. ?band and deep
 // links (/<project>, /qsl) skip the intro and land in the band.
-const hole = ({ a: finaleA, b: finaleB } as Record<string, Scene>)[q.get('hole') ?? ''] ?? singularity // ?hole=a, ?hole=b: the finale's takes
+const hole = finaleA // the finale: the cathedral falls in
 const scenes = q.has('specimen')
   ? [specimen]
   : q.get('world') === 'r01'

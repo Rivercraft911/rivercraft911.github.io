@@ -14,7 +14,6 @@ import newton from './fields/newton.wgsl?raw'
 import honeycomb from './fields/honeycomb.wgsl?raw'
 import julia4 from './fields/julia4.wgsl?raw'
 import polytope from './fields/polytope.wgsl?raw'
-import hole from './fields/hole.wgsl?raw'
 import bulb from './fields/bulb.wgsl?raw'
 import kleinian from './fields/kleinian.wgsl?raw'
 import apollonian from './fields/apollonian.wgsl?raw'
@@ -43,19 +42,15 @@ export const FIELDS: { code: string; data?: [number, number, number?]; shots?: t
   { code: camera + march + sierpinski },
   { code: camera + film + march + julia4 },
   { code: camera + polytope },
-  { code: camera + hole, shots: true },
 ]
 export const WRAP = 0
 export const PRIMES = 1
 export const INDRA = 2
-export const [KIFS, MANDALAY, KALISET, LYAPUNOV, NEWTON, HONEYCOMB, BULB, KLEINIAN, APOLLONIAN, SIERPINSKI, JULIA4, POLYTOPE, HOLE] = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+export const [KIFS, MANDALAY, KALISET, LYAPUNOV, NEWTON, HONEYCOMB, BULB, KLEINIAN, APOLLONIAN, SIERPINSKI, JULIA4, POLYTOPE] = [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 // The worlds of the fall, in the order we fell through them: the raster keeps a shot of each (raster.ts).
 export const WORLDS = [INDRA, KIFS, BULB, MANDALAY, KLEINIAN, KALISET, APOLLONIAN, LYAPUNOV, SIERPINSKI, NEWTON, HONEYCOMB, JULIA4]
 // The worlds after the fall, one a project: each appends its own.
 export const R01 = FIELDS.push({ code: camera + film + r01, data: [320, 120, 2] }) - 1
-// The finale, take A: the cathedral falls in.
+// The finale: the cathedral falls in.
 import holeA from './fields/holeA.wgsl?raw'
 export const HOLEA = FIELDS.push({ code: camera + holeA, shots: true }) - 1
-// The finale's take B, the fractal as the drain, through the shots for R5's last frame.
-import holeB from './fields/holeB.wgsl?raw'
-export const HOLEB = FIELDS.push({ code: camera + film + holeB, shots: true }) - 1

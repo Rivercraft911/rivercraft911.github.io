@@ -3,7 +3,7 @@
 import type { Stereo } from '../audio/audio'
 import { Path } from '../beam/path'
 import { draw, tex } from '../beam/math'
-import { hash, lock, view, type Frame } from './scene'
+import { TAU, lock, view, type Frame } from './scene'
 
 // A reality jump, as R1 makes it: a frame of overexposure burns the last reality out of the phosphor, the
 // lens is thrown wide and rings back, and the sound is spliced with a click. Fast cuts skip the flash:
@@ -13,11 +13,13 @@ export function jump(t: number, f: Frame, flash = true, kick = 0.45) {
   return kick - lock([[0, 0], [0, kick]], Math.max(0, t), 7, 0.4)
 }
 
-// The splice: 25 ms of a click in place of everything else. True while it plays.
+// The splice: each cut lands as a beat, a soft low thump (110 Hz falling to 40 in 90 ms) laid over the choir,
+// which sings straight through it. Adds into o; false, so the scene's voice goes on.
 export function splice(t: number, o: Stereo) {
-  if (t < 0 || t >= 0.025) return false
-  o.l = o.r = 0.5 * hash(t * 48000) * Math.exp(-t / 0.006)
-  return true
+  if (t < 0 || t >= 0.09) return false
+  const v = 0.4 * Math.min(1, t / 0.002) * Math.exp(-t / 0.03) * Math.sin(TAU * (110 * t - 390 * t * t))
+  o.l += v, o.r += v
+  return false
 }
 
 // The camera, written where a field shader reads it: p[0] eye, 1/tan(fov/2); p[1] right; p[2] up;

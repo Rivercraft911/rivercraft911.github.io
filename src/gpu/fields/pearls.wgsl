@@ -74,6 +74,9 @@ fn dive(ro: vec3f, rd: vec3f, t0: f32, px: f32, H: f32, fog: f32, drift: f32, a:
     t += d * 0.9;
     steps += 1.0;
     if (t > 40.0 * H) { break; }
+    // a ray that grazes the packing runs out of steps a hair from a surface: that surface is what it sees,
+    // or it would flicker to the background from frame to frame
+    if (i == 79 && d < 8.0 * px * t) { hit = true; }
   }
   let halo = vec3f(0.35, 0.5, 1.0) * glow;
   let deep = nebula(rd);
@@ -96,5 +99,6 @@ fn dive(ro: vec3f, rd: vec3f, t0: f32, px: f32, H: f32, fog: f32, drift: f32, a:
   let spec = pow(max(dot(r, key), 0.0), 300.0) + 0.4 * vec3f(1.0, 0.45, 0.8) * pow(max(dot(r, rim), 0.0), 40.0);
   let fres = 0.06 + 0.94 * pow(1.0 - ci, 2.5);
   let col = (11.0 * film(thick, ct) * fres * small + 0.8 * spec + 1.8 * nebula(r) * fres + vec3f(0.004, 0.005, 0.012)) * ao;
-  return mix(deep, col, exp(-t / H * fog)) + halo;
+  // gone into the haze before the march gives up on it, so far pearls never pop in
+  return mix(deep, col, exp(-t / H * fog) * smoothstep(40.0 * H, 28.0 * H, t)) + halo;
 }
