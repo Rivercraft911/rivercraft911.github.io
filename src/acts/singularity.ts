@@ -32,7 +32,7 @@ const TC = 5.5 // coalescence
 const K = (5 * MS / 256) ** 0.375 * 0.25 ** -0.375 / (Math.PI * MS) // f = K τ^−3/8, τ in seconds: 7 Hz at t = 0
 const TM = TC - (K / FR) ** (8 / 3) // the merger: the chirp reaches the ring's pitch
 const DAMP = 0.25 // the ringdown's decay. A real one's Q is 3.2, 6 ms; this one is held so it can be seen
-const AM = 0.42 // the strain at the merger, in scope units
+const AM = 0.7 // the strain at the merger, in scope units
 const freq = (t: number) => (t < TM ? K * (TC - t) ** -0.375 : FR)
 const phase = (t: number): number => (t < TM ? TAU * K * (TC ** 0.625 - (TC - t) ** 0.625) / 0.625 : phase(TM - 1e-9) + TAU * FR * (t - TM))
 const amp = (t: number) => (t < TM ? AM * (freq(t) / FR) ** (2 / 3) : AM * Math.exp(-(t - TM) / DAMP))

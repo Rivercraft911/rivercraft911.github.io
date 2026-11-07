@@ -381,6 +381,7 @@ fn field(q0: vec2f) -> vec3f {
   else if (end == 4) { e = vec3f(1.0, 0.75, 0.4) * u.p[6].w * 40.0; }
   if (end < 3 && !BIN) { e = shift(e, g); }
   if (SH < 0.0) { e = other(e); }
+  else if (u.p[6].z < 0.0 && end < 4) { e = memory(d, lod, 1.5); } // seen back through the ring: all that fell in, pouring out, time-reversed
   c += tr * e;
   return c * rim * u.p[4].z;
 }
