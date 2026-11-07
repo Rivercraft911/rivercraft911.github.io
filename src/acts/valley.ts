@@ -12,8 +12,8 @@ import { fft, hann } from '../dsp/fft'
 import { Field } from '../dsp/terrain'
 import { heard } from '../audio/audio'
 import { place, sing } from './choir'
-import { aim } from './reality'
-import { A0, ARC, FALL, KEYS as POOL, M, R, TAU_RASTER, pool, surface, turned, vortex as whirl } from './wrap'
+import { aim, equation } from './reality'
+import { A0, ARC, FALL, KEYS as POOL, M, R, TAU_RASTER, VORTEX, VORTEX_INK, live, pool, surface, turned, vortex as whirl } from './wrap'
 import { LOOK } from '../gpu/phosphor'
 import { Board, Say } from './say'
 import { TAU, cam, clamp, glide, hash, lock, mix, smooth, view, type Scene } from './scene'
@@ -512,7 +512,7 @@ export const valley: Scene = {
     heroGain = t < SCAN ? 0.3 : t < 3 ? 0.22 : t < 6 ? 0.35 : 0.4 // ridgelines and firs are jagged: quieter
     // the pool's printer runs from early on, so the water has its history when it shows
     const lit = smooth(16.3, 18.3, t)
-    if (t > 10) {
+    if (t > 11) {
       const fld = whirl(t - DUR, (f.at ?? 0) + t, f, lit), q = fld.p
       toPool(cur[0], cur[1], cur[2], WE), toPool(cur[3], cur[4], cur[5], WT)
       aim(q, WE, [WT[0] - WE[0], WT[1] - WE[1], WT[2] - WE[2]], UP, cur[6])
@@ -559,7 +559,10 @@ export const valley: Scene = {
     FALLS.vals[0] = YL, FALLS.hot = smooth(6.5, 8.5, t) * (1 - smooth(14.8, 16.8, t))
     SPEC.vals[0] = t, SPEC.hot = smooth(14.3, 15.3, t) * (1 - smooth(16.5, 17.5, t))
     POOL_EQ.vals[0] = pool.beta, POOL_EQ.hot = smooth(16, 17, t)
-    ceil = board.show(f, t, smooth(0.2, 0.8, t))
+    // the board gives way to the whirlpool's one equation as we come down into it
+    const hand = smooth(18.6, DUR, t)
+    ceil = board.show(f, t, smooth(0.2, 0.8, t) * (1 - hand))
+    if (hand > 0) equation(f, VORTEX, VORTEX_INK, 0.9 * hand, live)
 
     f.rate = mix(2.4e6, 7.2e6, smooth(1, 8, t))
     if (t > SING) place(t - SING)

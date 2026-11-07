@@ -7,7 +7,7 @@ import type { Stereo } from '../audio/audio'
 import { descent, place, sing } from './choir'
 import { hang, PER, plunge, SHRINK } from './drain'
 import { equation } from './reality'
-import { DUR as WRAP, LEAD, VORTEX, live, surface, vortex } from './wrap'
+import { DUR as WRAP, LEAD, VORTEX, VORTEX_INK, live, surface, vortex } from './wrap'
 import { TAU, clamp, mix, smooth, type Scene } from './scene'
 
 // Baudot (ITA2, US figures) by code: letters, then figures. '\0' marks a code that prints nothing.
@@ -20,7 +20,7 @@ const BAUD = 45.45, MARK = 2125, SPACE = 2295
 const HOLD = 3600 // the cell clock: 120 cells a row, 30 rows a second
 
 const row = new Uint8Array(512) // the centre row of text, as the raster last read it out
-const P1 = [0.1, 1, 0.27], AMBER = [1, 0.42, 0.02], EQ = [0.55, 0.85, 1] // linear light
+const P1 = [0.1, 1, 0.27], AMBER = [1, 0.42, 0.02] // linear light
 const ink = [0, 0, 0]
 
 // The teleprinter: one character after another from the centre row, each a start bit, five data bits
@@ -88,11 +88,11 @@ export const ascii: Scene = {
     const w = smooth(0, DUR, t)
     for (let i = 0; i < 3; i++) ink[i] = 1.4 * mix(P1[i], AMBER[i], w)
     fld.cell = 14
-    fld.fine = 2
+    fld.fine = t < SPREAD + 0.2 ? 2 : 1 // fine for the water's filaments while they show through; by the time the pearls do, all is text
     fld.ink = ink
     fld.lift = 14
     fld.read = row
-    equation(f, VORTEX, EQ, 0.9 * (1 - smooth(0, SPREAD, t)), live)
+    equation(f, VORTEX, VORTEX_INK, 0.9 * (1 - smooth(0, SPREAD, t)), live)
     place(T + LEAD)
     return (tt, o) => {
       const x = text(tt)

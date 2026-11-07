@@ -97,7 +97,7 @@ export function vortex(T: number, now: number, f: Frame, gain = 1) {
   p[7] = wet, p[15] = 0
   p[16] = R, p[17] = A0, p[18] = ARC, p[19] = gain
   p[20] = head % ROWS, p[21] = PER / BETA, p[22] = head - printer.from, p[23] = PER * (descent(T + LEAD) - descent(T + LEAD - FALL))
-  p[24] = 1, p[25] = Math.min(0.3, Math.max(-0.15, printer.ref - 0.8)) // the landing's white water; the reference level, as an offset in the rows' units
+  p[24] = 0.4, p[25] = Math.min(0.3, Math.max(-0.15, printer.ref - 0.8)) // the landing's white water; the reference level, as an offset in the rows' units
   p[26] = pool.H, p[27] = RC
   p[28] = pool.K, p[30] = U0, p[31] = DU
   p[46] = p[47] = 0
@@ -110,13 +110,13 @@ export function vortex(T: number, now: number, f: Frame, gain = 1) {
   return field
 }
 
-const EQ = [0.55, 0.85, 1]
+export const VORTEX_INK = [0.55, 0.85, 1]
 export const VORTEX = 'z=-\\frac{\\Gamma^2}{8\\pi^2g\\,(r^2+r_c^2)}\\qquad\\Gamma=\\num{0}{000}\\qquad\\frac{dr}{dt}=-\\num{1}{0.00}\\,r'
 export const wrap: Scene = {
   dur: DUR,
   build(t, f) {
     vortex(t, (f.at ?? 0) + t, f)
-    equation(f, VORTEX, EQ, 0.9, live)
+    equation(f, VORTEX, VORTEX_INK, 0.9, live)
     place(t + LEAD)
     return (tt, o) => sing(tt + LEAD, o)
   },

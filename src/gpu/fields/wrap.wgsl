@@ -168,8 +168,8 @@ fn field(q: vec2f) -> vec3f {
   let fine = vec2f(fx, fy);
   let lace = 1.0 - abs(2.0 * noise(vec2f(w * 768.0, ring / 192.0), vec2f(768.0, ROWS / 192.0)) - 1.0);
   let clump = noise(vec2f(w * 96.0, ring / 192.0), vec2f(96.0, ROWS / 192.0));
-  let land = u.p[6].x * exp(-rows * rows / 900.0) * step(b0, 1.0);
-  let foam = (smoothstep(0.93, 0.995, lace) * smoothstep(0.35, 0.75, clump + 0.5 * lv) * (0.2 + 0.8 * smoothstep(0.1, 0.6, lv)) * wet + land * smoothstep(0.5, 0.9, lace + 0.4 * clump)) * (1.0 - smoothstep(4.0, 24.0, fine.x + fine.y / 4.0));
+  let land = u.p[6].x * exp(-pow((rows + u.p[5].w) / 12.0, 2.0)) * step(b0, 1.0); // the ring the falls land on
+  let foam = (smoothstep(0.96, 0.998, lace) * smoothstep(0.5, 0.9, clump + 0.5 * lv) * smoothstep(0.15, 0.6, lv) * wet + land * smoothstep(0.5, 0.9, lace + 0.4 * clump)) * (1.0 - smoothstep(4.0, 24.0, fine.x + fine.y / 4.0));
   let ripple = noise(vec2f(w * 1536.0, ring / 6.0), vec2f(1536.0, ROWS / 6.0)) * (1.0 - smoothstep(1.0, 6.0, fine.x + fine.y));
 
   // The surface's normal from the vortex, roughened by the ripples and the foam.
