@@ -147,8 +147,9 @@ export const singularity: Scene = {
     for (let i = 0; i < 3; i++) beye[i] = AIM[i] - d * INTO[i]
     bup[0] = Math.cos(w), bup[1] = -Math.cos(w), bup[2] = Math.sin(w) // rolling as it goes
     aim(p.subarray(24), beye, INTO, bup, 0.95 + kick)
-    p[31] = 10, p[39] = 0.35
+    p[31] = 8, p[39] = 0.35
     p[40] = 2, p[41] = 0.3, p[42] = 50
+    field.res = t < OPEN ? 1 : 0.75 // the bulb is dear, and smeared by the fall into it
     if (p[18] > 0) f.field = field
 
     const lit = smooth(0.6, 1.5, t) * (1 - smooth(OPEN - 1, OPEN + 0.3, t))

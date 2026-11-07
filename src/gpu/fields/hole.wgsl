@@ -117,7 +117,7 @@ fn gas(x0: vec3f, x1: vec3f, b: f32, j: f32) {
     let rho = shape * smoothstep(0.42, 0.72, n) * 3.0;
     if (rho < 0.01) { continue; }
     let ut = (rr * s + A) / (pow(rr, 0.75) * sqrt(max(rr * s - 3.0 * s + 2.0 * A, 1e-3)));
-    let g = 1.0 / (ut * (1.0 + om * b));
+    let g = 1.0 / (ut * max(1.0 + om * b, 0.05));
     let x = rin / rr;
     let T = 7000.0 * 2.05 * pow(x, 0.75) * pow(max(1.0 - sqrt(x), 0.0), 0.25) + 1200.0;
     let o = 1.0 - exp(-0.8 * rho * ds); // what this sample hides, and so, being in equilibrium, emits
@@ -224,10 +224,11 @@ fn bulb(c: vec3f) -> f32 {
   let N = i32(u.p[7].w);
   for (var i = 0; i < N; i++) {
     if (r > 2.0) { break; }
-    dr = 8.0 * pow(r, 7.0) * dr + 1.0;
+    let r7 = r * r * r * r * r * r * r;
+    dr = 8.0 * r7 * dr + 1.0;
     let th = 8.0 * acos(clamp(z.z / r, -1.0, 1.0));
     let ph = 8.0 * atan2(z.y, z.x);
-    z = pow(r, 8.0) * vec3f(sin(th) * cos(ph), sin(th) * sin(ph), cos(th)) + c;
+    z = r7 * r * vec3f(sin(th) * cos(ph), sin(th) * sin(ph), cos(th)) + c;
     r = length(z);
     btrap = min(btrap, vec4f(abs(z), r * r));
   }
@@ -240,7 +241,7 @@ fn inside(q: vec2f) -> vec3f {
   var t = 0.0;
   var i = 0;
   var hit = false;
-  for (; i < 120; i++) {
+  for (; i < 96; i++) {
     let d = bulb(ro + rd * t);
     if (d < px * t + 1e-6) { hit = true; break; }
     t += d;
@@ -253,7 +254,7 @@ fn inside(q: vec2f) -> vec3f {
   let k = vec2f(1.0, -1.0);
   let n = normalize(k.xyy * bulb(P + k.xyy * e) + k.yyx * bulb(P + k.yyx * e) + k.yxy * bulb(P + k.yxy * e) + k.xxx * bulb(P + k.xxx * e));
   bulb(P);
-  let ao = pow(1.0 - f32(i) / 120.0, 2.0);
+  let ao = pow(1.0 - f32(i) / 96.0, 2.0);
   let key = normalize(vec3f(0.5, 0.7, 0.4));
   let dif = max(dot(n, key), 0.0);
   let spec = pow(max(dot(reflect(rd, n), key), 0.0), 30.0);
@@ -287,6 +288,7 @@ fn field(q0: vec2f) -> vec3f {
   var hit = false;
   var len = 0.0;
   var dx = vec3f(0.0);
+  var free = vec4f(x, hall(x)); // a ball the nave is known to keep clear of
   for (var i = 0; i < 110; i++) {
     let dp1 = flow(x, p, &dx);
     if (R < rh + 0.02) { fell = true; break; }
@@ -304,9 +306,12 @@ fn field(q0: vec2f) -> vec3f {
     gas(x, xn, b, j);
     // the nave, wherever this step of the ray might reach it
     let v = xn - x;
-    if (hall(x) < length(v)) {
-      let m = meet(x, v, len);
-      if (m >= 0.0) { x += m * v; len += m * length(v); hit = true; break; }
+    if (distance(xn, free.xyz) > free.w) {
+      free = vec4f(x, hall(x));
+      if (free.w < length(v)) {
+        let m = meet(x, v, len);
+        if (m >= 0.0) { x += m * v; len += m * length(v); hit = true; break; }
+      }
     }
     len += length(v);
     x = xn;
