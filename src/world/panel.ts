@@ -22,8 +22,15 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string,
 const head = (w: string, title: string) => el('h2', {}, el('b', {}, w), ' ', title)
 
 let root: HTMLElement | undefined
-// How much of the screen's width the page covers, so the world can frame its subject in the rest.
-export const cover = () => (!root || root.classList.contains('shut') || innerWidth < innerHeight * 0.85 ? 0 : root.offsetWidth / innerWidth)
+// How much of the screen the page covers, across from the right and up from the bottom, so the world can
+// frame its subject in the rest.
+const covered = [0, 0]
+export function cover() {
+  covered[0] = covered[1] = 0
+  if (root && !root.classList.contains('shut'))
+    innerWidth < innerHeight * 0.85 ? (covered[1] = root.offsetHeight / innerHeight) : (covered[0] = root.offsetWidth / innerWidth)
+  return covered
+}
 
 export function panel(p: Page) {
   if (root) return

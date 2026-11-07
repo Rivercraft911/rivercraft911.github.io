@@ -35,10 +35,10 @@
   top: 3.2vh;
   right: 2.6vw;
   z-index: 1;
-  padding: 0.3em 0;
+  padding: 0.35em 0.7em;
   border: 0;
   border-bottom: 1px solid #8b859766;
-  background: none;
+  background: #000000b8;
   color: var(--dim);
   font: inherit;
   font-size: 11.5px;

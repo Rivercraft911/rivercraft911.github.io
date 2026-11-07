@@ -81,7 +81,7 @@ function span(k: number, t: number) {
   return b ? (s0 * (Math.exp(b * (t - t0)) - 1)) / b : s0 * (t - t0)
 }
 const at = (t: number) => (t < LOOP ? t : LOOP + ((((t - LOOP) % PERIOD) + PERIOD) % PERIOD))
-const Q0 = W0 + (WIN * 86) / NX // we tune in on the first line, at pixel 86
+const Q0 = W0 + (WIN * 40) / NX // we tune in on the first line, at pixel 40
 const speed = { s: 0 }
 // Facets swept by scene time t (float64 throughout), and the speed then, in speed.s.
 function scan(t: number) {
@@ -116,7 +116,7 @@ function beamAt(q: number) {
 // A segment on screen, cut where it passes behind the eye: its ends into C; false if none of it shows.
 const C = [0, 0, 0, 0]
 function clip(ax: number, ay: number, az: number, bx: number, by: number, bz: number) {
-  const p = field.p, near = 0.03
+  const p = field.p, near = 0.15 // nearer than this is off the screen, or nearly
   const da = (ax - p[0]) * p[12] + (ay - p[1]) * p[13] + (az - p[2]) * p[14]
   const db = (bx - p[0]) * p[12] + (by - p[1]) * p[13] + (bz - p[2]) * p[14]
   if (da < near && db < near) return false
@@ -193,7 +193,7 @@ const eqp = new Path()
 const vals = [0, 0, 0, 0]
 function say(f: Frame, src: string, c: readonly number[]) {
   eqp.clear().color(c[0], c[1], c[2], 0.9)
-  draw(eqp, tex(src), -view.a * 0.9, 0.86, 0.055, 0, 1, vals)
+  draw(eqp, tex(src), -view.a * 0.9, 0.86, Math.min(0.055, 0.05 * view.a), 0, 1, vals) // a phone gets it smaller
   f.ch.push({ w: 0.15, path: eqp })
 }
 const INK = [0.95, 0.9, 1]
@@ -227,7 +227,8 @@ const PAGE: Page = {
   link: ['source on GitHub', 'https://github.com/Rivercraft911/R-01_Raster_Laser_Projector'],
 }
 
-let last = NaN, side = 0
+let last = NaN
+const side = [0, 0]
 export const r01: Scene = {
   dur: Infinity,
   build(t, f) {
@@ -247,9 +248,10 @@ export const r01: Scene = {
     const p = field.p
     aim(p, cam, fwd, up, cam[6])
     // with the page open, the subject sits in the middle of what is left of the screen
-    side += (cover() - side) * (1 - Math.exp(-4 * dt))
-    const d = Math.hypot(fwd[0], fwd[1], fwd[2]) * Math.tan(cam[6] / 2) * side * view.a
-    fwd[0] += d * p[4], fwd[1] += d * p[5], fwd[2] += d * p[6]
+    const c = cover(), ease = 1 - Math.exp(-4 * dt), h = Math.hypot(fwd[0], fwd[1], fwd[2]) * Math.tan(cam[6] / 2)
+    side[0] += (c[0] - side[0]) * ease, side[1] += (c[1] - side[1]) * ease
+    const dx = h * side[0] * view.a, dy = -h * side[1] // look right of (or below) the subject, so it sits in the open part
+    for (let i = 0; i < 3; i++) fwd[i] += dx * p[4 + i] + dy * p[8 + i]
     aim(p, cam, fwd, up, cam[6])
     p[16] = qm, p[17] = F, p[18] = s / LINE, p[19] = 1.6
     p[20] = (Math.PI / 2) * (1 - (q - Math.floor(q))), p[21] = Math.min(Math.PI / 2, (Math.PI / 2) * dq)

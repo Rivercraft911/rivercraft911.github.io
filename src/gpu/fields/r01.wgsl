@@ -22,6 +22,8 @@ const PA = 0.06;        // the polygon's half side
 const GX = 0.22;        // the galvo mirror, on the x axis
 const LAMP = vec3f(0.4, 1.3, -0.2); // the one lamp, over the bench
 const WARM = vec3f(1.0, 0.86, 0.7);
+const ROOM0 = vec3f(-3.2, FY, -3.0); // the room's corners: the floor, and the wall it paints at z = D
+const ROOM1 = vec3f(3.2, 2.4, D);
 
 var<private> mat: i32;
 var<private> facet: f32;
@@ -196,10 +198,11 @@ fn field(q: vec2f) -> vec3f {
   gn = normalize(vec3f(-cos(e), sin(e), -1.0));
   ga = normalize(cross(vec3f(0.0, 1.0, 0.0), gn));
 
-  // the room's two planes, and the machine
-  let tf = select(1e9, (FY - ro.y) / rd.y, rd.y < 0.0);
-  let tw = select(1e9, (D - ro.z) / rd.z, rd.z > 0.0);
-  let tm = machine(ro, rd, min(tf, tw), 90);
+  // the room, a box we are inside, and the machine in it
+  let wall0 = select(ROOM0, ROOM1, rd > vec3f(0.0));
+  let tr = (wall0 - ro) / rd;
+  let t = min(tr.x, min(tr.y, tr.z));
+  let tm = machine(ro, rd, t, 90);
   if (tm > 0.0) {
     let P = ro + rd * tm;
     let foot = cone() * tm;
@@ -218,17 +221,19 @@ fn field(q: vec2f) -> vec3f {
     }
     return c;
   }
-  let t = min(tf, tw);
-  if (t >= 1e8) { return vec3f(0.0); }
   let P = ro + rd * t;
   let foot = cone() * t;
-  if (tw < tf) { // the wall: what the lasers paint, and a little spill
-    return wall(P.x, P.y, foot / max(rd.z, 0.2)) + 0.004 * u.p[6].xyz + vec3f(0.0015);
+  let mean = u.p[6].xyz;
+  if (t == tr.z && rd.z > 0.0) { // the wall: what the lasers paint, and a little spill
+    return wall(P.x, P.y, foot / max(rd.z, 0.2)) + 0.004 * mean + vec3f(0.0015);
   }
-  // the floor: lit by the image, and holding a rough reflection of it
-  let near = exp(-(D - P.z) * 0.9) * exp(-abs(P.x) * 0.4);
-  let j = vec3f(0.08 * (fract(n0 * 3.1) - 0.5), 0.0, 0.08 * (fract(n0 * 5.7) - 0.5));
-  let r = normalize(reflect(rd, vec3f(0.0, 1.0, 0.0)) + j);
-  let fr = 0.04 + 0.96 * pow(1.0 - abs(rd.y), 5.0);
-  return vec3f(0.0015) + 0.05 * u.p[6].xyz * near + 0.5 * fr * env(P, r, foot);
+  // the rest of the room, lit only by the picture
+  let glow = mean * exp(-(D - P.z) * 0.9) * exp(-abs(P.x) * 0.4);
+  if (t == tr.y && rd.y < 0.0) { // the floor, holding a rough reflection of the picture
+    let j = vec3f(0.08 * (fract(n0 * 3.1) - 0.5), 0.0, 0.08 * (fract(n0 * 5.7) - 0.5));
+    let r = normalize(reflect(rd, vec3f(0.0, 1.0, 0.0)) + j);
+    let fr = 0.04 + 0.96 * pow(1.0 - abs(rd.y), 5.0);
+    return vec3f(0.0015) + 0.05 * glow + 0.5 * fr * env(P, r, foot);
+  }
+  return vec3f(0.0012) + 0.012 * glow;
 }
