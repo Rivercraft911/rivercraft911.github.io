@@ -19,7 +19,7 @@ import { ophanim, AT as R5, DUR as R5DUR } from './ophanim'
 import { aim, equation, jump } from './reality'
 import { TAU, clamp, hash, mix, smooth, type Frame, type Scene } from './scene'
 
-export const AT = R5 + R5DUR // 47.5 on the choir's clock; the cut is AT + PEAK, with choir.END just past it
+export const AT = R5 + R5DUR // 46 on the choir's clock; the cut is AT + PEAK, with choir.END just past it
 export const PEAK = 7.2 // the horizon: one flash, then silence
 const DOT = PEAK + 0.7 // and the dot
 

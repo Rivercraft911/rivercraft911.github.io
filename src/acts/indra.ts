@@ -14,7 +14,7 @@ import { aim, equation, project, seen } from './reality'
 import { smooth, type Scene } from './scene'
 
 export const AT = R1END // the choir's clock when this reality begins: as we come through the drain
-export const DUR = 4.5
+export const DUR = 3
 const HALF = -0.5 / Math.log(SHRINK) // ln |q|² to powers of λ
 const POWERS = Array.from({ length: 41 }, (_, i): [number, number] => [SHRINK ** (i - 20) * Math.cos(TURN * (i - 20)), SHRINK ** (i - 20) * Math.sin(TURN * (i - 20))]) // λⁿ, n = −20 … 20
 
