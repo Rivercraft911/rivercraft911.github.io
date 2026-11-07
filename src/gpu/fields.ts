@@ -3,6 +3,7 @@ import wrap from './fields/wrap.wgsl?raw'
 import film from './fields/film.wgsl?raw'
 import primes from './fields/primes.wgsl?raw'
 import camera from './fields/camera.wgsl?raw'
+import pearls from './fields/pearls.wgsl?raw'
 import indra from './fields/indra.wgsl?raw'
 import march from './fields/march.wgsl?raw'
 import kifs from './fields/kifs.wgsl?raw'
@@ -27,9 +28,9 @@ export const SIEVE = [1024, 64] // the primes' sieve: a byte for every 30 intege
 // A field's data texture: width, height, and bytes a texel (2: rg8, a 16-bit value split high and low);
 // or, for shots, the raster's shot of every world.
 export const FIELDS: { code: string; data?: [number, number, number?]; shots?: true }[] = [
-  { code: camera + wrap, data: [BINS, ROWS, 2] },
+  { code: camera + film + pearls + wrap, data: [BINS, ROWS, 2] }, // the drain opens onto the pearls
   { code: film + primes, data: [SIEVE[0], SIEVE[1]] },
-  { code: camera + film + indra },
+  { code: camera + film + pearls + indra },
   { code: camera + march + kifs },
   { code: camera + march + mandalay },
   { code: camera + kaliset },

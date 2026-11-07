@@ -1,5 +1,5 @@
-// R3 · Indra. The prime bubbles burst into Indra's pearls: the Maskit Kleinian group's balls in upper
-// half-space (indra.wgsl), grown a generation of the group at a time, each a soap film. We fall into the
+// R3 · Indra. Down the drain into Indra's pearls: the Maskit Kleinian group's balls in upper half-space
+// (pearls.wgsl), each a soap film, the text that read them eaten back by them. We fall into the
 // attracting fixed point of w = ab, where the group's picture repeats itself shrunk by |λ| and turned by
 // arg λ: half a period per octave of the choir's descent, so the dive spirals forever and is a loop. On the
 // floor the beam plays the chaos game: every sample one more random word of the group applied to a point
@@ -8,45 +8,17 @@
 import { INDRA as SHADER } from '../gpu/fields'
 import type { Field } from '../gpu/raster'
 import { descent, place, sing } from './choir'
-import { DUR as WRAP, LEAD } from './wrap'
-import { ascii } from './ascii'
-import { aim, equation, jump, project, seen, splice } from './reality'
-import { mix, smooth, type Scene } from './scene'
+import { AT as R1END } from './ascii'
+import { A, B, GROUP, GROUP_INK, H, LENS, MU, PER, SHRINK, TURN, ZM, ZP, div, eye, fall, fwd, mul, up } from './drain'
+import { aim, equation, project, seen } from './reality'
+import { smooth, type Scene } from './scene'
 
-export const AT = LEAD + WRAP + ascii.dur // the choir's clock when this reality begins
+export const AT = R1END // the choir's clock when this reality begins: as we come through the drain
 export const DUR = 4.5
-const A = 1.95859, B = 0.0112 // the trace of a: a pearl necklace that spirals as it shrinks
-const MU = { re: -B, im: A } // a(z) = μ + 1/z
-const PER = 0.5 // periods of w per octave of descent
-
-// w = ab = [[−iμ, −i(2μ + 1)], [−i, −2i]]: its fixed points z = (p − s ± √(tr² − 4)) / 2r, and the multiplier
-// λ = 1/(r z + s)² at the attracting one, z₊.
-type Z = [number, number]
-const mul = (a: Z, b: Z): Z => [a[0] * b[0] - a[1] * b[1], a[0] * b[1] + a[1] * b[0]]
-const div = (a: Z, b: Z): Z => {
-  const d = b[0] * b[0] + b[1] * b[1]
-  return [(a[0] * b[0] + a[1] * b[1]) / d, (a[1] * b[0] - a[0] * b[1]) / d]
-}
-const root = (a: Z): Z => {
-  const m = Math.hypot(a[0], a[1])
-  return [Math.sqrt((m + a[0]) / 2), Math.sign(a[1] || 1) * Math.sqrt((m - a[0]) / 2)]
-}
-const W = { p: [MU.im, -MU.re] as Z, r: [0, -1] as Z, s: [0, -2] as Z }
-const TR: Z = [W.p[0] + W.s[0], W.p[1] + W.s[1]], D = root(((x: Z): Z => [x[0] - 4, x[1]])(mul(TR, TR)))
-const PS: Z = [W.p[0] - W.s[0], W.p[1] - W.s[1]], R2X: Z = [2 * W.r[0], 2 * W.r[1]]
-const fixed = [div([PS[0] + D[0], PS[1] + D[1]], R2X), div([PS[0] - D[0], PS[1] - D[1]], R2X)]
-const mult = (z: Z) => {
-  const d = mul(W.r, z)
-  return div([1, 0], mul([d[0] + W.s[0], d[1] + W.s[1]], [d[0] + W.s[0], d[1] + W.s[1]]))
-}
-const [ZP, ZM] = Math.hypot(...mult(fixed[0])) < 1 ? fixed : [fixed[1], fixed[0]]
-const LAMBDA = mult(ZP), SHRINK = Math.hypot(LAMBDA[0], LAMBDA[1]), TURN = Math.atan2(LAMBDA[1], LAMBDA[0])
 const HALF = -0.5 / Math.log(SHRINK) // ln |q|² to powers of λ
-const POWERS = Array.from({ length: 41 }, (_, i): Z => [SHRINK ** (i - 20) * Math.cos(TURN * (i - 20)), SHRINK ** (i - 20) * Math.sin(TURN * (i - 20))]) // λⁿ, n = −20 … 20
+const POWERS = Array.from({ length: 41 }, (_, i): [number, number] => [SHRINK ** (i - 20) * Math.cos(TURN * (i - 20)), SHRINK ** (i - 20) * Math.sin(TURN * (i - 20))]) // λⁿ, n = −20 … 20
 
 const field: Field = { shader: SHADER, k: 1, p: new Float32Array(28) }
-const eye = [0, 0, 0], fwd = [1, 0, 0], up = [0, 0, 1]
-const EQ = [0.85, 0.78, 1]
 
 // The chaos game: a point of the limit set, walked by random words of the group.
 const z = { re: 0, im: 0, last: 0, seed: 1 }
@@ -76,17 +48,11 @@ function walk() {
 export const indra: Scene = {
   dur: DUR,
   build(t, f) {
-    const T = t + AT, kick = jump(t, f, false, 0.3), p = field.p // no flash: we fall through the drain
-    const s0 = PER * (descent(T) - descent(AT)), f0 = s0 - Math.floor(s0)
-    const k = SHRINK ** f0, c = Math.cos(TURN * f0), sn = Math.sin(TURN * f0), H = 1.2
-    const ex = H * (0.12 + 0.06 * Math.sin(0.4 * t)), ey = H * 0.06 * Math.sin(0.3 * t), ez = H * mix(1.6, 1, smooth(0, 3, t))
-    eye[0] = k * (c * ex - sn * ey), eye[1] = k * (sn * ex + c * ey), eye[2] = k * ez
-    const fx = -0.12, fy = 0.08 * Math.sin(0.27 * t)
-    fwd[0] = c * fx - sn * fy, fwd[1] = sn * fx + c * fy, fwd[2] = -1
-    up[0] = c, up[1] = sn, up[2] = 0
-    aim(p, eye, fwd, up, 1.25 + kick)
-    p[16] = A, p[17] = B, p[18] = Math.min(12, 1 + Math.floor(t * 6)), p[19] = smooth(0, 0.3, t)
-    p[20] = 0.4 * t, p[21] = 0.06, p[22] = k * H, p[23] = 2.6 * smooth(0, 0.9, t) ** 1.5
+    const T = t + AT, p = field.p // no jump: we come through the drain, on the camera that brought us
+    const s0 = PER * (descent(T) - descent(AT)), k = fall(s0 - Math.floor(s0), t)
+    aim(p, eye, fwd, up, LENS)
+    p[16] = A, p[17] = B, p[18] = 12, p[19] = 1
+    p[20] = 0.4 * t, p[21] = 0.06, p[22] = k * H
     p[24] = ZM[0], p[25] = ZM[1], p[26] = ZM[0] - ZP[0], p[27] = ZM[1] - ZP[1]
     f.field = field
 
@@ -109,13 +75,10 @@ export const indra: Scene = {
         s.r = 0.85, s.g = 0.8, s.b = 1
       },
     })
-    equation(f, 'a(z)=\\mu+\\frac{1}{z}\\quad b(z)=z+2', EQ)
+    equation(f, GROUP, GROUP_INK)
     f.rate = 2.4e6
     place(T)
 
-    return (tt, o) => {
-      if (splice(tt, o)) return
-      sing(tt + AT, o, 1, { gold: smooth(0, 1.5, tt), prime: 1 - smooth(0, 1.5, tt) })
-    }
+    return (tt, o) => sing(tt + AT, o, 1, { gold: smooth(0, 1.5, tt) })
   },
 }

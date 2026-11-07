@@ -12,7 +12,8 @@ export type Field = {
   k: number // brightness
   p: Float32Array // the shader's parameters, up to 60 floats
   res?: number // the light's resolution against the raster's usual
-  cell?: number // read out as text, in cells this many CSS px tall (3:5)
+  cell?: number // read out as text, in cells this many CSS px tall (3:5); where the field says it is not text, light
+  fine?: number // read out as text, the field's pixels across each of a cell's 6 × 10
   ink?: readonly number[] // the glyphs' colour, linear
   lift?: number // how much light makes a cell full
   rows?: { data: Uint8Array; at: number; n: number } // new rows for the shader's data texture, ring row `at`
@@ -62,7 +63,7 @@ export class Raster {
     this.u = d.createBuffer({ size: this.uf.byteLength, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
     this.glyph = d.createBuffer({ size: 64 * 60 * 4, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
     this.smp = d.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear', addressModeU: 'repeat', addressModeV: 'repeat' })
-    this.back = d.createBuffer({ size: 4096, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST })
+    this.back = d.createBuffer({ size: 8192, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST })
     const use = GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC | GPUTextureUsage.COPY_DST
     this.shots = d.createTexture({ size: [4 * SHOT[0], 3 * SHOT[1]], mipLevelCount: MIPS, format: FLOAT, usage: use })
     this.shot = d.createTexture({ size: SHOT, format: FLOAT, usage: use })
@@ -83,7 +84,7 @@ export class Raster {
       d.createRenderPipelineAsync({ layout: lay, vertex: { module, entryPoint: 'vs' }, fragment: { module, entryPoint: fs, targets: [{ format, blend }] } })
     const r = d.createShaderModule({ code: rasterWGSL }), fl = d.createPipelineLayout({ bindGroupLayouts: [layout] })
     ;[this.light, this.cell, this.text, this.blit, this.mip] = await Promise.all([
-      pipe(r, 'lightFS', acc, ADD), pipe(r, 'cellFS', 'rg32float'), pipe(r, 'textFS', acc, ADD), pipe(r, 'shotFS', FLOAT), pipe(r, 'mipFS', FLOAT),
+      pipe(r, 'lightFS', acc, ADD), pipe(r, 'cellFS', 'rgba32float'), pipe(r, 'textFS', acc, ADD), pipe(r, 'shotFS', FLOAT), pipe(r, 'mipFS', FLOAT),
     ])
     const level = (i: number) => this.shots.createView({ baseMipLevel: i, mipLevelCount: 1 })
     for (let i = 1; i < MIPS; i++)
@@ -123,13 +124,14 @@ export class Raster {
     const text = !!f.cell && this.chars.length > 0
     const ch = Math.round((f.cell ?? 20) * dpr), cw = Math.round(ch * 0.6)
     const cols = Math.floor(w / cw), rows = Math.floor(h / ch), sc = Math.min(1, this.scale * (f.res ?? 1))
-    const fw = text ? cols * GRID[0] : Math.max(1, Math.round(w * sc)), fh = text ? rows * GRID[1] : Math.max(1, Math.round(h * sc))
+    const fine = text ? (f.fine ?? 1) : 1
+    const fw = text ? cols * GRID[0] * fine : Math.max(1, Math.round(w * sc)), fh = text ? rows * GRID[1] * fine : Math.max(1, Math.round(h * sc))
     if (this.tex?.width !== fw || this.tex.height !== fh || this.mode !== +text || (text && this.cells?.width !== cols)) {
       this.tex?.destroy(), this.cells?.destroy()
       const tex = (w: number, h: number, format: GPUTextureFormat) =>
         d.createTexture({ size: [w, h], format, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_SRC })
       this.tex = tex(fw, fh, FLOAT)
-      this.cells = tex(Math.max(1, cols), Math.max(1, rows), 'rg32float')
+      this.cells = tex(Math.max(1, cols), Math.max(1, rows), 'rgba32float')
       const group = (p: GPURenderPipeline, e: [number, GPUBindingResource][]) =>
         d.createBindGroup({ layout: p.getBindGroupLayout(0), entries: e.map(([binding, resource]) => ({ binding, resource })) })
       const u = { buffer: this.u }, s = this.smp, v = (this.views[0] = this.tex.createView())
@@ -138,7 +140,7 @@ export class Raster {
       if (text)
         this.groups.push(
           group(this.cell, [[0, u], [2, v], [5, { buffer: this.glyph }]]),
-          group(this.text, [[0, u], [1, s], [3, this.views[1]], [4, this.atlas.createView()]]),
+          group(this.text, [[0, u], [1, s], [2, v], [3, this.views[1]], [4, this.atlas.createView()]]),
         )
       this.mode = +text
     }
@@ -177,12 +179,13 @@ export class Raster {
       d.queue.writeTexture({ texture: F.data, origin: [0, a] }, data, { bytesPerRow: B }, [W, m])
       if (n > m) d.queue.writeTexture({ texture: F.data }, data, { offset: m * B, bytesPerRow: B }, [W, n - m])
     }
+    if (!f.k) return void (this.on = false) // dark: its data kept, nothing swept
     uf[0] = w, uf[1] = h, uf[2] = cw, uf[3] = ch, uf[4] = cols, uf[5] = rows
     uf[6] = Math.floor((w - cols * cw) / 2), uf[7] = Math.floor((h - rows * ch) / 2)
     const ink = f.ink ?? [0.35, 1, 0.55]
     uf[8] = ink[0], uf[9] = ink[1], uf[10] = ink[2], uf[11] = gain * f.k
     uf[12] = TILE[0], uf[13] = TILE[1], uf[14] = ATLAS_COLS, uf[15] = this.chars.length
-    uf[16] = f.lift ?? 2, uf[17] = 0.2
+    uf[16] = f.lift ?? 2, uf[17] = 0.2, uf[18] = fine
     d.queue.writeBuffer(this.u, 0, uf)
 
     sweep(f, this.views[0], fw, fh, aspect)
@@ -191,7 +194,7 @@ export class Raster {
     if (!text) return
     pass(this.views[1], this.cell, this.groups[2])
     if (f.read && !this.reading) {
-      enc.copyTextureToBuffer({ texture: this.cells!, origin: [0, rows >> 1] }, { buffer: this.back, bytesPerRow: 4096 }, [Math.min(cols, 512), 1])
+      enc.copyTextureToBuffer({ texture: this.cells!, origin: [0, rows >> 1] }, { buffer: this.back, bytesPerRow: 8192 }, [Math.min(cols, 512), 1])
       this.reading = f.read
       this.cols = Math.min(cols, 512)
     }
@@ -211,9 +214,9 @@ export class Raster {
     if (!out || this.back.mapState !== 'unmapped') return
     const n = this.cols
     this.back.mapAsync(GPUMapMode.READ).then(() => {
-      const g = new Float32Array(this.back.getMappedRange(0, n * 8))
+      const g = new Float32Array(this.back.getMappedRange(0, n * 16))
       out.fill(0)
-      for (let i = 0; i < n && i < out.length; i++) out[i] = this.chars.charCodeAt(g[2 * i]) || 32
+      for (let i = 0; i < n && i < out.length; i++) out[i] = this.chars.charCodeAt(g[4 * i]) || 32
       this.back.unmap()
       this.reading = undefined
     })

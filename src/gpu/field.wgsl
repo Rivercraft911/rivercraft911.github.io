@@ -24,6 +24,10 @@ fn finite(c: vec3f) -> vec3f {
   return select(vec3f(0.0), max(c, vec3f(0.0)), ok);
 }
 
+// Read out as text, how much of this pixel is text and how much light (raster.wgsl): a field may say.
+var<private> text = 1.0;
+
 @fragment fn fs(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-  return vec4f(finite(field(vec2f((pos.x / u.res.x * 2.0 - 1.0) * u.aspect, 1.0 - pos.y / u.res.y * 2.0))), 0.0);
+  let c = finite(field(vec2f((pos.x / u.res.x * 2.0 - 1.0) * u.aspect, 1.0 - pos.y / u.res.y * 2.0)));
+  return vec4f(c, clamp(text, 0.0, 1.0));
 }
