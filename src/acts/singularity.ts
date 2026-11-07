@@ -15,9 +15,9 @@ import type { Field } from '../gpu/raster'
 import { place, sing } from './choir'
 import { indra } from './indra'
 import { ophanim, AT as R5, DUR as R5DUR } from './ophanim'
-import { aim, equation, jump, splice } from './reality'
+import { aim, equation, jump } from './reality'
 import { stutter } from './stutter'
-import { TAU, clamp, glide, hash, mix, smooth, type Frame, type Scene } from './scene'
+import { TAU, clamp, glide, hash, mix, smooth, view, type Frame, type Scene } from './scene'
 
 export const AT = R5 + R5DUR // 52 on the choir's clock; its clock stops, choir.END, at the merger
 
@@ -65,7 +65,7 @@ function worlds() {
   return out
 }
 
-const field: Field = { shader: HOLE, k: 1, p: new Float32Array(48) }
+const field: Field = { shader: HOLE, k: 1, p: new Float32Array(60) }
 const eye = [0, 0, 0], fwd = [0, 0, 0], up = [0, 0, 0]
 const look = { tau: 0.08 }, sharp = { tau: 0.012 } // the orbit drawn crisp; the white hole's chirp with its long trail
 const DREAD = { dread: 1 }
@@ -111,13 +111,33 @@ function fall(sh: number, e: number, out: Float32Array) {
 }
 
 
+// The hand-off: R5's Julia set, its last frame as a picture filling the view 2 M ahead of the eye, falls
+// into the first hole, shrinking and stretched along its fall, redshifted by √(1 − r_s/r), gone by SWALLOW.
+const SWALLOW = 1.8, hole = [0, 0, 0], to = [0, 0, 0]
+function swallow(t: number, p: Float32Array) {
+  const e = clamp(t / SWALLOW) ** 2, h = 2 * Math.tan(0.475), ps = p[21], d = p[22] / 2
+  p[51] = +(e < 1)
+  if (e >= 1) return
+  hole[0] = d * Math.cos(ps), hole[1] = d * Math.sin(ps), hole[2] = 0
+  let n = 0
+  for (let i = 0; i < 3; i++) (p[48 + i] = mix(eye[i] + 2 * p[12 + i], hole[i], e * e)), (to[i] = hole[i] - p[48 + i]), (n += to[i] ** 2)
+  n = Math.sqrt(n) || 1
+  const s = 1 - 0.9 * e, k = 3 * e
+  for (const [o, a, w] of [[52, 4, h * view.a], [56, 8, h]]) {
+    const along = (p[a] * to[0] + p[a + 1] * to[1] + p[a + 2] * to[2]) / (n * n)
+    for (let i = 0; i < 3; i++) p[o + i] = w * s * (p[a + i] + k * along * to[i])
+  }
+  p[55] = Math.sqrt(Math.max(0, 1 - 1 / Math.max(1, n)))
+  p[59] = 1 - smooth(0, 0.4, e) // its dark ground opaque at first, as R5 left it, then gone
+}
+
 export const singularity: Scene = {
   dur: 10,
   build(t, f) {
     field.bake ??= worlds() // before anything of ours: the other scenes' builds share the equation's path
     const dt = clamp(t - was, 0, 1 / 30), p = field.p
     was = t
-    const kick = jump(t, f, true, 0.6) + (t < TM ? 0 : jump(t - TM, f, true, 0.25)) // the merger's one flash
+    const kick = t < TM ? 0 : jump(t - TM, f, true, 0.25) // the merger's one flash; the Julia set flows on unbroken
     const D = fly(t), ci = eye[2] / D // cos ι: the beam's ellipse is the wave as it reaches the eye
     aim(p, eye, fwd, up, 0.95 + kick)
     const zc = Math.exp(1.6 * Math.max(0, t - (END - 0.9)) ** 1.6) // the collapse: the picture shrinks to a point
@@ -131,6 +151,7 @@ export const singularity: Scene = {
     if (t >= TM) fall(p[26], 1.8, p.subarray(44))
     p[39] = 1, p[40] = 1, p[41] = 0.3, p[42] = 60
     field.res = t < TM ? 0.85 : 0.6
+    swallow(t, p)
     if (p[18] > 0) f.field = field
 
     // the wave, h₊ and h× as x and y; at the end the dot alone, as station identification finds it
@@ -155,7 +176,7 @@ export const singularity: Scene = {
     const T = AT + proper(t)
     place(T)
     return (tt, o) => {
-      if (splice(tt, o)) return
+
       // the choir, as it sinks: its clock slowed by g, so its every pitch falls by g, and its sound dimmed
       if (tt < TM) sing(AT + proper(tt), o, redshift(tt), DREAD)
       const u = back(tt), ph = phase(u), A = clamp(amp(u), 0, 0.85) * (1 - smooth(END - 1.2, END - 0.1, tt))

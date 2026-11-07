@@ -235,6 +235,28 @@ fn memory(n: vec3f, lod: f32, blue: f32) -> vec3f {
   return shift(c, g) * u.p[8].z * select(1.0, 0.25, blue > 0.0);
 }
 
+// The last world, the Julia set, as the raster last showed it: a picture at c spanning ±U, ±V, falling into
+// the first hole, stretched along its fall and redshifted by g as it goes. Where the chord x to x + v meets it: its
+// light, and how much it hides, its dark ground opaque only at first.
+fn card(x: vec3f, v: vec3f) -> vec4f {
+  let U = u.p[13].xyz;
+  let V = u.p[14].xyz;
+  let n = cross(U, V);
+  let s = dot(u.p[12].xyz - x, n) / dot(v, n);
+  if (!(s >= 0.0 && s <= 1.0)) { return vec4f(0.0); }
+  let P = x + s * v - u.p[12].xyz;
+  let uu = dot(U, U);
+  let uv = dot(U, V);
+  let vv = dot(V, V);
+  let pu = dot(P, U);
+  let pv = dot(P, V);
+  let w = vec2f(pu * vv - pv * uv, pv * uu - pu * uv) / (uu * vv - uv * uv);
+  if (max(abs(w.x), abs(w.y)) > 1.0) { return vec4f(0.0); }
+  let at = (vec2f(3.0, 2.0) + clamp(0.5 + vec2f(0.5, -0.5) * w, vec2f(0.001), vec2f(0.999))) / vec2f(4.0, 3.0);
+  let c = textureSampleLevel(data, smp, at, 0.0).rgb;
+  return vec4f(shift(c, u.p[13].w) * u.p[12].w, max(smoothstep(0.01, 0.06, dot(c, vec3f(0.3, 0.6, 0.1))), u.p[14].w));
+}
+
 fn field(q0: vec2f) -> vec3f {
   let z = u.p[4].y;
   let q = q0 * z;
@@ -278,6 +300,7 @@ fn field(q0: vec2f) -> vec3f {
     g = 1.0 / abs(pt);
   }
   var c = vec3f(0.0); // the light gathered on the way
+  var tr = 1.0; // and how much of what lies beyond still shows
   var end = 0; // 0 lost, 1 escaped, 2 the nave, 3 fell in, 4 the ring, 5 piled against a horizon from inside
   var len = 0.0;
   var dx = p;
@@ -321,6 +344,12 @@ fn field(q0: vec2f) -> vec3f {
       let c = mix(x, xn, x.z / (x.z - xn.z));
       if (dot(c.xy, c.xy) < A * A) { SH = -SH; }
     }
+    if (u.p[12].w > 0.0) {
+      let k = card(x, xn - x);
+      c += tr * k.w * k.rgb;
+      tr *= 1.0 - k.w;
+      if (tr < 0.01) { end = 6; break; }
+    }
     // the nave, wherever this step of the ray might reach it
     let v = xn - x;
     if (distance(xn, free.xyz) > free.w) {
@@ -352,6 +381,6 @@ fn field(q0: vec2f) -> vec3f {
   else if (end == 4) { e = vec3f(1.0, 0.75, 0.4) * u.p[6].w * 40.0; }
   if (end < 3 && !BIN) { e = shift(e, g); }
   if (SH < 0.0) { e = other(e); }
-  c += e;
+  c += tr * e;
   return c * rim * u.p[4].z;
 }
