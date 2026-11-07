@@ -5,7 +5,7 @@
 // 2295 Hz, Baudot with its shifts), while the choir is held and crushed at the cell clock to five bits.
 import type { Stereo } from '../audio/audio'
 import { place, sing } from './choir'
-import { DUR as WRAP, LEAD, tube } from './wrap'
+import { DUR as WRAP, LEAD, vortex } from './wrap'
 import { TAU, hash, lock, mix, smooth, type Scene } from './scene'
 
 // Baudot (ITA2, US figures) by code: letters, then figures. '\0' marks a code that prints nothing.
@@ -72,7 +72,7 @@ export const ascii: Scene = {
   build(t, f) {
     const T = t + WRAP
     const kick = 0.45 - lock([[0, 0], [0, 0.45]], t, 7, 0.4) // the jump throws the lens wide; it rings back
-    const fld = tube(T, (f.at ?? 0) + t, f, kick, 1, 2.5)
+    const fld = vortex(T, (f.at ?? 0) + t, f, kick)
     const w = smooth(0.5, 7.5, t)
     for (let i = 0; i < 3; i++) ink[i] = 1.4 * mix(P1[i], AMBER[i], w)
     fld.cell = 14
