@@ -139,7 +139,7 @@ fn field(q: vec2f) -> vec3f {
     rmin = min(rmin, r);
     if (r < rh || (r < 3.0 * M && dot(x, v) < 0.0)) { fell = true; break; } // inside the photon sphere, going in, light never turns back
     let dd = de(x);
-    if (dd < px * len + 1e-4) { hit = true; break; }
+    if (dd < 1.5 * px * len + 1e-4) { hit = true; break; }
     let sp = length(v);
     var h = 0.85 * dd / sp;
     if (r < RV && M > 0.0) { h = min(h, clamp(0.3 * (r - 2.0 * M), 0.01, 0.5 * r) / sp); }

@@ -127,7 +127,7 @@ export const finaleB: Scene = {
       p[36] = 8, p[37] = (D + 8) * TAN, p[38] = 2.5 * Math.max(0, t - 0.25) ** 2, p[39] = 1 - smooth(0.6, 1.5, t)
       p[45] = 0.15 * D * D * (1 + 2 * smooth(1, PEAK, t)) // the exposure: brighter as we fall
       p[48] = 2 * u + 0.8 * t, p[49] = 2.5 * smooth(1.5, 3, t) // the light falling in down the spirals
-      field.res = 0.85 // the light is smeared by the fall anyway; the beam keeps the ring crisp
+      field.res = 0.8 // the light is smeared by the fall anyway; the beam keeps the ring crisp
       f.field = field
     }
 
