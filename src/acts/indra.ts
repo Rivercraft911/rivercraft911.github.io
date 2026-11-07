@@ -9,6 +9,7 @@ import { INDRA as SHADER } from '../gpu/fields'
 import type { Field } from '../gpu/raster'
 import { descent, place, sing } from './choir'
 import { AT as R1END } from './ascii'
+import { TAU_RASTER } from './wrap'
 import { A, B, GROUP, GROUP_INK, H, LENS, MU, PER, SHRINK, TURN, ZM, ZP, div, eye, fall, fwd, mul, up } from './drain'
 import { aim, equation, project, seen } from './reality'
 import { smooth, type Scene } from './scene'
@@ -55,6 +56,7 @@ export const indra: Scene = {
     p[20] = 0.4 * t, p[21] = 0.06, p[22] = k * H
     p[24] = ZM[0], p[25] = ZM[1], p[26] = ZM[0] - ZP[0], p[27] = ZM[1] - ZP[1]
     f.field = field
+    f.look = { tau: TAU_RASTER } // a fresh picture each frame: under the slow phosphor a moving raster smears into ghosts
 
     // the limit set on the floor, a dot per walk, carried by a power of w to the scale we are falling at
     const near = k * H

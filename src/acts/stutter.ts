@@ -61,6 +61,9 @@ let sym = 0
 // After every bend: a soft clip and a gentle low-pass (about 6 kHz), so no corruption can turn into a
 // full-scale screech, however loud the choir has grown; each keeps its character under the ceiling.
 const tamed = new Float64Array(3)
+// Each world's level, trimmed (dB) so they all sit at one loudness: measured late in the fall, KIFS,
+// Mandalay, Kaliset, Honeycomb and the bulb rang 4–6 dB over the rest. In WORLDS order.
+const TRIM = [-5.5, -4.5, -6, 0, -5, -2, -3.5, 0, -3, -5.5].map((db) => 10 ** (db / 20))
 const tame = (o: Stereo) => {
   for (let i = 0; i < 3; i++) {
     const x = o.s[i]
@@ -296,6 +299,8 @@ export const stutter: Scene = {
       remember(o)
       V.bend(tt, o, from)
       tame(o)
+      const g = TRIM[j % WORLDS.length]
+      o.s[0] *= g, o.s[1] *= g, o.s[2] *= g
     }
   },
 }
