@@ -45,8 +45,10 @@ const golden = new Shepard(PHI)
 const both = [choir, golden]
 
 // How a reality mutates the choir and its room: more dread, a prime world's hard little room, the period
-// crossfaded toward φ (gold ∈ [0, 1]), the descent reflected about a moment so the fall runs back up.
-export type Mood = { dread?: number; prime?: number; gold?: number; mirror?: number }
+// crossfaded toward φ (gold ∈ [0, 1]), the descent reflected about a moment so the fall runs back up. And
+// where it stands, which is an angle on the circle of a period: times n turns that angle n times as fast,
+// lift moves it on by some periods, and snap holds it to the nearest of that many steps.
+export type Mood = { dread?: number; prime?: number; gold?: number; mirror?: number; times?: number; lift?: number; snap?: number }
 const CALM: Mood = {}
 
 // Once a frame: the hall opens and the choir grows louder with the swell.
@@ -74,7 +76,9 @@ function tune(m: Mood) {
 // reads it only once a block.
 let at = -Infinity, was = CALM
 function set(T: number, m: Mood) {
-  const td = m.mirror === undefined ? T : 2 * m.mirror - T, s = sung(td), w = shimmer(T)
+  const td = m.mirror === undefined ? T : 2 * m.mirror - T, w = shimmer(T)
+  let s = sung(td) * (m.times ?? 1) + (m.lift ?? 0)
+  if (m.snap) s = Math.round(s * m.snap) / m.snap
   for (const v of both) {
     v.s = v === golden ? s / Math.log2(PHI) : s
     v.dread = Math.min(1, dread(td) + (m.dread ?? 0))

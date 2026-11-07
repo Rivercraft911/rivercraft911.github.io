@@ -392,9 +392,16 @@ const toPool = (x: number, y: number, z: number, o: number[]) => ((o[0] = (z - P
 const WE = [0, 0, 0], WT = [0, 0, 0], UP = [0, 0, 1]
 const fromPool = (k: number[]) => [k[0] + DUR, PX + M * k[2], PY + M * k[3], PZ + M * k[1], PX + M * k[5], PY + M * k[6], PZ + M * k[4], k[7]]
 KEYS.push(...POOL.map(fromPool)) // down the falls into the pool: the whirlpool's own flight, so it goes on unbroken
-function shade(v: number, i: number) {
+// The plot's colour for v, or, plot of the way back from it, water's: blue-white, foam where it is loud.
+function shade(v: number, i: number, plot = 1, foam = 0) {
   const f = clamp(v) * (PAL.length - 1), k = Math.min(PAL.length - 2, Math.floor(f)), u = f - k, c = PAL[k], d = PAL[k + 1]
-  ink.color(mix(c[0], d[0], u), mix(c[1], d[1], u), mix(c[2], d[2], u), i)
+  const w = clamp(foam), q = 1 - plot
+  ink.color(mix(mix(c[0], d[0], u), mix(WATER[0], 0.95, w), q), mix(mix(c[1], d[1], u), mix(WATER[1], 0.98, w), q), mix(mix(c[2], d[2], u), 1, q), i)
+}
+// Streaks in the falling water: smooth noise over lane and the moment it went over, so it falls with it.
+function streak(l: number, s: number) {
+  const k = Math.floor(s), u = s - k, a = rnd(l * 131 + k * 7.3), b = rnd(l * 131 + (k + 1) * 7.3)
+  return mix(a, b, u * u * (3 - 2 * u))
 }
 // Where the falls are on screen.
 let near = 1 // spray too close to the lens to hold in focus, thinned out
@@ -420,7 +427,7 @@ function plotAt(tau: number, l: number, m: number, r: number) {
   return visible(p3.x, p3.y)
 }
 function falls(t: number, show: number) {
-  const rows = smooth(14.6, 15.6, t) * (1 - smooth(19.4, 20.8, t)), water = 0.15 * (1 - smooth(12.3, 14.3, t))
+  const rows = smooth(14.6, 15.6, t) * (1 - smooth(19.4, 20.8, t)), plot = smooth(13.6, 14.9, t)
   const morph = smooth(MORPH[0], MORPH[1], t)
   // face to face with it, the lanes give way to rows: the raster of a waterfall plot. Then it pours down
   // into the pool, the rows nearest the water first, and lies on it as the whirlpool will: the newest at
@@ -455,7 +462,8 @@ function falls(t: number, show: number) {
     pen = true
   }
   // the lanes down the curtain, until face to face they give way to the rows. Seen obliquely they crowd
-  // together: keep the ink per unit of screen what it is face on.
+  // together: keep the ink per unit of screen what it is face on. Until it turns to the plot it is water,
+  // white in streaks that fall with it, foaming where the spectrum is loud.
   const lanes = 1 - smooth(14.6, 15.6, t)
   for (let l = 0; l < LANES && lanes > 0; l++) {
     let pen = false
@@ -471,10 +479,23 @@ function falls(t: number, show: number) {
         continue
       }
       const v = past(t - tau, l), gap = clamp(Math.hypot(p3.x - nx, p3.y - ny) / 0.025, 0.08, 1)
-      shade(v + water, 0.45 * near * gap * show * lanes * (0.08 + 0.8 * v) * fog(p3.z) * smooth(0, 0.5, tau))
+      const w = streak(l, 9 * (t - tau)) ** 2, look = mix(0.15 + 0.6 * w + 0.4 * v, 0.08 + 0.8 * v, plot)
+      shade(v, 0.45 * near * gap * show * lanes * look * fog(p3.z) * smooth(0, 0.5, tau), plot, w + v)
       pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
       pen = true
     }
+  }
+  // spray where it lands, flung back up from the foot of the curtain, until the water is the plot
+  const spray = show * lanes * (1 - plot)
+  for (let d = 0; d < 160 && spray > 0.02; d++) {
+    const l = Math.floor(rnd(d * 17) * LANES), life = 0.7 + 0.6 * rnd(d * 3), age = (t + life * rnd(d * 7)) % life
+    const x0 = fallX(TAU_MAX, l), z0 = fallZ(TAU_MAX, l), out = 1 + 3 * rnd(d * 19)
+    const vx = (x0 - LIP) / TAU_MAX + out * Math.cos(AL[l]), vz = out * Math.sin(AL[l]) + 2 * rnd(d * 11) - 1, vy = 2 + 5 * rnd(d * 5)
+    const at = (a: number) => cam.project(x0 + vx * a, PY + vy * a - 0.5 * G * a * a, z0 + vz * a, p3)
+    if (!at(age) || !visible(p3.x, p3.y)) continue
+    const x1 = p3.x, y1 = p3.y
+    if (!at(Math.max(0, age - 0.06))) continue
+    ink.color(0.9, 0.97, 1, 0.8 * spray * (1 - age / life) * (0.3 + past(t - TAU_MAX - age, l))).moveTo(p3.x, p3.y).lineTo(x1, y1)
   }
 }
 

@@ -1,11 +1,12 @@
 // R4 · The multiverse stutter. Hard cuts, faster and faster, through ten worlds, each a reality of its own
 // with its own light and its own corruption of the choir, each still running while we are elsewhere: a
-// kaleidoscopic IFS (ring-modulated), the Mandelbulb (through T_n, its own angle multiplication), the
-// Amazing Surface (through a comb), a pseudo-Kleinian (played backwards, inverted in time), the Kaliset
-// (granulated), an Apollonian packing (an octave up, a smaller copy of itself), a Lyapunov fractal on the
-// DVB-S2 start-of-frame word (through the logistic map), a Sierpinski tetrahedron (gated by the gasket's
-// own k & (k >> 3) rhythm), Newton's method on 32APSK (every sample pair hard-decided to the
-// constellation), and the {4,3,5} honeycomb (the choir's descent reflected, its fall run back up). The
+// kaleidoscopic IFS (ring-modulated), the Mandelbulb (its own angle multiplication, the fall n times as
+// steep), the Amazing Surface (through a comb), a pseudo-Kleinian (played backwards, inverted in time), the
+// Kaliset (granulated), an Apollonian packing (an octave up, a smaller copy of itself), a Lyapunov fractal
+// on the DVB-S2 start-of-frame word (sung as FSK), a Sierpinski tetrahedron (gated by the gasket's own
+// k & (k >> 3) rhythm), Newton's method on 32APSK (the glide pulled to semitone steps), and the {4,3,5}
+// honeycomb (the choir's descent reflected, its fall run back up). Every corruption keeps the choir a
+// tone: none of them may turn it to noise, which drowns the fall it is the sound of. The
 // first pass shows each world for a second down to 0.6 s, then they come round again faster, to a third
 // of a second; only cuts of 0.6 s or more flash, so there are never more than two flashes a second.
 // ?w=<n> pins world n, for review.
@@ -37,7 +38,7 @@ const cut = (t: number) => {
 type World = {
   shader: number
   eq: string | ((t: number) => string)
-  mood?: Mood
+  mood?: Mood | ((tt: number, from: number) => Mood) // how the choir sings here, if not as the gold choir
   ink: readonly number[]
   set(p: Float32Array, t: number, fall: number, kick: number): void
   beam?(f: Frame, t: number): void
@@ -56,14 +57,15 @@ const remember = (o: Stereo) => {
 }
 const past = (i: number, d: number) => lines[i][(w - d + LINE) & (LINE - 1)]
 const combs = [0, 1, 2].map(() => new Float32Array(LINE)) // the comb's own output, fed back
-const held = [0, 0, 0] // Newton's last decided symbol
-let sym = 0
+let gate = 1 // the gasket's gate, eased so it never clicks
+const bulb: Mood = { gold: 1, prime: 1, times: 8 }, fsk: Mood = { gold: 1, lift: 0 }, mirrored: Mood = { gold: 1, mirror: 0 }
+const SOF = 0x18d2e82 // the DVB-S2 start-of-frame word, which the Lyapunov fractal's sequence reads
 // After every bend: a soft clip and a gentle low-pass (about 6 kHz), so no corruption can turn into a
 // full-scale screech, however loud the choir has grown; each keeps its character under the ceiling.
 const tamed = new Float64Array(3)
-// Each world's level, trimmed (dB) so they all sit at one loudness: measured late in the fall, KIFS,
-// Mandalay, Kaliset, Honeycomb and the bulb rang 4–6 dB over the rest. In WORLDS order.
-const TRIM = [-5.5, -4.5, -6, 0, -5, -2, -3.5, 0, -3, -5.5].map((db) => 10 ** (db / 20))
+// Each world's level, trimmed (dB) so they all sit at one loudness (momentary LUFS, each pinned with ?w=).
+// In WORLDS order.
+const TRIM = [-5, -3.5, -1, -0.5, -6.5, -2.5, -5, 1, -1.5, -5.5].map((db) => 10 ** (db / 20))
 const tame = (o: Stereo) => {
   for (let i = 0; i < 3; i++) {
     const x = o.s[i]
@@ -84,25 +86,24 @@ const WORLDS: World[] = [
       p[16] = 0.12 + 0.1 * Math.sin(0.31 * t), p[17] = 0.08 * Math.sin(0.23 * t + 1), p[18] = 1, p[19] = 2
     },
     bend(tt, o) {
-      const c = Math.sin(TAU * 311 * tt)
-      for (let i = 0; i < 3; i++) o.s[i] *= 2 * c
+      // ring-modulated, but not all the way: the choir stays under its sidebands
+      const c = 0.7 + 1.3 * Math.sin(TAU * 311 * tt)
+      for (let i = 0; i < 3; i++) o.s[i] *= c
     },
   },
   {
     shader: BULB,
     eq: (t) => `z\\to z^{${power(t).toFixed(1)}}+c`,
     ink: [0.75, 0.82, 1],
-    mood: { gold: 1, prime: 1 },
+    // the bulb's own move, angles times n, on the choir: where it stands is an angle on the circle of a
+    // period, so it turns n times as fast, a fall n times as steep that still never lands
+    mood: (_, from) => ((bulb.times = Math.round(power(from))), bulb),
     set(p, t, fall, kick) {
       const a = 0.25 * t, r = 1.8 - 0.4 * smooth(0, 13, t) - 0.05 * Math.sin(0.5 * fall)
       aim(p, set3(eye, r * Math.cos(a), 0.5 * Math.sin(0.3 * t), r * Math.sin(a)), set3(fwd, -Math.cos(a) + 0.4 * Math.sin(a), -0.3 * Math.sin(0.3 * t), -Math.sin(a) - 0.4 * Math.cos(a)), set3(up, 0.2 * Math.sin(0.2 * t), 1, 0), 1.2 + kick)
       p[16] = power(t), p[17] = 1
     },
-    bend(_, o, from) {
-      // the bulb's own move, angles times n, as a waveshaper: cos(n acos x), the Chebyshev polynomial T_n
-      const n = power(from)
-      for (let i = 0; i < 3; i++) o.s[i] = 0.25 * Math.cos(n * Math.acos(Math.max(-1, Math.min(1, o.s[i] / 0.25))))
-    },
+    bend() {},
   },
   {
     shader: MANDALAY,
@@ -113,9 +114,9 @@ const WORLDS: World[] = [
       p[16] = -1.5 - 0.04 * Math.sin(0.3 * t), p[17] = 1
     },
     bend(_, o) {
-      // a comb on each voice: y[n] = x[n] + 0.9 y[n − D], tuned to A, C♯, E
+      // a comb on each voice: y[n] = x[n] + 0.8 y[n − D], tuned to A, C♯, E
       for (let i = 0; i < 3; i++) {
-        const y = 0.7 * o.s[i] + 0.9 * combs[i][(w - Math.round(SR / [110, 138.6, 164.8][i]) + LINE) & (LINE - 1)]
+        const y = 0.3 * o.s[i] + 0.8 * combs[i][(w - Math.round(SR / [110, 138.6, 164.8][i]) + LINE) & (LINE - 1)]
         o.s[i] = combs[i][w] = y
       }
     },
@@ -197,15 +198,10 @@ const WORLDS: World[] = [
       const k = Math.exp(-0.1 * t) // zooming on a superstable star, where the dark curves cross
       p[16] = 3.22 - 0.07 * k, p[17] = 3.24 + 0.11 * k, p[18] = 0.5 * k * (1 + 0.5 * kick), p[19] = 1
     },
-    bend(_, o) {
-      // through the logistic map twice, at r just shy of 4
-      for (let i = 0; i < 3; i++) {
-        let x = Math.min(1, Math.max(0, 0.5 + 1.8 * o.s[i]))
-        x = 3.9 * x * (1 - x)
-        x = 3.9 * x * (1 - x)
-        o.s[i] = 0.45 * (x - 0.5)
-      }
-    },
+    // the start-of-frame word as the fractal reads it, a bit at a time choosing the map's rate: here
+    // choosing the choir's pitch, a 1 a fifth up, so it sings the word as FSK, twenty bits a second
+    mood: (tt) => ((fsk.lift = ((SOF >> (25 - (Math.floor(20 * tt) % 26))) & 1) * (7 / 12)), fsk),
+    bend() {},
   },
   {
     shader: SIERPINSKI,
@@ -220,7 +216,8 @@ const WORLDS: World[] = [
     bend(tt, o) {
       // the gasket as a rhythm: a 32nd sounds only where its count k has k & (k >> 3) = 0
       const k = Math.floor(tt * 24)
-      if (k & (k >> 3)) for (let i = 0; i < 3; i++) o.s[i] *= 0.1
+      gate += ((k & (k >> 3) ? 0.1 : 1) - gate) * 0.01
+      for (let i = 0; i < 3; i++) o.s[i] *= gate
     },
   },
   {
@@ -242,40 +239,26 @@ const WORLDS: World[] = [
       }
       f.ch.push({ w: 0.3, path: roots })
     },
-    bend(_, o) {
-      // each pair of voices as I and Q, hard-decided to the nearest point of 32APSK, once a symbol (8
-      // samples) and held between, so it steps like a modem, not hisses like noise
-      const s = 0.22
-      if (sym++ & 7) return void ((o.s[0] = held[0]), (o.s[1] = held[1]), (o.s[2] = held[2]))
-      for (const [a, b] of [[0, 1], [2, 0]]) {
-        const x = o.s[a] / s, y = o.s[b] / s
-        let best = 0, bd = Infinity
-        for (let k = 0; k < APSK32.pts.length; k += 2) {
-          const d = (APSK32.pts[k] - x) ** 2 + (APSK32.pts[k + 1] - y) ** 2
-          if (d < bd) (bd = d), (best = k)
-        }
-        o.s[a] = s * APSK32.pts[best]
-        if (a === 0) o.s[b] = s * APSK32.pts[best + 1]
-      }
-      held[0] = o.s[0], held[1] = o.s[1], held[2] = o.s[2]
-    },
+    // Newton's method pulls every point to its nearest root: the choir's glide pulled to the nearest of the
+    // middle ring's twelve points, so it falls in semitone steps, Shepard's own scale of 1964
+    mood: { snap: 12 },
+    bend() {},
   },
   {
     shader: HONEYCOMB,
     eq: '\\{4,3,5\\}',
     ink: [0.8, 0.5, 1],
+    mood: (_, from) => ((mirrored.mirror = from + AT), mirrored), // the choir's descent reflected about the cut: its fall run back up
     set(p, t, fall, kick) {
       aim(p, eye, set3(fwd, 1, 0.15 * Math.sin(0.3 * t), 0.12 * Math.cos(0.2 * t)), set3(up, 0, Math.cos(0.15 * t), Math.sin(0.15 * t)), 1.5 + kick)
       p[16] = 1.0618 * (fall % 1), p[17] = 1
     },
-    bend() {}, // the reflection is in how it sings, below
+    bend() {},
   },
 ]
 
 const field: Field = { shader: KIFS, k: 1, p: new Float32Array(28) }
-const GOLD = { gold: 1 }, mirrored = { gold: 1, mirror: 0 }
-const MIRROR = (at: number) => ((mirrored.mirror = at), mirrored)
-
+const GOLD = { gold: 1 }
 export const stutter: Scene = {
   dur: DUR,
   build(t, f) {
@@ -292,10 +275,10 @@ export const stutter: Scene = {
     place(T)
 
     return (tt, o) => {
-      const j = cut(tt), from = STARTS[j], V = WORLDS[j % WORLDS.length]
+      const j = cut(tt), from = PIN >= 0 ? 0 : STARTS[j], V = WORLDS[j % WORLDS.length]
       if (splice(tt - from, o)) return
       const TT = tt + AT
-      sing(TT, o, smooth(0, 0.03, tt - from), V.shader === HONEYCOMB ? MIRROR(from + AT) : V.mood ?? GOLD)
+      sing(TT, o, smooth(0, 0.03, tt - from), typeof V.mood === 'function' ? V.mood(tt, from) : V.mood ?? GOLD)
       remember(o)
       V.bend(tt, o, from)
       tame(o)
