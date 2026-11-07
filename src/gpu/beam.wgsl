@@ -40,7 +40,7 @@ fn px(p: vec2f) -> vec2f {
   let w = a + dir * o.q.x + vec2f(-dir.y, dir.x) * o.q.y;
   o.pos = vec4f(w.x / u.res.x * 2.0 - 1.0, 1.0 - w.y / u.res.y * 2.0, 0.0, 1.0);
   o.len = len;
-  o.col = pow(s1.c.rgb, vec3f(2.2)) * s1.p.z; // authored like CSS color(display-p3 r g b), deposited as light
+  o.col = pow(max(s1.c.rgb, vec3f(0.0)), vec3f(2.2)) * max(s1.p.z, 0.0); // authored like CSS color(display-p3 r g b), deposited as light; never negative, or pow gives NaN and the phosphor keeps it
   return o;
 }
 

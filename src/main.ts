@@ -49,7 +49,7 @@ const gpu = await Phosphor.create(canvas, beam.max).catch(() => {
 
 load('tech').then((face) => gpu.glyphs(face, CHARS)) // the raster's character generator
 
-let on = q.has('auto') || direct()
+let on = q.has('auto') || q.has('world') || direct()
 let t = Number(q.get('t') ?? 0)
 let speed = q.has('pause') ? 0 : 1
 let last = performance.now()
