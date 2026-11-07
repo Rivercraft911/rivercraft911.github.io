@@ -20,12 +20,12 @@
 // and the well's redshift, bluer and far brighter where it comes toward us.
 //
 // p[0..3] camera   p[4] time, M, gain, ring light
-// p[5] infall K, wind, gas, gas light   p[6] the eye's velocity, near clip
+// p[5] infall K, wind, gas, gas light   p[6] the eye's velocity, the flash
 // p[7] the card (R5's last frame) centre, half-height   p[8] its right, turn   p[9] its up, how far its sky has cleared
 // p[10] tile, nave scale, hole light, key light   p[11] the crossing's radius, the nave's
 
-const FAR = 170.0;
-const STEPS = 160;
+const FAR = 120.0;
+const STEPS = 128;
 
 fn turn(v: vec2f, a: f32) -> vec2f { return vec2f(cos(a) * v.x - sin(a) * v.y, sin(a) * v.x + cos(a) * v.y); }
 
@@ -46,7 +46,7 @@ fn kleinian(q: vec3f) -> f32 {
   var p = q;
   var s = 1.0;
   trap = vec4f(1e9);
-  for (var i = 0; i < 7; i++) {
+  for (var i = 0; i < 6; i++) {
     p = 2.0 * clamp(p, -box, box) - p;
     let r2 = dot(p, p);
     trap = min(trap, vec4f(abs(p), r2));
@@ -142,6 +142,7 @@ fn ring(x: vec3f, v: vec3f, s: f32) -> f32 {
 }
 
 fn field(q: vec2f) -> vec3f {
+  if (u.p[6].w > 0.0) { return vec3f(u.p[6].w); } // the flash: the whole screen burnt white
   M = u.p[4].y;
   let x0 = eye();
   var d = ray(q);
@@ -202,7 +203,6 @@ fn field(q: vec2f) -> vec3f {
   var v = v0;
   var a = pull(x);
   let px = cone();
-  let near = u.p[6].w;
   var len = 0.0;
   var hit = false;
   var fell = false;
@@ -215,11 +215,11 @@ fn field(q: vec2f) -> vec3f {
     if (r < rh) { fell = true; break; }
     let dd = de(x);
     let g = gas;
-    if (dd < px * len + 1e-4 && len >= near && g < 0.5) { hit = true; break; }
+    if (dd < px * len + 1e-4 && g < 0.5) { hit = true; break; }
     var s = min(abs(dd), bend(r));
     if (g > 0.0) {
       // the gas: as dense as the stone it was is near, glowing at its orbit's blackbody
-      s = clamp(abs(dd), 0.012 * r, 0.04 * r);
+      s = clamp(abs(dd), 0.02 * r, 0.06 * r);
       let rho = g * smoothstep(1.0, 0.0, stone) * smoothstep(0.02 * r, -0.02 * r, above) * smoothstep(2.0, -2.0, sight);
       if (rho > 0.0) {
         hot += through * rho * s * burn(x, v);
@@ -236,7 +236,7 @@ fn field(q: vec2f) -> vec3f {
     len += s;
     if (len > FAR) { break; }
   }
-  if (i == STEPS) { hit = true; }
+  if (i == STEPS) { fell = length(x) < 3.5 * M; hit = !fell; } // out of steps: among the stone, or wound into the hole
   var col = vec3f(0.0);
   let haze = vec3f(0.004, 0.003, 0.012);
   if (hit) {

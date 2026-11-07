@@ -108,7 +108,11 @@ export const finaleA: Scene = {
     field.bake ??= julia()
     const p = field.p, M = mass(t)
     ring.on = false
-    if (t >= PEAK) jump(t - PEAK, f, true, 0) // the one flash
+    if (t >= PEAK) {
+      // the one flash: the last picture, burnt white
+      jump(t - PEAK, f, true, 0)
+      if (t < PEAK + 0.04) (p[27] = 3), (f.field = field)
+    }
     else {
       // the eye looks where it sees the hole, rolling as it winds round
       const r = fall(t)
@@ -129,12 +133,12 @@ export const finaleA: Scene = {
       p[39] = smooth(0.1, 0.5, t)
       p[40] = WORLDS.indexOf(JULIA4), p[41] = 5, p[42] = 1.5, p[43] = 0.07
       p[44] = 14, p[45] = 9
-      field.res = 1
+      field.res = 0.75
       f.field = field
       // the photon ring, where the eye sees it: in the static frame a cone round the inward direction,
       // sin ψ = 3√3 M √(1 − 2M/r) / r, past 90° inside 3M
       const s = (3 * Math.sqrt(3) * M * Math.sqrt(Math.max(0, 1 - (2 * M) / r))) / r, psi = r > 3 * M ? Math.asin(Math.min(1, s)) : Math.PI - Math.asin(Math.min(1, s))
-      ring.cos = Math.cos(psi), ring.sin = Math.sin(psi), ring.on = M > 0.05 && r > 3.3
+      ring.cos = Math.cos(psi), ring.sin = Math.sin(psi), ring.on = M > 0.05 && r > 4
       // e1, e2 across the inward direction, e1 as near the screen's right as it can be
       const rd = p[4] * inward[0] + p[5] * inward[1] + p[6] * inward[2]
       for (let i = 0; i < 3; i++) e1[i] = p[4 + i] - rd * inward[i]
