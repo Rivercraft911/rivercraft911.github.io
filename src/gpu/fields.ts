@@ -53,3 +53,6 @@ export const [KIFS, MANDALAY, KALISET, LYAPUNOV, NEWTON, HONEYCOMB, BULB, KLEINI
 export const WORLDS = [INDRA, KIFS, BULB, MANDALAY, KLEINIAN, KALISET, APOLLONIAN, LYAPUNOV, SIERPINSKI, NEWTON, HONEYCOMB, JULIA4]
 // The worlds after the fall, one a project: each appends its own.
 export const R01 = FIELDS.push({ code: camera + film + r01, data: [320, 120, 2] }) - 1
+// The finale, take A: the cathedral falls in.
+import holeA from './fields/holeA.wgsl?raw'
+export const HOLEA = FIELDS.push({ code: camera + holeA, shots: true }) - 1

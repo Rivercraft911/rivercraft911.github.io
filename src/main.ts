@@ -10,6 +10,7 @@ import { meander } from './acts/meander'
 import { valley } from './acts/valley'
 import { ident } from './acts/ident'
 import { singularity } from './acts/singularity'
+import { finaleA } from './acts/finaleA'
 import { wrap } from './acts/wrap'
 import { indra } from './acts/indra'
 import { stutter } from './acts/stutter'
@@ -23,6 +24,7 @@ const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
 const beam = new Beam()
 const audio = new Audio()
+const finale = q.get('hole') === 'a' ? finaleA : singularity // ?hole=a: take A of the finale
 // ?fall plays only the fall, from the lip of the falls on (the pool needs their history); ?ident and ?end the last stretch. ?band and deep
 // links (/<project>, /qsl) skip the intro and land in the band.
 const scenes = q.has('specimen')
@@ -32,12 +34,12 @@ const scenes = q.has('specimen')
     : direct()
       ? [band]
       : q.has('fall')
-        ? [valley, wrap, ascii, indra, stutter, ophanim, singularity]
+        ? [valley, wrap, ascii, indra, stutter, ophanim, finale]
         : q.has('ident')
           ? [ident]
           : q.has('end')
-            ? [singularity, ident, band]
-            : [hook, meander, valley, wrap, ascii, indra, stutter, ophanim, singularity, ident, band]
+            ? [finale, ident, band]
+            : [hook, meander, valley, wrap, ascii, indra, stutter, ophanim, finale, ident, band]
 const timeline = new Timeline(scenes)
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }
