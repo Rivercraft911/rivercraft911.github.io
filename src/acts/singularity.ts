@@ -43,8 +43,9 @@ function ring(t: number) {
   return r < 3 * M ? Infinity : Math.tan(Math.asin(Math.min(1, s))) / Math.tan(FOV / 2)
 }
 
-// The chirp: f = K (t_c − t)^−3/8, 200 Hz 2.5 s before the cut and 1.6 kHz at it; its phase in closed form.
-const TC = PEAK + 2.5 / (8 ** (8 / 3) - 1), K = 200 * (TC - PEAK + 2.5) ** 0.375
+// The chirp: f = K (t_c − t)^−3/8, 200 Hz 2.5 s before the cut and 1 kHz at it, 35 ms short of
+// coalescence; its phase in closed form.
+const TC = PEAK + 2.5 / (5 ** (8 / 3) - 1), K = 200 * (TC - PEAK + 2.5) ** 0.375
 const freq = (t: number) => K * (TC - t) ** -0.375
 const phase = (t: number) => (TAU * K * (TC ** 0.625 - (TC - t) ** 0.625)) / 0.625
 const amp = (t: number) => 1.5 * (freq(t) / freq(PEAK)) ** (1 / 3)
@@ -77,6 +78,7 @@ function slot(i: number, k: number, j: number, p: Float32Array) {
   p[o + 2] = j < 1 ? 1.2 * (1 / (j + 0.15) - 1 / 1.15) : 0
   p[o + 3] = N - 1 - Math.min(N - 1, k) // its tile: the shots are kept oldest first
   p[52 + i] = 1 + 1.5 * (1 - f)
+  p[56 + i] = k ? 1 : 1 - f // the Julia set as R5 left it, the rest as bright as each other
 }
 // The bulb's camera closes on a point of its surface that stays rough at every scale (found by a search),
 // along the ray that found it.

@@ -21,7 +21,7 @@
 //
 // p[0..3] camera   p[4] time, M, gain, ring light   p[5] the bulb seen through the horizon, past it
 // p[6..9] the bulb's camera, p[7].w its iterations, p[9].w its light
-// p[10..12] the falling worlds: depth past the hole, half-height, turn, tile   p[13] their light
+// p[10..12] the falling worlds: depth past the hole, half-height, turn, tile   p[13] their light, p[14] how far each is evened out
 
 const RV = 80.0; // past this, rays run straight
 
@@ -159,7 +159,10 @@ fn field(q: vec2f) -> vec3f {
     let t = i32(w.w);
     let at = vec2f(f32(t % 4), f32(t / 4));
     let e = exp2(lod) * vec2f(0.5 / 512.0, 0.5 / 320.0);
-    col += textureSampleLevel(data, smp, (at + clamp(uv, e, 1.0 - e)) / vec2f(4.0, 3.0), lod).rgb * u.p[13][k];
+    // as bright as each other, as far as p[14] says: the shot's mean, from its smallest mip
+    let mean = dot(textureSampleLevel(data, smp, (at + 0.5) / vec2f(4.0, 3.0), 6.0).rgb, vec3f(0.3, 0.6, 0.1));
+    let g = mix(1.0, 0.3 / (0.03 + mean), u.p[14][k]);
+    col += textureSampleLevel(data, smp, (at + clamp(uv, e, 1.0 - e)) / vec2f(4.0, 3.0), lod).rgb * u.p[13][k] * g;
   }
   if (fell && u.p[5].x > 0.0) { col += inside(q) * u.p[5].x; }
   return col * u.p[4].z;
