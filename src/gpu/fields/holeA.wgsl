@@ -58,12 +58,14 @@ fn kleinian(q: vec3f) -> f32 {
   return max(rxy - 0.92784, abs(rxy * p.z) / length(p)) / s;
 }
 
-// The world as it is torn in: the stone at x, drawn from where it fell from; and how much of it is gas,
-// pressed into a disk about the plane of the spin.
+// The world as it is torn in: the stone at x, drawn from where it fell from; and how much of it is gas.
+// What has fallen far is worn away above the plane of the spin, the more the higher, into a disk walled by
+// the stone still standing round it: a funnel, as water goes down a drain.
 var<private> gas: f32;
 var<private> fallen: f32; // r₀ / r
 var<private> stone: f32; // the distance to the stone where it fell from, there
-var<private> slab: f32; // and to the disk
+var<private> above: f32; // how far above the disk
+var<private> sight: f32; // and into the eye's clear line to the shadow
 fn de(x: vec3f) -> f32 {
   let r = max(length(x), 1e-3);
   let r0 = pow(r * sqrt(r) + u.p[5].x, 2.0 / 3.0);
@@ -71,13 +73,19 @@ fn de(x: vec3f) -> f32 {
   let k = 2.0 * M / max(r, 2.0);
   let w = u.p[5].y * k * sqrt(k);
   let y = vec3f(turn(x.xy * s, w), x.z * s);
+  let c = smoothstep(1.1, 2.0, s) * u.p[5].z;
   fallen = s;
   gas = smoothstep(1.5, 4.0, s) * u.p[5].z;
   let S = u.p[10].y;
   let hollow = min(length(y) - u.p[11].x, length(y.xz) - u.p[11].y); // the crossing and the nave, kept clear
+  above = abs(x.z) - r * (0.08 + 2.0 * (1.0 - c)) - 0.05;
   stone = max(S * kleinian(y / S + vec3f(0.0, 0.5, 0.0)), -hollow);
-  slab = (abs(x.z) - 0.08 * r - 0.05 - 40.0 * (1.0 - smoothstep(1.1, 2.0, s) * u.p[5].z)) / 1.2; // a funnel, as water down a drain
-  return max(stone / (s * (1.0 + 1.5 * w)), slab);
+  // and nothing comes between the eye and the shadow: a cone from the eye a little wider than it is cleared
+  let e = eye();
+  let D = length(e);
+  let along = dot(x - e, -e) / D;
+  sight = 7.0 * along / D * smoothstep(D - 1.0, D - 4.0, along) - length(x - e + e * along / D);
+  return max((stone / (s * (1.0 + 1.5 * w)) + max(above, 0.0) / 3.0) / 1.5, 0.9 * sight);
 }
 
 // R5's last frame, on a card square to the eye's first line of sight: (s along the segment, uv), or s = 2.
@@ -103,7 +111,7 @@ fn planck(T: f32) -> vec3f {
 }
 
 // What has fallen to r is as hot as a thin disk there: T ∝ r^−3/4, cold inside the last stable orbit.
-fn temp(r: f32) -> f32 { return 4200.0 * pow(6.0 / max(r, 3.0), 0.75); }
+fn temp(r: f32) -> f32 { return 3600.0 * pow(6.0 / max(r, 3.0), 0.75); }
 // The light of what has fallen to x, seen along v: the blackbody's colour at gT, and its strength, which
 // a thin disk gives as r^−3 (eased to r^−3/2, or the outer stone would be lost), beamed as g³.
 fn burn(x: vec3f, v: vec3f) -> vec3f {
@@ -212,7 +220,7 @@ fn field(q: vec2f) -> vec3f {
     if (g > 0.0) {
       // the gas: as dense as the stone it was is near, glowing at its orbit's blackbody
       s = clamp(abs(dd), 0.012 * r, 0.04 * r);
-      let rho = g * smoothstep(1.0, 0.0, stone) * smoothstep(0.02 * r, -0.02 * r, slab);
+      let rho = g * smoothstep(1.0, 0.0, stone) * smoothstep(0.02 * r, -0.02 * r, above) * smoothstep(2.0, -2.0, sight);
       if (rho > 0.0) {
         hot += through * rho * s * burn(x, v);
         through *= exp(-rho * s * 0.4);
@@ -248,7 +256,7 @@ fn field(q: vec2f) -> vec3f {
     let lapis = vec3f(0.03, 0.07, 0.4);
     let gold = vec3f(1.8, 0.95, 0.25);
     let base = mix(lapis, ivory, smoothstep(0.15, 0.9, trap.w));
-    let glowing = burn(P, v) * smoothstep(1.2, 2.5, fallen) * 0.5; // stone heating as it falls
+    let glowing = burn(P, v) * smoothstep(1.2, 2.5, fallen) * 0.4 * (0.2 + smoothstep(0.6, 0.05, trap.w)); // stone heating as it falls
     let c = glowing + base * (0.01 + fire + key) * ao + gold * exp(-30.0 * trap.w) * (0.15 + fire) * (1.0 - smoothstep(1.0, 1.6, fallen)) + 0.1 * rim * vec3f(0.2, 0.3, 1.0) * ao;
     col = mix(haze, c, exp(-0.012 * len));
   } else if (!fell) {

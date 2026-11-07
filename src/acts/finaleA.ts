@@ -29,16 +29,16 @@ const mass = (t: number) => smooth(0, 0.7, t)
 const SW0 = 0.3, SW1 = 1.7
 // The world torn in: K, the infall that has drawn each stone in from r₀^3/2 = r^3/2 + K; its orbits' wind;
 // and how much of what has fallen far is gas.
-const TEAR = 2.4
-const infall = (t: number) => 260 * smooth(TEAR, PEAK, t) ** 1.6
-const wind = (t: number) => 30 * smooth(TEAR, PEAK + 1, t) ** 2
-const molten = (t: number) => smooth(TEAR, TEAR + 1.5, t)
+const TEAR = 1.9
+const infall = (t: number) => 260 * clamp((t - TEAR) / (PEAK - TEAR)) ** 1.5
+const wind = (t: number) => 30 * clamp((t - TEAR) / (PEAK + 1 - TEAR)) ** 1.5
+const molten = (t: number) => smooth(TEAR + 0.5, TEAR + 2.2, t)
 
 // The eye's fall: from r = 26, r^3/2 running down ever faster to the horizon at PEAK, above the plane
 // the stone falls into.
 const R0 = 26, RH = 2.06
-const incl = (t: number) => mix(0.2, 0.6, smooth(2, 5, t))
-const radius = (t: number) => (R0 ** 1.5 - (R0 ** 1.5 - RH ** 1.5) * clamp(t / PEAK) ** 1.6) ** (2 / 3)
+const incl = (t: number) => mix(0.2, 0.6, smooth(2.8, 5.2, t))
+const radius = (t: number) => (R0 ** 1.5 - (R0 ** 1.5 - RH ** 1.5) * clamp(t / PEAK) ** 1.4) ** (2 / 3)
 // How it winds round: E = 1, L = 3.5 (a plunge: no orbit with L < 4M is saved). dφ/dr = (L/r²) / (dr/dτ),
 // (dr/dτ)² = 2/r − L²/r² + 2L²/r³; φ(r) tabulated once, from R0 down.
 const L = 3.5, PHI = new Float64Array(1025)
@@ -62,7 +62,7 @@ function julia() {
 
 // Where the eye is at t, into o.
 function place3(t: number, o: number[]) {
-  const r = radius(t), ph = -Math.PI / 2 + phi(r) + 0.12 * t, i = incl(t)
+  const r = radius(t), ph = -Math.PI / 2 + phi(r) + 0.25 * t, i = incl(t)
   o[0] = r * Math.cos(ph) * Math.cos(i), o[1] = r * Math.sin(ph) * Math.cos(i), o[2] = r * Math.sin(i)
   return r
 }
@@ -117,7 +117,7 @@ export const finaleA: Scene = {
       const roll = 0.4 * phi(r), sx = fwd[1], sy = -fwd[0], sn = Math.hypot(sx, sy) || 1
       up[0] = (Math.sin(roll) * sx) / sn, up[1] = (Math.sin(roll) * sy) / sn, up[2] = Math.cos(roll)
       aim(p, eye, fwd, up, fov(t))
-      p[16] = t, p[17] = M, p[18] = 1, p[19] = 0.5 * smooth(3.2, 5, r)
+      p[16] = t, p[17] = M, p[18] = 1, p[19] = (0.5 + 2 * Math.exp(-(((t - SW1) / 0.12) ** 2))) * smooth(3.2, 5, r) // flaring as the Julia set goes
       p[20] = infall(t), p[21] = wind(t), p[22] = molten(t), p[23] = 1.5
       p[24] = vel[0], p[25] = vel[1], p[26] = vel[2], p[27] = 0
       // the card: square to the first line of sight, past the hole, filling the view as R5 left it, then
@@ -128,13 +128,13 @@ export const finaleA: Scene = {
       p[35] = 1.5 * (1 / (j + 0.12) - 1 / 1.12)
       p[39] = smooth(0.1, 0.5, t)
       p[40] = WORLDS.indexOf(JULIA4), p[41] = 5, p[42] = 1.5, p[43] = 0.07
-      p[44] = 9, p[45] = 7
+      p[44] = 14, p[45] = 9
       field.res = 1
       f.field = field
       // the photon ring, where the eye sees it: in the static frame a cone round the inward direction,
       // sin ψ = 3√3 M √(1 − 2M/r) / r, past 90° inside 3M
       const s = (3 * Math.sqrt(3) * M * Math.sqrt(Math.max(0, 1 - (2 * M) / r))) / r, psi = r > 3 * M ? Math.asin(Math.min(1, s)) : Math.PI - Math.asin(Math.min(1, s))
-      ring.cos = Math.cos(psi), ring.sin = Math.sin(psi), ring.on = M > 0.05
+      ring.cos = Math.cos(psi), ring.sin = Math.sin(psi), ring.on = M > 0.05 && r > 3.3
       // e1, e2 across the inward direction, e1 as near the screen's right as it can be
       const rd = p[4] * inward[0] + p[5] * inward[1] + p[6] * inward[2]
       for (let i = 0; i < 3; i++) e1[i] = p[4 + i] - rd * inward[i]
@@ -154,7 +154,7 @@ export const finaleA: Scene = {
           for (let i = 0; i < 3; i++) d3[i] = ring.cos * inward[i] + ring.sin * (c * e1[i] - sn * e2[i])
           seen(d3, s3)
           const dz = s3[0] * p[12] + s3[1] * p[13] + s3[2] * p[14], k = p[3] / Math.max(0.05, dz)
-          s.x = k * (s3[0] * p[4] + s3[1] * p[5] + s3[2] * p[6]), s.y = k * (s3[0] * p[8] + s3[1] * p[9] + s3[2] * p[10])
+          s.x = clamp(k * (s3[0] * p[4] + s3[1] * p[5] + s3[2] * p[6]), -3, 3), s.y = clamp(k * (s3[0] * p[8] + s3[1] * p[9] + s3[2] * p[10]), -3, 3)
           s.r = 1, s.g = 0.85, s.b = 0.6, s.z = dz > 0.05 ? z : 0
         },
       })
