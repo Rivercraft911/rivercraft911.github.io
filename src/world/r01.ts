@@ -259,7 +259,8 @@ export const r01: Scene = {
     const lit = Math.min(1, (F * NY + qm) / NY)
     p[24] = mean[0] * lit * 1.6, p[25] = mean[1] * lit * 1.6, p[26] = mean[2] * lit * 1.6, p[27] = t % 64
     // each laser's power over this frame (or now, when the frame is a sliver of a facet)
-    for (let c = 0; c < 3; c++) avg[c] = dq < 0.02 ? (c ? (c > 1 ? b.b : b.g) : b.r) : (energy(q, c) - energy(q0, c)) / (dq * (NX / WIN))
+    // (never below 0: the sums' rounding could dip a hair under, and the beam's pow(c, 2.2) of that is NaN)
+    for (let c = 0; c < 3; c++) avg[c] = dq < 0.02 ? (c ? (c > 1 ? b.b : b.g) : b.r) : Math.max(0, energy(q, c) - energy(q0, c)) / (dq * (NX / WIN))
     p[28] = avg[0], p[29] = avg[1], p[30] = avg[2], p[31] = Q0
     if (!fresh) field.rows = undefined
     fresh = false
@@ -309,7 +310,7 @@ const voice = (tt: number, o: { l: number; r: number }) => {
   const step = tt - aT > 0 && tt - aT < 1e-3
   for (let c = 0; c < 3; c++) {
     const e = energy(q, c)
-    pw[c] = step && q > aq + 1e-12 ? (e - e0[c]) / ((q - aq) * (NX / WIN)) : NaN
+    pw[c] = step && q > aq + 1e-12 ? Math.max(0, e - e0[c]) / ((q - aq) * (NX / WIN)) : NaN
     e0[c] = e
   }
   if (pw[0] !== pw[0]) beamAt(q), (pw[0] = B.r), (pw[1] = B.g), (pw[2] = B.b)
