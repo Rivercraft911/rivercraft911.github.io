@@ -56,3 +56,6 @@ export const R01 = FIELDS.push({ code: camera + film + r01, data: [320, 120, 2] 
 // The finale, take A: the cathedral falls in.
 import holeA from './fields/holeA.wgsl?raw'
 export const HOLEA = FIELDS.push({ code: camera + holeA, shots: true }) - 1
+// The finale's take B, the fractal as the drain, through the shots for R5's last frame.
+import holeB from './fields/holeB.wgsl?raw'
+export const HOLEB = FIELDS.push({ code: camera + film + holeB, shots: true }) - 1

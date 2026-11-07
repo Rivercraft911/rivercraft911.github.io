@@ -51,36 +51,50 @@ fn pearls(p: vec3f, a: f32, b: f32, n: i32, m: vec4f) -> vec3f {
   return vec3f(k.x * back, k.y, a / k.z * back);
 }
 
-// The pearls seen along a ray from ro, marched from t: soap films lit by one key light, fogged with distance
-// in units of H, the scale we are falling at. px is a pixel's width per unit of distance.
+// The space the pearls hang in: a dim nebula, violet toward the key light, teal below, so a film has
+// something to mirror and the gaps are never dead black.
+fn nebula(r: vec3f) -> vec3f {
+  let k = normalize(vec3f(0.4, 0.3, 1.0));
+  return vec3f(0.008, 0.006, 0.024) + vec3f(0.06, 0.03, 0.14) * pow(max(dot(r, k), 0.0), 3.0) + vec3f(0.01, 0.05, 0.06) * pow(max(-r.z, 0.0), 2.0);
+}
+
+// The pearls seen along a ray from ro, marched from t: soap films lit by a key light and a coloured rim
+// light, mirroring the nebula, fogged with distance in units of H, the scale we are falling at. Where the
+// ray grazes the packing it gathers glow, so the limit set, where the pearls kiss, shines. px is a pixel's
+// width per unit of distance.
 fn dive(ro: vec3f, rd: vec3f, t0: f32, px: f32, H: f32, fog: f32, drift: f32, a: f32, b: f32, n: i32, m: vec4f) -> vec3f {
   var t = max(t0, 0.002 * H);
   var hit = false;
   var steps = 0.0;
-  for (var i = 0; i < 72; i++) {
+  var glow = 0.0;
+  for (var i = 0; i < 80; i++) {
     let d = pearls(ro + rd * t, a, b, n, m).x;
     if (d < px * t) { hit = true; break; }
+    glow += exp(-d / (0.012 * t + 1e-4)) * 0.012;
     t += d * 0.9;
     steps += 1.0;
     if (t > 40.0 * H) { break; }
   }
-  let deep = vec3f(0.003, 0.004, 0.014);
-  if (!hit) { return deep; }
+  let halo = vec3f(0.35, 0.5, 1.0) * glow;
+  let deep = nebula(rd);
+  if (!hit) { return deep + halo; }
   let P = ro + rd * t;
   let e = 0.5 * px * t;
   let k = vec2f(1.0, -1.0);
   let nrm = normalize(k.xyy * pearls(P + k.xyy * e, a, b, n, m).x + k.yyx * pearls(P + k.yyx * e, a, b, n, m).x +
                       k.yxy * pearls(P + k.yxy * e, a, b, n, m).x + k.xxx * pearls(P + k.xxx * e, a, b, n, m).x);
   let pearl = pearls(P, a, b, n, m);
-  let small = mix(0.45, 1.0, smoothstep(0.6, 0.12, pearl.z / H)); // the giants are dark glass
+  let small = mix(0.75, 1.0, smoothstep(0.6, 0.12, pearl.z / H)); // the giants a little darker glass
   let ci = abs(dot(nrm, rd));
   let ct = sqrt(1.0 - (1.0 - ci * ci) / (1.33 * 1.33));
   // a film drains: thinner toward the top of each pearl, and thinner with time
   let thick = 220.0 + 380.0 * (0.5 + 0.5 * sin(2.2 * pearl.y + drift)) - 140.0 * nrm.z;
-  let ao = 1.0 - steps / 72.0;
+  let ao = 1.0 - 0.7 * steps / 80.0;
   let key = normalize(vec3f(0.4, 0.3, 1.0));
-  let spec = pow(max(dot(reflect(rd, nrm), key), 0.0), 300.0);
+  let rim = normalize(vec3f(-0.5, -0.4, -0.6));
+  let r = reflect(rd, nrm);
+  let spec = pow(max(dot(r, key), 0.0), 300.0) + 0.4 * vec3f(1.0, 0.45, 0.8) * pow(max(dot(r, rim), 0.0), 40.0);
   let fres = 0.06 + 0.94 * pow(1.0 - ci, 2.5);
-  let col = (8.0 * film(thick, ct) * fres * small + 0.6 * spec + vec3f(0.003, 0.004, 0.01)) * ao * ao;
-  return mix(deep, col, exp(-t / H * fog));
+  let col = (11.0 * film(thick, ct) * fres * small + 0.8 * spec + 1.8 * nebula(r) * fres + vec3f(0.004, 0.005, 0.012)) * ao;
+  return mix(deep, col, exp(-t / H * fog)) + halo;
 }
