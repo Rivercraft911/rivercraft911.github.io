@@ -14,13 +14,14 @@ const AHEAD = 0.1 // seconds of signal kept queued past the present
 const C = 2 + VOICES - BED
 const GAIN = 0.22
 
-// The bed's room: rt seconds for its hall to fall 60 dB, how much of the hall is heard, and the level.
-// The choir sets it once a frame.
-export const room = { rt: 2.5, wet: 0.5, gain: 1 }
+// The bed's room: rt seconds for its hall to fall 60 dB, how much of the hall is heard, the level, and
+// tone, where the hall's highs start to die (Hz). The choir sets it.
+export const room = { rt: 2.5, wet: 0.5, gain: 1, tone: 7000 }
 
 // The bed: voices 0 and 1 straight to left and right, voice 2 in the middle and deeper in the hall, its
 // DC blocked (scenes bend the voices), then a gentle stereo-linked compressor, 2:1 over a knee with fast
-// attack and slow release, so the swell never clips.
+// attack and slow release, so the swell never clips. The hall hears nothing much below 150 Hz, so the
+// bass stays dry and close and the room never booms.
 const KNEE = 1
 export class Bed {
   private hall: Hall
@@ -28,6 +29,8 @@ export class Bed {
   private att: number
   private rel: number
   private dc: number
+  private hp: number
+  private lo = [0, 0]
   private x = [0, 0]
   private y = [0, 0]
   constructor(sr: number) {
@@ -35,16 +38,19 @@ export class Bed {
     this.att = 1 - Math.exp(-1 / (0.005 * sr))
     this.rel = 1 - Math.exp(-1 / (0.4 * sr))
     this.dc = 1 - (2 * Math.PI * 15) / sr
+    this.hp = 1 - Math.exp((-2 * Math.PI * 150) / sr)
   }
 
   clear() {
     this.hall.clear()
+    this.lo[0] = this.lo[1] = 0
   }
 
   mix(o: Stereo) {
     const s = o.s, a = s[0], b = s[1], c = s[2], h = this.hall
     if (!(Math.abs(a + b + c) < 1e3)) return void (s[0] = s[1] = s[2] = 0) // a bad sample must never reach the hall's memory
-    h.run(a + c, b + c, room.rt)
+    const lo = this.lo, k = this.hp
+    h.run(a + c - (lo[0] += k * (a + c - lo[0])), b + c - (lo[1] += k * (b + c - lo[1])), room.rt, room.tone)
     const l = this.block(0, room.gain * (a + 0.5 * c + room.wet * h.l)), r = this.block(1, room.gain * (b + 0.5 * c + room.wet * h.r))
     const p = Math.max(Math.abs(l), Math.abs(r))
     this.env += (p > this.env ? this.att : this.rel) * (p - this.env)
