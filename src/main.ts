@@ -17,6 +17,7 @@ import { ophanim } from './acts/ophanim'
 import { ascii, CHARS } from './acts/ascii'
 import { load } from './beam/font'
 import { band, direct } from './band/band'
+import { edit } from './acts/edit'
 import { r01 } from './world/r01'
 
 const canvas = document.querySelector('canvas')!
@@ -26,6 +27,18 @@ const audio = new Audio()
 // ?fall plays only the fall, from the lip of the falls on (the pool needs their history); ?ident and ?end the last stretch. ?band and deep
 // links (/<project>, /qsl) skip the intro and land in the band.
 const hole = finaleA // the finale: the cathedral falls in
+// ?short: the transmission in about 25 s, each scene cut to its best stretch and played a little faster
+const SHORT = [
+  edit(hook, [[0.9, 5.3, 2.2]]),
+  edit(meander, [[0, 3.3, 1.65]]),
+  edit(valley, [[0, 11, 3.2], [15.3, 19.8, 2]]), // the opening and the flight, then straight to the falls landing
+  edit(wrap, [[0, 4, 1.6]]),
+  edit(ascii, [[0, 3.5, 2]]),
+  edit(stutter, [[2, 6, 1]]), // the cuts as they are: they land on beats
+  edit(hole, [[1.6, 8.2, 1.8]]),
+  edit(ident, [[0, 7.2, 2]]),
+  band,
+]
 const scenes = q.has('specimen')
   ? [specimen]
   : q.get('world') === 'r01'
@@ -38,7 +51,9 @@ const scenes = q.has('specimen')
           ? [ident]
           : q.has('end')
             ? [hole, ident, band]
-            : [hook, meander, valley, wrap, ascii, indra, stutter, ophanim, hole, ident, band]
+            : q.has('short')
+              ? SHORT
+              : [hook, meander, valley, wrap, ascii, indra, stutter, ophanim, hole, ident, band]
 const timeline = new Timeline(scenes)
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }
