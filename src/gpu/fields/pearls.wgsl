@@ -96,7 +96,12 @@ fn dive(ro: vec3f, rd: vec3f, t0: f32, px: f32, H: f32, fog: f32, drift: f32, a:
   let ci = abs(dot(nrm, rd));
   let ct = sqrt(1.0 - (1.0 - ci * ci) / (1.33 * 1.33));
   // a film drains: thinner toward the top of each pearl, and thinner with time
-  let thick = 220.0 + 380.0 * (0.5 + 0.5 * sin(2.2 * pearl.y + drift)) - 140.0 * nrm.z;
+  // and its colour comes from the pearl's size at the scale we're falling at, which the zoom's loop leaves
+  // unchanged, so a pearl one loop deeper is coloured exactly as it was (an orbit trap is not, and the loop
+  // showed as a cut)
+  let thick = 220.0 + 380.0 * (0.5 + 0.5 * sin(2.2 * log2(pearl.z / H) + drift)) - 140.0 * nrm.z;
+  // a pearl a few pixels across can't show its film's bands without shimmering: it shows their average
+  let sharp = smoothstep(1.5, 6.0, pearl.z / (px * t));
   // occlusion from one probe out along the normal, a pearl's own size away: how crowded it is there. A
   // count of march steps would do it cheaper, but steps jump from frame to frame and the shading flickers.
   let probe = 0.25 * pearl.z;
@@ -106,7 +111,7 @@ fn dive(ro: vec3f, rd: vec3f, t0: f32, px: f32, H: f32, fog: f32, drift: f32, a:
   let r = reflect(rd, nrm);
   let spec = pow(max(dot(r, key), 0.0), 300.0) + 0.4 * vec3f(1.0, 0.45, 0.8) * pow(max(dot(r, rim), 0.0), 40.0);
   let fres = 0.06 + 0.94 * pow(1.0 - ci, 2.5);
-  let col = (11.0 * film(thick, ct) * fres * small + 0.8 * spec + 1.8 * nebula(r) * fres + vec3f(0.004, 0.005, 0.012)) * ao;
+  let col = (11.0 * mix(vec3f(0.035), film(thick, ct), sharp) * fres * small + 0.8 * spec + 1.8 * nebula(r) * fres + vec3f(0.004, 0.005, 0.012)) * ao;
   // gone into the haze before the march gives up on it, so far pearls never pop in
   return mix(deep, col, exp(-t / H * fog) * smoothstep(34.0 * H, 24.0 * H, t));
 }

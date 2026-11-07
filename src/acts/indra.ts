@@ -9,7 +9,6 @@ import { INDRA as SHADER } from '../gpu/fields'
 import type { Field } from '../gpu/raster'
 import { descent, place, sing } from './choir'
 import { AT as R1END } from './ascii'
-import { TAU_RASTER } from './wrap'
 import { A, B, GROUP, GROUP_INK, H, LENS, MU, PER, SHRINK, TURN, ZM, ZP, div, eye, fall, fwd, mul, up } from './drain'
 import { aim, equation, project, seen } from './reality'
 import { smooth, type Scene } from './scene'
@@ -50,13 +49,15 @@ export const indra: Scene = {
   dur: DUR,
   build(t, f) {
     const T = t + AT, p = field.p // no jump: we come through the drain, on the camera that brought us
-    const s0 = PER * (descent(T) - descent(AT)), k = fall(s0 - Math.floor(s0), t)
+    // one continuous zoom, never looped back: over these few seconds it goes barely past one period of w, and
+    // a loop lands on a copy of the packing that is not quite the same, which showed as a cut
+    const s0 = PER * (descent(T) - descent(AT)), k = fall(s0, t)
     aim(p, eye, fwd, up, LENS)
     p[16] = A, p[17] = B, p[18] = 40, p[19] = 1.2 // deep enough that every pearl big enough to see exists at every depth of the zoom; settled points bail out early
     p[20] = 0.4 * t, p[21] = 0.06, p[22] = k * H
     p[24] = ZM[0], p[25] = ZM[1], p[26] = ZM[0] - ZP[0], p[27] = ZM[1] - ZP[1]
     f.field = field
-    f.look = { tau: TAU_RASTER } // a fresh picture each frame: under the slow phosphor a moving raster smears into ghosts
+    f.look = { tau: 0.018 } // a moving raster under the slow phosphor smears into ghosts; a third of it still smooths the finest detail
 
     // the limit set on the floor, a dot per walk, carried by a power of w to the scale we are falling at
     const near = k * H
