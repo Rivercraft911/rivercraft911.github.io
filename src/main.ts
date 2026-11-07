@@ -17,6 +17,7 @@ import { ophanim } from './acts/ophanim'
 import { ascii, CHARS } from './acts/ascii'
 import { load } from './beam/font'
 import { band, direct } from './band/band'
+import { r01 } from './world/r01'
 
 const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
@@ -26,15 +27,17 @@ const audio = new Audio()
 // links (/<project>, /qsl) skip the intro and land in the band.
 const scenes = q.has('specimen')
   ? [specimen]
-  : direct()
-    ? [band]
-    : q.has('fall')
-      ? [wrap, ascii, indra, stutter, ophanim, singularity]
-      : q.has('ident')
-        ? [ident]
-        : q.has('end')
-          ? [singularity, ident, band]
-          : [hook, meander, valley, wrap, ascii, indra, stutter, ophanim, singularity, ident, band]
+  : q.get('world') === 'r01'
+    ? [r01]
+    : direct()
+      ? [band]
+      : q.has('fall')
+        ? [wrap, ascii, indra, stutter, ophanim, singularity]
+        : q.has('ident')
+          ? [ident]
+          : q.has('end')
+            ? [singularity, ident, band]
+            : [hook, meander, valley, wrap, ascii, indra, stutter, ophanim, singularity, ident, band]
 const timeline = new Timeline(scenes)
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }

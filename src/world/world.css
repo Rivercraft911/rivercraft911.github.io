@@ -1,0 +1,98 @@
+/* A world's page: a readout at the edge of the room, black falling off into it, so the world shows
+   through on its side and the text sits on dark. The section weights are the laser channels'. */
+#world {
+  --ink: #e4e0ea;
+  --dim: #8b8597;
+  --hot: #fff;
+  --r: #ff5a4a;
+  --g: #59ff8a;
+  --b: #6c8cff;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(410px, 36vw);
+  color: var(--ink);
+  font: 13px/1.62 ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+  -webkit-font-smoothing: antialiased;
+  pointer-events: none;
+}
+#world .page {
+  box-sizing: border-box;
+  height: 100%;
+  overflow-y: auto;
+  padding: 9vh 2.6vw 8vh 4.2vw;
+  background: linear-gradient(to right, transparent, #000000c4 3.4vw, #000000e0);
+  scrollbar-width: thin;
+  scrollbar-color: #8b859755 transparent;
+  pointer-events: auto;
+  transition: transform 0.5s cubic-bezier(0.3, 0.7, 0.2, 1), opacity 0.5s;
+}
+#world.shut .page { transform: translateX(104%); opacity: 0; }
+
+#world .fold {
+  position: absolute;
+  top: 3.2vh;
+  right: 2.6vw;
+  z-index: 1;
+  padding: 0.3em 0;
+  border: 0;
+  border-bottom: 1px solid #8b859766;
+  background: none;
+  color: var(--dim);
+  font: inherit;
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  pointer-events: auto;
+}
+#world .fold:hover, #world .fold:focus-visible { color: var(--hot); border-bottom-color: var(--hot); outline: none; }
+
+#world h1 {
+  margin: 0;
+  font: inherit;
+  font-size: 40px;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  color: var(--hot);
+  text-shadow: 0 0 18px #ffffff40;
+}
+/* three beams, combined: red, green and blue meeting in one white line under the name */
+#world h1::after {
+  content: '';
+  display: block;
+  width: 9.5ch;
+  height: 1px;
+  margin-top: 0.45em;
+  background: linear-gradient(to right, var(--r) 0 18%, var(--g) 18% 36%, var(--b) 36% 54%, #fff 54%);
+  box-shadow: 0 0 8px #ffffff55;
+}
+#world .what { margin: 1.1em 0 2.6em; color: var(--ink); font-size: 14px; }
+
+#world section { margin: 0 0 2.3em; }
+#world h2 { margin: 0 0 0.7em; font: inherit; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
+#world h2 b { display: inline-block; min-width: 3ch; color: var(--hot); font-weight: normal; }
+#world p { margin: 0 0 0.9em; }
+#world .proof .num { margin: 0.1em 0 0.3em; font-size: 34px; line-height: 1.1; color: var(--hot); text-shadow: 0 0 14px #ffffff50; }
+
+#world figure { margin: 0 0 1.6em; }
+#world figure img, #world figure video { display: block; width: 100%; height: auto; max-height: 56vh; object-fit: contain; object-position: left top; background: #000; }
+#world figcaption { margin-top: 0.5em; color: var(--dim); font-size: 12px; }
+
+#world .status { padding-left: 1.2ch; border-left: 1px solid var(--r); color: var(--dim); }
+#world a { color: var(--hot); text-decoration: none; border-bottom: 1px solid #ffffff55; }
+#world a:hover, #world a:focus-visible { border-bottom-color: var(--hot); outline: none; text-shadow: 0 0 8px #ffffff88; }
+#world .link a::before { content: '→ '; color: var(--dim); }
+
+/* a phone: a sheet over the bottom of the room */
+@media (max-aspect-ratio: 17 / 20) {
+  #world { top: auto; left: 0; width: auto; height: 52vh; }
+  #world .page { padding: 4.5em 5vw 6vh; background: linear-gradient(transparent, #000000d0 2.5em, #000000e8); }
+  #world.shut .page { transform: translateY(104%); }
+  #world .fold { top: 1.6em; right: 5vw; }
+  #world h1 { font-size: 30px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #world .page { transition: none; }
+}
