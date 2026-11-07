@@ -75,7 +75,7 @@ fn de(x: vec3f) -> f32 {
   let y = vec3f(turn(x.xy * s, w), x.z * s);
   let c = smoothstep(1.1, 2.0, s) * u.p[5].z;
   fallen = s;
-  gas = smoothstep(1.5, 4.0, s) * u.p[5].z;
+  gas = max(smoothstep(1.5, 4.0, s), smoothstep(4.0, 3.0, r)) * u.p[5].z; // and nothing solid within the photon sphere
   let S = u.p[10].y;
   let hollow = min(length(y) - u.p[11].x, length(y.xz) - u.p[11].y); // the crossing and the nave, kept clear
   above = abs(x.z) - r * (0.08 + 2.0 * (1.0 - c)) - 0.05;
@@ -84,7 +84,7 @@ fn de(x: vec3f) -> f32 {
   let e = eye();
   let D = length(e);
   let along = dot(x - e, -e) / D;
-  sight = 7.0 * along / D * smoothstep(D - 1.0, D - 4.0, along) - length(x - e + e * along / D);
+  sight = 7.0 * along / D * smoothstep(D - 0.5, D - 2.0, along) - length(x - e + e * along / D);
   return max((stone / (s * (1.0 + 1.5 * w)) + max(above, 0.0) / 3.0) / 1.5, 0.9 * sight);
 }
 
