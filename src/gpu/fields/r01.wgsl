@@ -189,7 +189,8 @@ fn shade(P: vec3f, rd: vec3f, n: vec3f, m: i32, foot: f32, first: bool) -> vec3f
 fn field(q: vec2f) -> vec3f {
   let ro = eye();
   let rd = ray(q);
-  let n0 = hash(vec3f(q * 913.0, u.p[6].w));
+  let pix = floor(q / u.px) + 5.588238 * floor(u.p[6].w * 60.0); // interleaved gradient noise: blur that averages fast
+  let n0 = fract(52.982919 * fract(dot(pix, vec2f(0.06711056, 0.00583715))));
   facet = u.p[5].x + u.p[5].y * (n0 - 0.5);
   let e = u.p[5].z + u.p[5].w * (fract(n0 * 7.31) - 0.5);
   gn = normalize(vec3f(-cos(e), sin(e), -1.0));
@@ -202,8 +203,9 @@ fn field(q: vec2f) -> vec3f {
   if (tm > 0.0) {
     let P = ro + rd * tm;
     let foot = cone() * tm;
-    let m = mat;
+    var m = mat;
     let n = normal(P, max(0.0005, 0.5 * foot));
+    if (m == 0 && abs(n.y) > 0.7) { m = 2; } // the polygon's caps are machined, not mirrored
     var c = shade(P, rd, n, m, foot, true);
     if (m == 0 || m == 3) { // a mirror: what it sees, the machine included
       let r = reflect(rd, n);
