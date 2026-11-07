@@ -30,16 +30,17 @@ fn palette(s: f32) -> vec3f {
   return mix(c[i], c[i + 1u], x - f32(i));
 }
 
+fn wrap(i: vec2f, n: vec2f) -> vec2f { return i - n * floor(i / n); }
 fn hash(p: vec2f) -> f32 { return fract(sin(dot(p, vec2f(127.1, 311.7))) * 43758.547); }
 // Value noise on a lattice that tiles every n cells, so it is seamless round the disc and round the ring.
 fn noise(x: vec2f, n: vec2f) -> f32 {
   let i = floor(x);
   let f = x - i;
   let w = f * f * (3.0 - 2.0 * f);
-  let a = hash(i % n);
-  let b = hash((i + vec2f(1.0, 0.0)) % n);
-  let c = hash((i + vec2f(0.0, 1.0)) % n);
-  let d = hash((i + 1.0) % n);
+  let a = hash(wrap(i, n));
+  let b = hash(wrap(i + vec2f(1.0, 0.0), n));
+  let c = hash(wrap(i + vec2f(0.0, 1.0), n));
+  let d = hash(wrap(i + 1.0, n));
   return mix(mix(a, b, w.x), mix(c, d, w.x), w.y);
 }
 
@@ -83,8 +84,11 @@ fn field(q: vec2f) -> vec3f {
   let A = u.p[4].w;
   let a = atan2(d.x, d.y) - 0.5 * K * log((1.0 + k / r2) / (1.0 + k / (R * R))) - u.p[4].z;
   let b = (a - TAU * floor(a / TAU)) / A; // across the nine octaves, 0..1; beyond 1 the sheet is not there
+  // Water older than the sheet carries the oldest row on down to the drain.
+  let oldest = min(u.p[5].z, ROWS - 8.0);
   let rows = log(c * rho) / c * u.p[5].y; // ≤ 0 behind the lip
   let ring = u.p[5].x + rows;
+  let row = u.p[5].x + max(rows, -oldest);
 
   // A pixel's footprint, in bins and rows: how far it reaches across the spiral and down it.
   let dPx = dpdx(P);
@@ -102,14 +106,13 @@ fn field(q: vec2f) -> vec3f {
   let nx = i32(clamp(ceil(fx * 0.5), 1.0, 3.0));
   var pw = 0.0;
   for (var j = 0; j < ny; j++) {
-    let v = (ring + 0.5 + ((f32(j) + e) / f32(ny) - 0.5) * fy) / size.y;
+    let v = (row + 0.5 + ((f32(j) + e) / f32(ny) - 0.5) * fy) / size.y;
     for (var i = 0; i < nx; i++) {
       pw += power(at(vec2f(u.p[7].z + b * u.p[7].w + ((f32(i) + e) / f32(nx) - 0.5) * fx / size.x, v)));
     }
   }
   pw /= f32(nx * ny);
-  let oldest = min(u.p[5].z, ROWS - 8.0);
-  let sheet = select(0.0, 1.0, b < 1.0 && rows <= 0.0 && !miss) * (1.0 - smoothstep(oldest - 40.0, oldest, -rows));
+  let sheet = select(0.0, 1.0, b < 1.0 && rows <= 0.0 && !miss);
   let lv = (level(pw) * (1.0 - u.p[6].x) + u.p[6].x) * sheet;
 
   // Foam and ripples in the water's own coordinates (the angle it entered at, the row it entered with), so
@@ -117,9 +120,9 @@ fn field(q: vec2f) -> vec3f {
   // let go where it would be finer than a pixel.
   let wet = u.p[1].w;
   let fine = vec2f(fx, fy);
-  let lace = 1.0 - abs(2.0 * noise(vec2f(b * 384.0, ring / 96.0), vec2f(384.0, ROWS / 96.0)) - 1.0);
-  let patch = noise(vec2f(b * 48.0, ring / 192.0), vec2f(48.0, ROWS / 192.0));
-  let foam = smoothstep(0.93, 0.995, lace) * smoothstep(0.35, 0.75, patch + 0.5 * lv) * (0.2 + 0.8 * smoothstep(0.1, 0.6, lv)) * wet * (1.0 - smoothstep(4.0, 24.0, fine.x + fine.y / 4.0));
+  let lace = 1.0 - abs(2.0 * noise(vec2f(b * 384.0, ring / 192.0), vec2f(384.0, ROWS / 192.0)) - 1.0);
+  let clump = noise(vec2f(b * 48.0, ring / 192.0), vec2f(48.0, ROWS / 192.0));
+  let foam = smoothstep(0.93, 0.995, lace) * smoothstep(0.35, 0.75, clump + 0.5 * lv) * (0.2 + 0.8 * smoothstep(0.1, 0.6, lv)) * wet * (1.0 - smoothstep(-20.0, 20.0, rows)) * (1.0 - smoothstep(4.0, 24.0, fine.x + fine.y / 4.0));
   let ripple = noise(vec2f(b * 768.0, ring / 6.0), vec2f(768.0, ROWS / 6.0)) * (1.0 - smoothstep(1.0, 6.0, fine.x + fine.y));
 
   // The surface's normal from the vortex, roughened by the ripples and the foam.

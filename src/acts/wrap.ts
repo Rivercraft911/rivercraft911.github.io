@@ -5,6 +5,7 @@
 // present is printed, angle is pitch and log-radius is age, so the rows run inward exactly as fast as the
 // choir falls, and the Shepard choir's partials, octaves apart, are spokes round the wheel. Then the water
 // spins up into a vortex and drinks the spectrum down in log spirals, and we are pulled down after it.
+import { heard } from '../audio/audio'
 import { BINS, F0, PER as PER_BIN, Waterfall } from '../dsp/waterfall'
 import { ROWS, WRAP as SHADER } from '../gpu/fields'
 import type { Field } from '../gpu/raster'
@@ -23,7 +24,7 @@ const MAX = 256 // most rows printed in a frame
 const LIP = 0.42, S0 = 1 / Math.tan(0.45), L = 1.55 / 3.4 / rate(LEAD)
 // The vortex, in the units of the plot: its depth, its core, and how many radians its water turns for
 // every e-fold it is drawn in. g sets the scale of the circulation the equation shows: a metre a unit.
-const H = 0.9, RC = 0.14, K = 6, G = 9.81
+const H = 0.9, RC = 0.18, K = 10, G = 9.81
 let aspect = 0, W = 1, X0 = 0, C1 = 1 // the plot's width, where 80 Hz is on it, and the curl that closes it
 const U0 = (PER_BIN * Math.log2(80 / F0)) / BINS, DU = (PER_BIN * Math.log2(100)) / BINS // and where they are on the rows
 function chart() {
@@ -48,7 +49,11 @@ const printer = { k: 0, from: 0, T: -1, ref: -1 }
 function print(T: number, now: number, f: Field) {
   T += LEAD // on the choir's clock
   const head = descent(T) * PER, top = Math.floor(head), pr = printer, dt = T - pr.T
-  if (dt < 0 || dt > 0.5 || top - pr.k > MAX) (pr.k = pr.from = top - MAX), (pr.ref = -1) // a jump: start a fresh sheet
+  if (dt < 0 || dt > 0.5 || top - pr.k > MAX) {
+    // a jump: start a fresh sheet, as far back as the speakers remember
+    pr.k = pr.from = top - Math.min(MAX, Math.floor((heard.buf.length / heard.sr - 0.05) * rate(T) * PER))
+    pr.ref = -1
+  }
   pr.T = T
   const n = top - pr.k
   let hi = 0
