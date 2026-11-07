@@ -125,7 +125,7 @@ const look = { tau: 0.08 }
 const DREAD = { dread: 1 }
 // The bulb's camera closes on a point of its surface, a crevice, along the ray that found it.
 const AIM = [0.694737, 0.389077, 0.596482], INTO = [-0.7621, -0.1682, -0.6252], beye = [0, 0, 0], bup = [0, 0, 0]
-const PER = 2 // octaves of the bulb's zoom per octave of the choir's descent
+const PER = 1.3 // octaves of the bulb's zoom per octave of the choir's descent
 
 export const singularity: Scene = {
   dur: TC + 2,
@@ -139,15 +139,15 @@ export const singularity: Scene = {
     fwd[0] = -eye[0], fwd[1] = -eye[1], fwd[2] = -eye[2]
     aim(p, eye, fwd, up, 0.95 + kick)
     const z = Math.exp(1.6 * Math.max(0, t - FALL) ** 1.6) // the collapse: the picture shrinks to a point
-    p[16] = 60 + 3 * t, p[17] = z, p[18] = Math.min(4, Math.sqrt(z)) * (z < 400 ? 1 : 0), p[19] = smooth(OPEN, OPEN + 1, t)
-    p[20] = SPIN, p[21] = ISCO, p[22] = 0.4, p[23] = 1
+    p[16] = 12 + 3 * t, p[17] = z, p[18] = Math.min(4, Math.sqrt(z)) * (z < 400 ? 1 : 0), p[19] = smooth(OPEN, OPEN + 1, t)
+    p[20] = SPIN, p[21] = ISCO, p[22] = 0.25, p[23] = 1
     // the bulb, its zoom as fast as the choir falls
     const d = 1.4 * 2 ** (-PER * Math.max(0, descent(T) - descent(AT + OPEN))), w = 0.3 * t
     for (let i = 0; i < 3; i++) beye[i] = AIM[i] - d * INTO[i]
     bup[0] = Math.cos(w), bup[1] = -Math.cos(w), bup[2] = Math.sin(w) // rolling as it goes
     aim(p.subarray(24), beye, INTO, bup, 0.95 + kick)
     p[31] = 12, p[39] = 0.5
-    p[40] = 0.012, p[41] = 0.3, p[42] = 50, p[43] = 0
+    p[40] = 2, p[41] = 0.3, p[42] = 50, p[43] = 0
     if (p[18] > 0) f.field = field
 
     const lit = smooth(0.6, 1.5, t) * (1 - smooth(OPEN - 1, OPEN + 0.3, t))

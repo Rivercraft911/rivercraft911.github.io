@@ -71,10 +71,10 @@ fn flow(x: vec3f, p: vec3f, dx: ptr<function, vec3f>) -> vec3f {
   return 0.5 * k * k * gf + f * k * gL;
 }
 
-// A blackbody at T kelvin, at 630, 532 and 465 nm.
+// A blackbody at T kelvin, at 630, 532 and 465 nm, white-balanced so that 6500 K is white.
 fn planck(T: f32) -> vec3f {
   let l = vec3f(0.63, 0.532, 0.465);
-  return 1.0 / (l * l * l * l * l * (exp(min(14388.0 / (l * max(T, 300.0)), vec3f(80.0))) - 1.0));
+  return vec3f(1.198, 1.0, 0.936) / (l * l * l * l * l * (exp(min(14388.0 / (l * max(T, 300.0)), vec3f(80.0))) - 1.0));
 }
 
 // The gas along the chord from x0 to x1, marched as a volume: its light into col, what it hides from
@@ -107,15 +107,15 @@ fn gas(x0: vec3f, x1: vec3f, b: f32, j: f32) {
     let om = 1.0 / (rr * s + A);
     // the gas in its own orbit: each radius turned back by its own Ω t, so the shear winds it
     let th = -om * u.p[4].x;
-    var q = vec3f(cos(th) * P.x - sin(th) * P.y, sin(th) * P.x + cos(th) * P.y, 2.5 * P.z) * 0.9;
+    var q = vec3f(cos(th) * P.x - sin(th) * P.y, sin(th) * P.x + cos(th) * P.y, 2.5 * P.z) * 1.3;
     q += 1.4 * vec3f(noise(0.5 * q), noise(0.5 * q + 7.1), 0.0) - 0.7; // domain warp
     let n = 0.55 * noise(q) + 0.3 * noise(2.1 * q + 3.3) + 0.15 * noise(4.3 * q + 9.7);
-    let rho = shape * smoothstep(0.35, 0.75, n) * 3.0;
+    let rho = shape * smoothstep(0.42, 0.72, n) * 3.0;
     if (rho < 0.01) { continue; }
     let ut = (rr * s + A) / (pow(rr, 0.75) * sqrt(max(rr * s - 3.0 * s + 2.0 * A, 1e-3)));
     let g = 1.0 / (ut * (1.0 + om * b));
     let x = rin / rr;
-    let T = 9000.0 * 2.05 * pow(x, 0.75) * pow(max(1.0 - sqrt(x), 0.0), 0.25) + 1200.0;
+    let T = 7000.0 * 2.05 * pow(x, 0.75) * pow(max(1.0 - sqrt(x), 0.0), 0.25) + 1200.0;
     let o = 1.0 - exp(-0.8 * rho * ds); // what this sample hides, and so, being in equilibrium, emits
     col += through * o * planck(g * T) * u.p[5].z;
     through *= 1.0 - o;
@@ -138,14 +138,13 @@ fn hall(x: vec3f) -> f32 {
     if (p.x < p.z) { p = p.zyx; }
     if (p.y < p.z) { p = p.xzy; }
     p = vec3f(turn(p.xy, 0.12), p.z);
-    p = vec3f(p.x, turn(p.yz, 0.08));
     p = 3.0 * p - vec3f(2.0, 2.0, 0.0);
     if (p.z > 1.0) { p.z -= 2.0; }
     s *= 3.0;
     trap = min(trap, dot(p, p));
   }
   let e = abs(p) - 1.0;
-  return S * (length(max(e, vec3f(0.0))) + min(max(e.x, max(e.y, e.z)), 0.0)) / s;
+  return max(S * (length(max(e, vec3f(0.0))) + min(max(e.x, max(e.y, e.z)), 0.0)) / s, max(abs(x.x) - 3.0 * S, max(abs(x.y), abs(x.z)) - S)); // one cell thick
 }
 
 // Where the chord from x to x + v meets the nave, as a fraction of it, or −1; t0 is how far the ray had run.
