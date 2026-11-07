@@ -516,7 +516,7 @@ export const valley: Scene = {
           pen = false
           continue
         }
-        line.color(WATER[0], WATER[1], WATER[2], glow((x - X0) / (XM - X0), t + 2.8) * k)
+        line.color(WATER[0], WATER[1], WATER[2], glow((x - X0) / (XM - X0), t + 3.3) * k)
         pen ? line.lineTo(p3.x, p3.y) : line.moveTo(p3.x, p3.y)
         pen = true
         if (t < SCAN && heroN < HERO) (hx[heroN] = p3.x), (hy[heroN++] = p3.y)
