@@ -1,4 +1,5 @@
-// The raster's way into the phosphor: a field as light, or read out as text through a character generator.
+// The raster's way into the phosphor: a field as light, or read out as text through a character generator,
+// or both: a field's alpha says how much of each pixel is read out as text, and the rest is light.
 
 struct R {
   res: vec2f,  // the phosphor's size in px
@@ -12,6 +13,7 @@ struct R {
   n: f32,      // glyphs
   lift: f32,   // scene light to coverage
   dim: f32,    // how dark a glyph may get in a dark cell
+  fine: f32,   // the field's pixels across a grid step of a cell
 }
 
 @group(0) @binding(0) var<uniform> r: R;
@@ -49,17 +51,21 @@ const Y = vec3f(0.2290, 0.6917, 0.0793);
   return vec4f(textureSampleLevel(src, smp, 2.0 * pos.xy / vec2f(textureDimensions(src)), 0.0).rgb, 1.0);
 }
 
-// One fragment per cell. The field was rendered at 6 × 10 pixels a cell: the cell's shape, as the ink it
+// One fragment per cell. The field was rendered at 6 × 10 pixels a cell (each fine × fine): the cell's shape, as the ink it
 // asks for (light saturates into coverage), each sample raised to a power over the cell's darkest-to-
 // brightest so an edge reads as an edge. The glyph whose ink over the same grid is nearest wins, so dim
 // light prints sparse glyphs and bright light dense ones, each shaped like what it covers.
 const SHARP = 1.8;
 @fragment fn cellFS(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-  let c = vec2i(floor(pos.xy)) * vec2i(6, 10);
+  let m = i32(r.fine);
+  let c = vec2i(floor(pos.xy)) * vec2i(6, 10) * m;
   var d: array<vec4f, 15>;
   var hi = 0.0;
   for (var i = 0; i < 60; i++) {
-    let v = 1.0 - exp(-r.lift * dot(textureLoad(src, c + vec2i(i % 6, i / 6), 0).rgb, Y));
+    var s = vec4f(0.0);
+    for (var j = 0; j < m * m; j++) { s += textureLoad(src, c + vec2i(i % 6, i / 6) * m + vec2i(j % m, j / m), 0); }
+    s /= f32(m * m);
+    let v = (1.0 - exp(-r.lift * dot(s.rgb, Y))) * s.a; // only the text part of it asks for ink
     d[i / 4][i % 4] = v;
     hi = max(hi, v);
   }
@@ -80,13 +86,15 @@ const SHARP = 1.8;
 }
 
 // Each pixel finds its cell and shows that cell's glyph from the atlas, four taps a pixel so a tile drawn
-// larger than the cell still lands without aliasing.
+// larger than the cell still lands without aliasing; and whatever of the field is not text, as light.
 @fragment fn textFS(@builtin(position) pos: vec4f) -> @location(0) vec4f {
+  let f = textureSampleLevel(src, smp, pos.xy / r.res, 0.0);
+  let light = vec4f(f.rgb * (1.0 - f.a) * r.gain, 0.0);
   let p = pos.xy - r.off;
   let c = floor(p / r.cell);
-  if (any(c < vec2f(0.0)) || any(c >= r.grid)) { return vec4f(0.0); }
+  if (any(c < vec2f(0.0)) || any(c >= r.grid)) { return light; }
   let g = textureLoad(cells, vec2i(c), 0);
-  if (g.x <= 0.0) { return vec4f(0.0); }
+  if (g.x <= 0.0) { return light; }
   let tile = vec2f(g.x - r.cols * floor(g.x / r.cols), floor(g.x / r.cols));
   let scale = r.tile / r.cell / vec2f(textureDimensions(atlas));
   let o = tile * r.tile / vec2f(textureDimensions(atlas)) + (p - c * r.cell) * scale;
@@ -95,5 +103,5 @@ const SHARP = 1.8;
     ink += textureSampleLevel(atlas, smp, o + (vec2f(f32(i & 1), f32(i >> 1)) - 0.5) * 0.5 * scale, 0.0).r;
   }
   let lit = mix(r.dim, 1.0, g.y) + 1.5 * pow(g.y, 6.0); // the fullest cells burn past white
-  return vec4f(r.ink * (0.25 * ink * lit * r.gain), 0.0);
+  return light + vec4f(r.ink * (0.25 * ink * lit * r.gain), 0.0);
 }

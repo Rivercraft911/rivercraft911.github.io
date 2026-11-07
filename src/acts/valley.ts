@@ -12,6 +12,9 @@ import { fft, hann } from '../dsp/fft'
 import { Field } from '../dsp/terrain'
 import { heard } from '../audio/audio'
 import { place, sing } from './choir'
+import { aim } from './reality'
+import { A0, ARC, FALL, KEYS as POOL, M, R, TAU_RASTER, pool, surface, turned, vortex as whirl } from './wrap'
+import { LOOK } from '../gpu/phosphor'
 import { Board, Say } from './say'
 import { TAU, cam, clamp, glide, hash, lock, mix, smooth, view, type Scene } from './scene'
 
@@ -192,9 +195,10 @@ const FIRS = L('x(y) = 0.3 H (1 - y / H)^{0.9}\\, tri(\\pi n y / H),\; N = \\num
 const PEAKS = L('h(z) = 20 \\log_{10} |S(e^{i \\omega})|', INK, 6)
 const SPRAY = L('(x, y) = (x_0 + v_x \\tau,\; y_0 + v_y \\tau - 3.5 \\tau^2)', WHITE, 2)
 const EYE = L('eye = (\\num{0}{-00.0}, \\num{1}{-00.0}, \\num{2}{-00.0})', WHITE, 5.2)
-const FALL = L('(x, y) = (62 + 1.6 \\tau,\; \\num{0}{-0.00} - 2.5 \\tau^2)', WHITE, 11.3)
+const FALLS = L('(x, z) = (x_l, z_l) + v_l \\tau,\; y = \\num{0}{-0.00} - 2.5 \\tau^2', WHITE, 11.3)
+const POOL_EQ = L('\\theta = \\theta_l + \\frac{K}{2} \\ln \\frac{1 + r_c^2 / r^2}{1 + r_c^2 / R^2},\; r = R e^{-\\num{0}{0.00} \\tau}', WATER, 15.6)
 const SPEC = L('S(f, t) = |\\sum_n x[n]\\, w[n - tH]\\, e^{-i 2\\pi f n / 1024}|,\; t = \\num{0}{00.00}', CYAN, 14.3)
-const board = new Board([RIVER, OPEN, FLOWS, LAND, WALL, WAVES, SPRAY, FIRS, EYE, PEAKS, FALL, SPEC])
+const board = new Board([RIVER, OPEN, FLOWS, LAND, WALL, WAVES, SPRAY, FIRS, EYE, PEAKS, FALLS, SPEC, POOL_EQ])
 const say = new Say()
 export const RIVER_EQ = '\\theta(s) = \\omega_1 \\sin(2\\pi s / M_1) + \\omega_2 \\sin(2\\pi s / M_2 + \\phi)'
 let ceil = 1 // nothing of the land is drawn above this: the board's room
@@ -213,7 +217,7 @@ let heroN = 0, heroGain = 0.7, occlude = 1, landK = 1, lp = 0, hl = 0, hr = 0 //
 // The flight: one continuous path, eye, target and lens gliding through these without stopping. Straight
 // down on the map the meander drew; a crane up and back as the valley rises; downstream over the firs;
 // around the pool as its stones lock; low and fast down the river to the lip; over it and round in an
-// arc to face the falls; then back, the lens narrowing as we go, until the falls are flat as a plot.
+// arc to face the falls; then down their face with the water into the plunge pool below (wrap.ts).
 export const DUR = 19.8, SING = -1.2 // the choirs begin to sing at SING
 const MAP_FOV = 1.1, YL = riverY(LIP - 0.2), ZL = riverZ(LIP)
 const on = (x: number, h: number, dz: number, tx: number, fov: number) => [x, riverY(x) + h, riverZ(x) + dz, tx, riverY(tx), riverZ(tx), fov]
@@ -227,8 +231,6 @@ const KEYS: number[][] = [
   [12.6, LIP - 8, YL + 5, riverZ(LIP - 8) + 2, LIP + 6, YL - 4, ZL + 2, 1],
   [14.2, LIP + 10, YL + 4, ZL + 11, LIP + 2, YL - 8, ZL, 1],
   [15.6, LIP + 14, YL - 4, ZL + 9, LIP + 1.5, YL - 11, ZL, 0.9],
-  [17, LIP + 18, YL - 11, ZL, LIP + 1, YL - 12, ZL, 0.8],
-  [DUR, LIP + 40, YL - 12, ZL, LIP + 1, YL - 12, ZL, 0.34],
 ]
 // Straight down on the stretch the meander drew, framed as it framed it.
 function framed(k: number[]) {
@@ -371,48 +373,65 @@ function rowAt(t: number) {
 }
 const past = (t: number, lane: number) => (row ? spec[rowAt(t) + lane] : 0)
 const PAL = [[0.02, 0.08, 0.35], [0.05, 0.4, 1], [0.1, 0.95, 0.9], [1, 0.85, 0.2], [1, 1, 1]]
-const FALL_G = 5, V0 = 1.6, TAU_MAX = 3.4
-const fallX = (tau: number, l: number) => LIP + V0 * tau + 0.05 * Math.sin(7 * tau + l)
-const fallZ = (tau: number, l: number) => ZL + (0.5 - l / (LANES - 1)) * 2 * wide(LIP) * 1.3 * (1 + 1.1 * tau) // fanning as it falls
+// Every lane flies from its place on the lip to its place on the ring round the plunge pool's drain (wrap.ts),
+// ballistic: straight across at its own speed while it falls 2.5τ², so the curtain bows round the pool and
+// the spectrum lands on the ring in order, 80 Hz to 8 kHz, angle for log-frequency.
+const FALL_G = 5, TAU_MAX = FALL, W_LIP = wide(LIP) * 1.3
+const PX = LIP + 1.6 * TAU_MAX + M * R, PY = YL - 0.5 * FALL_G * TAU_MAX ** 2, PZ = ZL // the drain, under the pool's surface
+const BX = new Float64Array(LANES), BZ = new Float64Array(LANES), LZ = new Float64Array(LANES), AL = new Float64Array(LANES)
+for (let l = 0; l < LANES; l++) {
+  AL[l] = A0 + (l / (LANES - 1)) * ARC
+  BX[l] = PX + M * R * Math.cos(AL[l]), BZ[l] = PZ + M * R * Math.sin(AL[l]), LZ[l] = ZL + (1 - (2 * l) / (LANES - 1)) * W_LIP
+}
+const fallX = (tau: number, l: number) => LIP + ((BX[l] - LIP) * tau) / TAU_MAX + 0.05 * Math.sin(7 * tau + l)
+const fallZ = (tau: number, l: number) => LZ[l] + ((BZ[l] - LZ[l]) * tau) / TAU_MAX
+// The pool's units (x across, y downstream, z up, from the drain) and ours.
+const toPool = (x: number, y: number, z: number, o: number[]) => ((o[0] = (z - PZ) / M), (o[1] = (x - PX) / M), (o[2] = (y - PY) / M))
+const WE = [0, 0, 0], WT = [0, 0, 0], UP = [0, 0, 1]
+const fromPool = (k: number[]) => [k[0] + DUR, PX + M * k[2], PY + M * k[3], PZ + M * k[1], PX + M * k[5], PY + M * k[6], PZ + M * k[4], k[7]]
+KEYS.push(...POOL.map(fromPool)) // down the falls into the pool: the whirlpool's own flight, so it goes on unbroken
 function shade(v: number, i: number) {
   const f = clamp(v) * (PAL.length - 1), k = Math.min(PAL.length - 2, Math.floor(f)), u = f - k, c = PAL[k], d = PAL[k + 1]
   ink.color(mix(c[0], d[0], u), mix(c[1], d[1], u), mix(c[2], d[2], u), i)
 }
-// Where the falls are on screen. Face to face with them they flatten into what a waterfall display draws:
-// a lane per frequency across, time falling down from the lip, the lip itself the live spectrum on top.
+// Where the falls are on screen.
 let near = 1 // spray too close to the lens to hold in focus, thinned out
-function fallAt(tau: number, l: number, lift: number, flat: number) {
-  const x = fallX(tau, l), y = YL - 0.5 * FALL_G * tau * tau + 1.2 * lift, z = fallZ(tau, l), ok = cam.project(x, y, z, p3)
-  if (!ok && flat < 1) return false
-  if (!ok) p3.z = 1
-  near = mix(smooth(4, 14, Math.hypot(x - eye.x, y - eye.y, z - eye.z)), 1, flat)
-  p3.x = mix(p3.x, (l / (LANES - 1) - 0.5) * 2.3 * view.a, flat)
-  p3.y = mix(p3.y, 0.42 - (tau / TAU_MAX) * 1.55 + 0.1 * lift, flat)
-  return flat > 0.5 || visible(p3.x, p3.y)
+function fallAt(tau: number, l: number, lift: number) {
+  const x = fallX(tau, l), y = YL - 0.5 * FALL_G * tau * tau + 1.2 * lift, z = fallZ(tau, l)
+  if (!cam.project(x, y, z, p3)) return false
+  near = smooth(4, 14, Math.hypot(x - eye.x, y - eye.y, z - eye.z))
+  return visible(p3.x, p3.y)
+}
+// Where lane l is on the pool, r from the drain: carried in on its streamline, turned as the water has.
+function poolAt(r: number, l: number) {
+  const a = AL[l] + turned(r)
+  if (!cam.project(PX + M * r * Math.cos(a), PY + M * surface(r), PZ + M * r * Math.sin(a), p3)) return false
+  near = 1
+  return true
 }
 function falls(t: number, show: number) {
-  const rows = smooth(14.8, 16.8, t), flat = smooth(15.3, 17.8, t), water = 0.15 * (1 - smooth(12.3, 14.3, t))
-  // as we come round to face it, the lanes give way to rows: the raster of a waterfall plot
+  const rows = smooth(14.6, 15.6, t) * (1 - smooth(17, 18.2, t)), water = 0.15 * (1 - smooth(12.3, 14.3, t))
+  // face to face with it, the lanes give way to rows: the raster of a waterfall plot
   for (let j = 0; j < 130 && rows > 0; j++) {
     const tau = (j / 129) * TAU_MAX, r = row ? rowAt(t - tau) : 0
     let pen = false
     for (let l = 0; l < LANES; l++) {
       const v = spec[r + l]
-      if (!fallAt(tau, l, 0, flat)) {
+      if (!fallAt(tau, l, 0)) {
         pen = false
         continue
       }
-      shade(v, show * rows * (0.1 + 0.9 * v) * smooth(0, 0.3, tau + flat))
+      shade(v, show * rows * near * (0.1 + 0.9 * v) * smooth(0, 0.3, tau))
       pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
       pen = true
     }
   }
   // the lip, heaving with the spectrum going over it now
-  const lip = smooth(13.3, 15.3, t)
+  const lip = smooth(13.3, 15.3, t) * (1 - smooth(16.5, 17.5, t))
   let pen = false
   for (let l = 0; l < LANES && lip > 0; l++) {
     const v = past(t, l)
-    if (!fallAt(0, l, v * lip, flat)) {
+    if (!fallAt(0, l, v * lip)) {
       pen = false
       continue
     }
@@ -420,23 +439,20 @@ function falls(t: number, show: number) {
     pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
     pen = true
   }
-  if (rows >= 1) return
-  // seen obliquely the lanes crowd together; keep the ink per unit of screen what it is face on
-  for (let l = 0; l < LANES; l++) {
+  // the lanes: down the curtain, and on round the pool in the current, the spectrum going with them, until
+  // the water itself carries it (wrap.ts)
+  const lanes = 1 - rows, swirl = smooth(15, 16.5, t) * (1 - smooth(18, DUR, t)), hand = 1 - smooth(18.5, DUR, t)
+  for (let l = 0; l < LANES && hand > 0; l++) {
     let pen = false
-    for (let j = 0; j <= 44; j++) {
-      const tau = (j / 44) ** 1.3 * TAU_MAX, v = past(t - tau, l)
-      if (!fallAt(tau, l ? l - 1 : 1, 0, flat)) {
+    for (let j = 0; j <= 44 + 40; j++) {
+      const fell = j <= 44, tau = fell ? (j / 44) ** 1.3 * TAU_MAX : TAU_MAX + (j - 44) * 0.09 / pool.beta, r = R * Math.exp(-(j - 44) * 0.09)
+      if (!fell && swirl <= 0) break
+      const v = past(t - tau, l)
+      if (!(fell ? fallAt(tau, l, 0) : poolAt(r, l))) {
         pen = false
         continue
       }
-      const nx = p3.x, ny = p3.y
-      if (!fallAt(tau, l, 0, flat)) {
-        pen = false
-        continue
-      }
-      const gap = clamp(Math.hypot(p3.x - nx, p3.y - ny) / 0.025, 0.08, 1)
-      shade(v + water, 0.45 * near * gap * show * (1 - rows) * (0.08 + 0.8 * v) * fog(p3.z) * smooth(0, 0.5, tau))
+      shade(v + water, 0.45 * near * hand * show * (fell ? lanes : swirl) * (0.08 + 0.8 * v) * fog(p3.z) * smooth(0, 0.5, tau))
       pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
       pen = true
     }
@@ -494,11 +510,19 @@ export const valley: Scene = {
       for (let x = Math.max(X0, eye.x + 1); x < LIP && heroN < HERO; x += 0.3)
         if (cam.project(x, riverY(x), riverZ(x), p3)) (hx[heroN] = p3.x), (hy[heroN++] = p3.y)
     heroGain = t < SCAN ? 0.3 : t < 3 ? 0.22 : t < 6 ? 0.35 : 0.4 // ridgelines and firs are jagged: quieter
+    // the pool's printer runs from early on, so the water has its history when it shows
+    const lit = smooth(16.3, 18.3, t)
+    if (t > 10) {
+      const fld = whirl(t - DUR, (f.at ?? 0) + t, f, lit), q = fld.p
+      toPool(cur[0], cur[1], cur[2], WE), toPool(cur[3], cur[4], cur[5], WT)
+      aim(q, WE, [WT[0] - WE[0], WT[1] - WE[1], WT[2] - WE[2]], UP, cur[6])
+      f.look = lit > 0 ? { tau: mix(LOOK.tau, TAU_RASTER, lit) } : undefined
+    }
     if (t > 6) listen(t), falls(t, smooth(6, 8, t))
     // over the edge: the speakers trace the lip, the spectrum going over it, until the choir takes over
     if (heroN < 2 && t > 6)
       for (let l = 0; l < LANES && heroN < HERO; l++)
-        if ((fallAt(0, l, past(t, l), smooth(15.3, 17.8, t)), p3.z)) (hx[heroN] = p3.x), (hy[heroN++] = p3.y) // heard even where the board hides it
+        if ((fallAt(0, l, past(t, l)), p3.z)) (hx[heroN] = p3.x), (hy[heroN++] = p3.y) // heard even where the board hides it
     // exposure: the ink is energy per length, so as the valley fills in it would burn brighter and
     // brighter; past a reference length, stop down, as an eye or a camera would
     const stop = Math.min(1, (EXPOSE / Math.max(1, ink.len)) ** 0.7)
@@ -532,8 +556,9 @@ export const valley: Scene = {
     FIRS.vals[0] = grown, FIRS.hot = +(hero === 2)
     WAVES.vals[0] = (7 * t) % TAU, WAVES.vals[1] = (5.3 * t) % TAU, WAVES.hot = FLOWS.hot = 0.4
     EYE.vals[0] = eye.x, EYE.vals[1] = eye.y, EYE.vals[2] = eye.z, EYE.hot = 0.3
-    FALL.vals[0] = YL, FALL.hot = smooth(6.5, 8.5, t) * (1 - smooth(14.8, 16.8, t))
-    SPEC.vals[0] = t, SPEC.hot = smooth(14.3, 16.3, t)
+    FALLS.vals[0] = YL, FALLS.hot = smooth(6.5, 8.5, t) * (1 - smooth(14.8, 16.8, t))
+    SPEC.vals[0] = t, SPEC.hot = smooth(14.3, 15.3, t) * (1 - smooth(16.5, 17.5, t))
+    POOL_EQ.vals[0] = pool.beta, POOL_EQ.hot = smooth(16, 17, t)
     ceil = board.show(f, t, smooth(0.2, 0.8, t))
 
     f.rate = mix(2.4e6, 7.2e6, smooth(1, 8, t))
@@ -546,7 +571,7 @@ export const valley: Scene = {
       // over the edge the scope rule ends: the falls roar
       if (tt > 6.5) { // on through the crossfade: the whirlpool takes the choir over smoothly (sing caches a repeated t)
         lp += (hash(tt * 48_000) - lp) * 0.04
-        const roar = 0.5 * lp * smooth(6.5, 11, tt) * (1 - 0.6 * smooth(13.8, 17.8, tt))
+        const roar = 0.5 * lp * smooth(6.5, 11, tt) * (1 - 0.6 * smooth(13.8, 17.8, tt)) * (1 - smooth(18, DUR, tt))
         o.l += roar, o.r += roar
         if (tt > SING && tt < DUR) sing(tt - SING, o) // silent until the falls flatten, then fading in
       }
