@@ -79,7 +79,7 @@ const freq = (t: number) => K * (TC - t) ** -0.375
 const phase = (t: number) => (TAU * K * (TC ** 0.625 - (TC - t) ** 0.625)) / 0.625
 const amp = (t: number) => 1.5 * (freq(t) / freq(PEAK)) ** (1 / 3)
 
-const field: Field = { shader: HOLEB, k: 1, p: new Float32Array(48) }
+const field: Field = { shader: HOLEB, k: 1, p: new Float32Array(52) }
 const eye = [0, 0, 0], fwd = [0, 0, 0], up = [0, 0, 1]
 const DREAD = { dread: 1, gold: 0 }
 let gain = 1
@@ -96,8 +96,12 @@ export const finaleB: Scene = {
       field.bake = [{ ...g.field!, p: g.field!.p.slice() }]
     }
     const p = field.p, D = dist(t), u = Math.log(D0 / D), M = smooth(0, 0.7, t)
-    if (t >= PEAK) jump(t - PEAK, f, true, 0) // the one flash
-    else {
+    p[50] = 0
+    if (t >= PEAK) {
+      // the one flash: a frame of white light, burnt out of the phosphor at once
+      jump(t - PEAK, f, true, 0)
+      if (t < PEAK + 1 / 30) (p[50] = 1), (f.field = field)
+    } else {
       const az = 0.4 - TURN * u, el = elevation(t), ro = roll(u)
       eye[0] = D * Math.cos(el) * Math.cos(az), eye[1] = D * Math.cos(el) * Math.sin(az), eye[2] = D * Math.sin(el)
       fwd[0] = -eye[0], fwd[1] = -eye[1], fwd[2] = -eye[2]
@@ -117,7 +121,9 @@ export const finaleB: Scene = {
       // the Julia set on its card, filling the view, then drained into the hole down the same flow
       p[36] = 8, p[37] = (D + 8) * TAN, p[38] = 2.5 * Math.max(0, t - 0.25) ** 2, p[39] = 1 - smooth(0.6, 1.5, t)
       p[40] = Math.exp(AX) * Math.cos(AY), p[41] = Math.exp(AX) * Math.sin(AY), p[42] = Math.exp(BX) * Math.cos(BY), p[43] = Math.exp(BX) * Math.sin(BY)
-      p[44] = TURN, p[45] = 0.25 * D * D * (1 + 2 * smooth(1, PEAK, t)), p[46] = P, p[47] = Q
+      p[44] = TURN, p[45] = 0.15 * D * D * (1 + 2 * smooth(1, PEAK, t)), p[46] = P, p[47] = Q
+      p[48] = 2 * u + 0.8 * t, p[49] = 2.5 * smooth(1.5, 3, t)
+      field.res = 0.85 // the light is smeared by the fall anyway; the beam keeps the ring crisp
       f.field = field
     }
 

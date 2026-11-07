@@ -13,6 +13,7 @@
 // p[0..3] camera   p[4] time, M, gain, ring light   p[5] A, B   p[6] the lattice's inverse basis
 // p[7] κ of the three walls, bloom   p[8] ρ of the three walls, film drift   p[9] the card: depth past the
 // hole, half-height, σ, light   p[10] a = e^A, b = e^B   p[11] the flow's turn per e-fold, exposure, P, Q
+// p[12] the falling light's phase, strength, the flash
 
 const RV = 60.0; // past this, rays run straight
 const FAR = 4000.0;
@@ -92,23 +93,27 @@ fn pearl(P: vec3f, d: vec3f, len: f32, px: f32) -> vec3f {
   let ao = clamp(de(P + n * a) / a, 0.0, 1.0) * clamp(0.5 + 0.5 * de(P + n * 3.0 * a) / (3.0 * a), 0.0, 1.0);
   let r2 = dot(P, P);
   let L = -P / sqrt(r2);
-  let lit = u.p[11].y / r2; // the ring's light, as the eye's exposure sees it
+  // the ring's light, as the eye's exposure sees it, and the rings of light that fall in down the
+  // spirals, one an e-fold, forever
+  let fall = exp(-8.0 * fract(u.p[12].x + 0.5 * log(r2)));
+  let lit = u.p[11].y / r2 * (1.0 + u.p[12].y * fall);
   let ci = abs(dot(n, d));
   let ct = sqrt(1.0 - (1.0 - ci * ci) / (1.33 * 1.33));
   // the film: thicker along some arms than others, and draining as we fall
   let arm = 6.2831853 * me.x / u.p[11].z; // a hue to each of the P arms, round once: a turn round the hole is the same pearl
-  let dye = 500.0 + 150.0 * sin(arm + u.p[8].w + 0.7 * me.z);
+  let dye = 470.0 + 230.0 * sin(arm + u.p[8].w + 0.7 * me.z);
   let thick = dye - 140.0 * dot(n, L);
   let fres = 0.08 + 0.92 * pow(1.0 - ci, 3.0);
   let rf = reflect(d, n);
   let glint = pow(max(dot(rf, L), 0.0), 40.0);
   let dif = max(dot(n, L), 0.0);
-  let body = (vec3f(0.03, 0.02, 0.06) + 11.0 * film(dye, 1.0)) * (0.04 + dif) * lit;
-  let skin = 12.0 * film(thick, ct) * fres * (0.2 + lit);
+  let body = (vec3f(0.02, 0.015, 0.05) + 11.0 * film(dye, 1.0)) * (0.02 + dif * sqrt(dif)) * lit;
+  let skin = 10.0 * film(thick, ct) * fres * (0.08 + lit);
   return (body + skin + vec3f(1.0, 0.85, 0.6) * glint * lit * 3.0) * ao;
 }
 
 fn field(q: vec2f) -> vec3f {
+  if (u.p[12].z > 0.0) { return vec3f(u.p[12].z); } // the flash
   M = u.p[4].y;
   var x = eye();
   let n = ray(q);
@@ -129,10 +134,10 @@ fn field(q: vec2f) -> vec3f {
   var hit = false;
   var cd = vec3f(2.0);
   var len = 0.0;
-  for (var i = 0; i < 150; i++) {
+  for (var i = 0; i < 120; i++) {
     let r = length(x);
     rmin = min(rmin, r);
-    if (r < rh) { fell = true; break; }
+    if (r < rh || (r < 3.0 * M && dot(x, v) < 0.0)) { fell = true; break; } // inside the photon sphere, going in, light never turns back
     let dd = de(x);
     if (dd < px * len + 1e-4) { hit = true; break; }
     let sp = length(v);
