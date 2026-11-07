@@ -42,7 +42,7 @@ const [AX, AY, BX, BY] = (() => {
 })()
 // The walls: cones h = κ|z|. Lifted off the plane a pearl's neighbours move apart, so each wall's ρ is
 // the largest that still touches the nearest of them.
-const KAPPA = [0, 2, -2]
+const KAPPA = [0, 3.2, -1]
 const touch = (k: number) =>
   Math.min(
     ...[[AX, AY], [BX, BY], [AX + BX, AY + BY]].flatMap(([x, y]) =>
@@ -60,7 +60,10 @@ const FX = -(AX + BX), FY = -(AY + BY), TURN = FY / -FX
 // DEND at PEAK, where the shadow has swallowed the view. u is the e-folds fallen.
 const D0 = 40, DEND = 3.2
 const dist = (t: number) => (D0 ** 1.5 - (D0 ** 1.5 - DEND ** 1.5) * clamp(t / PEAK)) ** (2 / 3)
-const EL = Math.atan(0.7) // the eye's elevation: over the disk, as the flow keeps it
+// The eye's elevation over the disk: from high over the spiral down to skimming it. The flow keeps any
+// elevation, so the world below stays the same while we sink toward its plane, rolling as it spins.
+const elevation = (t: number) => mix(1.15, 0.38, smooth(1, PEAK - 0.6, t))
+const roll = (u: number) => 0.18 * u * u
 const FOV = 1, TAN = Math.tan(FOV / 2)
 
 // Where the eye sees the photon ring: sin ψ = 3√3 M √(1 − 2M/r) / r; on screen at tan ψ / tan(FOV/2).
@@ -95,12 +98,17 @@ export const finaleB: Scene = {
     const p = field.p, D = dist(t), u = Math.log(D0 / D), M = smooth(0, 0.7, t)
     if (t >= PEAK) jump(t - PEAK, f, true, 0) // the one flash
     else {
-      const az = 0.4 - TURN * u
-      eye[0] = D * Math.cos(EL) * Math.cos(az), eye[1] = D * Math.cos(EL) * Math.sin(az), eye[2] = D * Math.sin(EL)
+      const az = 0.4 - TURN * u, el = elevation(t), ro = roll(u)
+      eye[0] = D * Math.cos(el) * Math.cos(az), eye[1] = D * Math.cos(el) * Math.sin(az), eye[2] = D * Math.sin(el)
       fwd[0] = -eye[0], fwd[1] = -eye[1], fwd[2] = -eye[2]
+      // up: the disk's normal, turned about the line of sight by the roll
+      const sx = -Math.sin(az), sy = Math.cos(az) // sideways, square to the line of sight
+      up[0] = Math.cos(ro) * -Math.sin(el) * Math.cos(az) + Math.sin(ro) * sx
+      up[1] = Math.cos(ro) * -Math.sin(el) * Math.sin(az) + Math.sin(ro) * sy
+      up[2] = Math.cos(ro) * Math.cos(el)
       aim(p, eye, fwd, up, FOV)
       const flare = Math.exp(-5 * ((u / -FX) % 1)) // a pulse each time the world comes round to itself
-      p[16] = t, p[17] = M, p[18] = 1, p[19] = M * (0.25 + 0.25 * smooth(1, PEAK, t) + 0.25 * flare * smooth(1, 2, t))
+      p[16] = t, p[17] = M, p[18] = 1, p[19] = M * (0.25 + 0.6 * smooth(1, PEAK, t) ** 2 + 0.3 * flare * smooth(1, 2, t))
       p[20] = AX, p[21] = AY, p[22] = BX, p[23] = BY
       const det = AX * BY - BX * AY
       p[24] = BY / det, p[25] = -BX / det, p[26] = -AY / det, p[27] = AX / det

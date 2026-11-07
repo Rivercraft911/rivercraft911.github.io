@@ -31,6 +31,8 @@ fn cmul(a: vec2f, b: vec2f) -> vec2f { return vec2f(a.x * b.x - a.y * b.y, a.x *
 var<private> id: vec4f; // the nearest pearl: its lattice m, n, its wall, its size
 fn wall(x: vec3f, r: f32, th: f32, k: f32, rho: f32, o: vec2f, j: f32, best: f32) -> f32 {
   let rp = max((r + k * x.z) / (1.0 + k * k), 1e-4); // the nearest point of the cone, its |z|
+  // no pearl of this wall stands further off its cone than 1.5 ρ |z| here: if that is too far, skip it
+  if (abs(x.z - k * r) * inverseSqrt(1.0 + k * k) - 1.5 * rho * rp > best) { return best; }
   let w = vec2f(log(rp), th);
   let c = vec2f(dot(u.p[6].xy, w), dot(u.p[6].zw, w)) - o;
   let f = floor(c) + o;
@@ -41,9 +43,10 @@ fn wall(x: vec3f, r: f32, th: f32, k: f32, rho: f32, o: vec2f, j: f32, best: f32
     var z = z0;
     if ((i & 1) != 0) { z = cmul(z, u.p[10].xy); }
     if ((i & 2) != 0) { z = cmul(z, u.p[10].zw); }
-    let R = length(z);
+    let lr = wl.x + f32(i & 1) * u.p[5].x + f32(i >> 1) * u.p[5].z;
+    let R = exp(lr);
     // the bloom, inward from far out; and inside the innermost stable orbit, r = 6M, nothing stays
-    let s = rho * R * clamp(u.p[7].w + 0.6 * log(R), 0.0, 1.0) * smoothstep(6.0 * M, 8.0 * M, R * sqrt(1.0 + k * k));
+    let s = rho * R * clamp(u.p[7].w + 0.6 * lr, 0.0, 1.0) * smoothstep(6.0 * M, 8.0 * M, R * sqrt(1.0 + k * k));
     if (s <= 0.0) { continue; }
     let e = distance(x, vec3f(z, k * R)) - s;
     if (e < d) { d = e; id = vec4f(f + vec2f(f32(i & 1), f32(i >> 1)), j, s); }
@@ -93,14 +96,14 @@ fn pearl(P: vec3f, d: vec3f, len: f32, px: f32) -> vec3f {
   let ci = abs(dot(n, d));
   let ct = sqrt(1.0 - (1.0 - ci * ci) / (1.33 * 1.33));
   // the film: thicker along some arms than others, and draining as we fall
-  let arm = 6.2831853 * (me.x / u.p[11].z + me.y / u.p[11].w); // whole turns round the hole: the same pearl
-  let thick = 280.0 + 200.0 * sin(arm + u.p[8].w + 0.7 * me.z) - 120.0 * dot(n, L);
+  let arm = 6.2831853 * me.x / u.p[11].z; // a hue to each of the P arms, round once: a turn round the hole is the same pearl
+  let dye = 500.0 + 150.0 * sin(arm + u.p[8].w + 0.7 * me.z);
+  let thick = dye - 140.0 * dot(n, L);
   let fres = 0.08 + 0.92 * pow(1.0 - ci, 3.0);
   let rf = reflect(d, n);
   let glint = pow(max(dot(rf, L), 0.0), 40.0);
   let dif = max(dot(n, L), 0.0);
-  let tint = film(thick, 0.8);
-  let body = (vec3f(0.08, 0.06, 0.16) + 6.0 * tint) * (0.05 + dif) * lit;
+  let body = (vec3f(0.03, 0.02, 0.06) + 11.0 * film(dye, 1.0)) * (0.04 + dif) * lit;
   let skin = 12.0 * film(thick, ct) * fres * (0.2 + lit);
   return (body + skin + vec3f(1.0, 0.85, 0.6) * glint * lit * 3.0) * ao;
 }
