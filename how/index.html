@@ -139,6 +139,34 @@
       </p>
       <!-- River: the pen-and-ink sketch that started the valley would be a good story here -->
 
+      <h2>The storm</h2>
+      <p>
+        Halfway down the river there's a pool, and in the pool there's a modem. (Stay with me.) A carrier
+        shows up a few hundred hertz off frequency, so it spins, and a little control loop drags it in
+        until it stands still. You can hear that happen: the beat note slides down to nothing. Then it
+        starts talking real DVB-S2, and every point of its constellation is a stone standing in the
+        water. Sixteen of them, 16APSK.
+      </p>
+      <p>
+        Then it rains. Rain eats satellite signals, and there is an actual ITU recommendation for how
+        much, per kilometre of wet sky, at a rain rate of R millimetres an hour:
+      </p>
+      <span class="eq">A = k R<sup>α</sup> L &nbsp;&nbsp;&nbsp; E<sub>s</sub> ⁄ N<sub>0</sub> = clear sky − A</span>
+      <p>
+        At 12 GHz that's k = 0.0239 and α = 1.18, so a proper downpour costs about ten decibels. DVB-S2
+        was built for exactly this. Every frame, the modem picks the densest constellation the link can
+        still hold, at the standard's own thresholds, so as the rain comes in the stones run together:
+        sixteen, then eight, then four. At the bottom of the storm it's down to QPSK, and the speakers,
+        which are just hopping from stone to stone, are playing a 110 Hz square wave with rain in it.
+        Which is the first thing you heard in this whole intro.
+      </p>
+      <p>
+        Then the sky clears and the stones split back apart. I decided the sky behind the storm is
+        clearer than the sky in front of it (my valley, my weather), so it ends one step up, on
+        thirty-two. And if you wiggle your mouse while it's locked, you detune the carrier, and if
+        you're quick enough the loop slips a cycle and the whole constellation spins.
+      </p>
+
       <h2>The waterfall</h2>
       <p>
         If you've done any radio you have lost hours of your life staring at a waterfall plot: the
