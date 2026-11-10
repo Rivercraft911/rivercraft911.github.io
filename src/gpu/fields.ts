@@ -24,7 +24,7 @@ import { BINS } from '../dsp/waterfall'
 export const ROWS = 4096 // the waterfall's ring of rows
 export const SIEVE = [1024, 64] // the primes' sieve: a byte for every 30 integers
 
-// A field's data texture: width, height, and bytes a texel (2: rg8, a 16-bit value split high and low);
+// A field's data texture: width, height, and bytes a texel (2: rg8, a 16-bit value split high and low; 4: rgba8);
 // or, for shots, the raster's shot of every world.
 export const FIELDS: { code: string; data?: [number, number, number?]; shots?: true }[] = [
   { code: camera + film + pearls + wrap, data: [BINS, ROWS, 2] }, // the drain opens onto the pearls

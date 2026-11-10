@@ -6,6 +6,7 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "fonts": "node scripts/bake-fonts.mjs",
+    "boards": "node scripts/bake-boards.mjs",
     "shot": "node scripts/shot.mjs",
     "fps": "node scripts/fps.mjs",
     "clip": "node scripts/clip.mjs",

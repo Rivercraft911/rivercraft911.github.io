@@ -71,7 +71,7 @@ export class Raster {
     this.shot = d.createTexture({ size: SHOT, format: FLOAT, usage: use })
     this.shotView = this.shot.createView()
     this.data = FIELDS.map(({ data: [w, h, b = 1] = [1, 1], shots }) =>
-      shots ? this.shots : d.createTexture({ size: [w, h], format: b > 1 ? 'rg8unorm' : 'r8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST }),
+      shots ? this.shots : d.createTexture({ size: [w, h], format: b > 2 ? 'rgba8unorm' : b > 1 ? 'rg8unorm' : 'r8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST }),
     )
   }
 
@@ -128,7 +128,7 @@ export class Raster {
     const d = this.device, uf = this.uf
     if (f.rows) {
       const { data, at, n } = f.rows, D = this.data[f.shader], W = D.width, H = D.height, a = at % H, m = Math.min(n, H - a)
-      const B = D.format === 'rg8unorm' ? 2 * W : W
+      const B = W * (FIELDS[f.shader].data?.[2] ?? 1)
       d.queue.writeTexture({ texture: D, origin: [0, a] }, data, { bytesPerRow: B }, [W, m])
       if (n > m) d.queue.writeTexture({ texture: D }, data, { offset: m * B, bytesPerRow: B }, [W, n - m])
     }
