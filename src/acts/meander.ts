@@ -6,26 +6,25 @@
 // A second, longer bend joins it, and the line is the valley's river seen from above, where it lies.
 import { Path } from '../beam/path'
 import { morph } from '../beam/morph'
-import { AMP, F, LAST, PERIODS, square } from './hook'
-import { M1, M2, MAP, PHI, RIVER_EQ, W1, W2, glow, mapped } from './valley'
+import { AMP, DUR as HOOK, F, LAST, PERIODS, square, weights } from './hook'
+import { M1, M2, MAP, MEANDER as END, PHI, RIVER_EQ, W1, W2, glow, mapped } from './valley'
 import { Say } from './say'
 import { TAU, clamp, lock, mix, smooth, view, type Scene } from './scene'
 
 const N = 900 // points along the reach
-const ONES = new Float64Array(LAST + 1).fill(1)
-const END = 3.3 // the valley picks up its current's phase from here
+const RING = new Float64Array(LAST + 1) // the hook's harmonics, still ringing as we take them
 const FLOW = 55 // Hz: how fast the speakers run the river, there and back
 export const WATER = [0.5, 0.78, 1] as const // Coe's lidar blue
 
 // Harmonic k lets go of the heading, the highest first, quickening down to the fundamental.
-const DROP = (k: number) => 0.35 + 1.5 * (1 - k / LAST) ** 2.2
+const DROP = (k: number) => 0.25 + 0.9 * (1 - k / LAST) ** 2.2
 const W = new Float64Array(LAST + 1)
 function heading(t: number) {
   W[0] = 1
-  for (let k = 1; k <= LAST; k++) W[k] = 1 - lock([[0, 0], [DROP(k), 1]], t, 12, 0.6)
+  for (let k = 1; k <= LAST; k++) W[k] = 1 - lock([[0, 0], [DROP(k), 1]], t, 16, 0.6)
 }
-const omega = (t: number) => lock([[0, 0.9], [0.95, 1.45], [2, W1]], t, 5, 0.75)
-const second = (t: number) => W2 * smooth(1.7, 2.5, t)
+const omega = (t: number) => lock([[0, 0.9], [0.6, 1.45], [1.25, W1]], t, 8, 0.75)
+const second = (t: number) => W2 * smooth(1.05, 1.6, t)
 
 // The reach: integrate the heading over the first MAP metres, then fit it to the screen.
 const xs = new Float64Array(N), ys = new Float64Array(N)
@@ -51,11 +50,11 @@ function river(p: Path, t: number) {
   return p
 }
 
-// The hook's last trace, as a path: three periods of the full square, steady on its trigger.
+// The hook's trace, as a path: three periods of its square, steady on its trigger.
 function trace(p: Path, A: number) {
   p.clear()
   for (let i = 0; i < N; i++) {
-    const u = i / (N - 1), y = AMP * square((u * PERIODS) / F, ONES)
+    const u = i / (N - 1), y = AMP * square((u * PERIODS) / F, RING)
     i ? p.lineTo(mix(-A, A, u), y) : p.moveTo(-A, y)
   }
   return p
@@ -83,26 +82,27 @@ function at(u: number) {
 export const meander: Scene = {
   dur: END,
   build(t, f) {
-    const A = view.a * 0.9, fold = clamp(lock([[0, 0], [0.05, 1]], t, 8, 0.7), 0, 1.15)
-    const w = omega(t), w2 = second(t), land = clamp(lock([[0, 0], [2.35, 1]], t, 7.5, 0.85), 0, 1.05)
+    const A = view.a * 0.9, fold = clamp(lock([[0, 0], [0.05, 1]], t, 12, 0.7), 0, 1.15)
+    const w = omega(t), w2 = second(t), land = clamp(lock([[0, 0], [1.4, 1]], t, 11, 0.85), 0, 1.05)
+    weights(HOOK + t, RING)
     heading(t)
     reach(w, w2, A)
     let r = river(b, t)
     if (land > 0) r = morph(r, mapped(map, t), land, m, N) // registered onto the land it will run through
-    f.ch.push({ w: 1, path: fold < 1 || t < 1 ? morph(trace(a, A), r, fold, m, N) : r })
+    f.ch.push({ w: 1, path: fold < 1 || t < 0.6 ? morph(trace(a, A), r, fold, m, N) : r })
 
     let n = 0
     for (let k = 0; k <= LAST; k++) if (W[k] > 0.5) n = k
-    eq.say(f, t, n > 0 || t < 1.8 ? SQ : RIVER_EQ, WATER, n > 0 || t < 1.7
+    eq.say(f, t, n > 0 || t < 1.15 ? SQ : RIVER_EQ, WATER, n > 0 || t < 1.1
       ? [['\\omega', w, 2], ['N', n, 0], ['\\sigma', 1 / j0(w), 3]]
       : [['\\omega_1', w, 2], ['\\omega_2', w2, 2], ['M_1', M1, 0], ['M_2', M2, 0]])
 
-    const hand = smooth(0.1, 0.9, t), s = 1 / (0.9 * view.a)
+    const hand = smooth(0.05, 0.55, t), s = 1 / (0.9 * view.a)
     return (tt, out) => {
       // the hook's sweep and square, handing over to the river run there and back
       const ph = ((tt * FLOW) % 1) * 2, p = at(ph < 1 ? ph : 2 - ph)
       out.l = mix(0.3 * (2 * (((tt * F) / PERIODS) % 1) - 1), 0.35 * p.x * s, hand)
-      out.r = mix(0.9 * AMP * square(tt, ONES), 0.35 * p.y * s * 1.6, hand)
+      out.r = mix(0.9 * AMP * square(tt, RING), 0.35 * p.y * s * 1.6, hand)
     }
   },
 }

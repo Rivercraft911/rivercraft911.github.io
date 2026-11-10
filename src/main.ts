@@ -29,8 +29,8 @@ const audio = new Audio()
 const hole = finaleA // the finale: the cathedral falls in
 // ?short: the transmission in about 25 s, each scene cut to its best stretch and played a little faster
 const SHORT = [
-  edit(hook, [[0.9, 5.3, 2.2]]),
-  edit(meander, [[0, 3.3, 1.65]]),
+  edit(hook, [[0.45, 2, 1]]), // the opening is already short
+  edit(meander, [[0, 1.95, 1]]),
   edit(valley, [[0, 11, 3.2], [15.3, 21.3, 2]]), // the opening and the flight, then straight to the falls landing
   edit(wrap, [[0, 2.5, 1.6]]),
   edit(ascii, [[0, 3.5, 2]]),

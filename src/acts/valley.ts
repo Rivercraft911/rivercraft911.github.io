@@ -254,6 +254,7 @@ function crane(t: number) {
 }
 
 // The river on the map, as the meander must leave it: the same stretch through the same lens.
+export const MEANDER = 1.95 // how long the meander runs before us: its current's phase carries on from there
 export const glow = (u: number, t: number) => 0.65 + 0.35 * Math.cos(TAU * (6 * u - 2.5 * t))
 export function mapped(p: Path, t: number) {
   crane(0)
@@ -580,7 +581,7 @@ export const valley: Scene = {
           pen = false
           continue
         }
-        line.color(WATER[0], WATER[1], WATER[2], glow((x - X0) / (XM - X0), t + 3.3) * k)
+        line.color(WATER[0], WATER[1], WATER[2], glow((x - X0) / (XM - X0), t + MEANDER) * k)
         pen ? line.lineTo(p3.x, p3.y) : line.moveTo(p3.x, p3.y)
         pen = true
         if (t < SCAN && heroN < HERO) (hx[heroN] = p3.x), (hy[heroN++] = p3.y)
