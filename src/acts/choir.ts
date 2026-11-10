@@ -7,9 +7,10 @@
 // world's mood is also its room. T is time since the fall began.
 import { room, type Stereo } from '../audio/audio'
 import { Shepard, type Part } from '../dsp/shepard'
+import { END } from './clock' // on the choir's clock: the cut to silence
 import { clamp, smooth } from './scene'
 
-export const END = 46 + 7.5 // on the choir's clock: the cut to silence (singularity's AT + PEAK) and the 0.3 s sing() fades over, so it is cut at its loudest
+export { END }
 const GAIN = 1 // the choir's swing, root and all, about what the realities' bends expect
 const FALL = 13.5 // the falls flattening into the plot: the choir is silent before it, then fades in
 

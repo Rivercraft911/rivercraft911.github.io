@@ -9,11 +9,10 @@ import { BINS, F0, PER as PER_BIN, Waterfall } from '../dsp/waterfall'
 import { ROWS, WRAP as SHADER } from '../gpu/fields'
 import type { Field } from '../gpu/raster'
 import { descent, place, rate, sing } from './choir'
+import { WRAP as DUR, LEAD } from './clock' // LEAD: how long the choir has been falling when the wrap begins
 import { aim, equation } from './reality'
 import { TAU, glide, smooth, type Frame, type Scene } from './scene'
 
-export const LEAD = 22.5 // how long the choir has been falling when the wrap begins: valley.DUR − valley.SING
-export const DUR = 2.5
 const PER = 360 // rows printed per octave of the choir's descent
 const MAX = 256 // most rows printed in a frame
 const FRESH = 48 // history a fresh sheet back-fills at once: more costs a visible hitch

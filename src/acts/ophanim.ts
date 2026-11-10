@@ -14,12 +14,10 @@ import { fiber, turn, type Point4 } from '../dsp/hopf'
 import { JULIA4, POLYTOPE } from '../gpu/fields'
 import type { Field } from '../gpu/raster'
 import { place, sing } from './choir'
+import { OPHANIM as DUR, R5 as AT } from './clock' // DUR: the quaternion Julia set; the polytope cage is cut
 import { aim, equation, jump, project, seen, splice } from './reality'
-import { AT as R4, DUR as R4DUR } from './stutter'
 import { TAU, mix, smooth, type Scene } from './scene'
 
-export const AT = R4 + R4DUR
-export const DUR = 2.5 // the quaternion Julia set; the polytope cage is cut
 const CUT = 3.5 // the Julia set gives way to the polytopes
 
 // The binary icosahedral group, as flat x, y, z, w: the 24-cell first (its 16 tesseract vertices at 8),

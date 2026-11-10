@@ -16,17 +16,14 @@ import { APSK32 } from '../dsp/dvbs2'
 import { APOLLONIAN, BULB, HONEYCOMB, KALISET, KIFS, KLEINIAN, LYAPUNOV, MANDALAY, NEWTON, SIERPINSKI } from '../gpu/fields'
 import type { Field } from '../gpu/raster'
 import { descent, place, sing, type Mood } from './choir'
-import { AT as R3, DUR as R3DUR } from './indra'
+import { LENGTHS, R4 as AT, STUTTER as DUR } from './clock'
 import { aim, equation, jump, splice } from './reality'
 import { TAU, hash, smooth, type Frame, type Scene } from './scene'
 
-export const AT = R3 + R3DUR
 const SR = 48000
 
-// When each cut lands, and which world it opens on.
-const LENGTHS = [1.01, 0.95, 0.85, 0.78, 0.72, 0.68, 0.64, 0.6, 0.6, 0.6, 0.5, 0.46, 0.42, 0.4, 0.38, 0.36, 0.35, 0.34, 0.34, 0.34, 0.34, 0.34]
+// When each cut lands (their LENGTHS are the clock's), and which world it opens on.
 const STARTS = LENGTHS.map((_, i) => LENGTHS.slice(0, i).reduce((a, b) => a + b, 0))
-export const DUR = STARTS[STARTS.length - 1] + LENGTHS[LENGTHS.length - 1]
 const PIN = Number(new URLSearchParams(location.search).get('w') ?? -1)
 const cut = (t: number) => {
   if (PIN >= 0) return PIN

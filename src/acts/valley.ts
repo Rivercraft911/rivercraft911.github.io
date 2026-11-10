@@ -12,6 +12,7 @@ import { fft, hann } from '../dsp/fft'
 import { Field } from '../dsp/terrain'
 import { heard } from '../audio/audio'
 import { place, sing } from './choir'
+import { VALLEY as DUR, SING } from './clock' // the choirs begin to sing at SING
 import { aim, equation } from './reality'
 import { A0, ARC, FALL, KEYS as POOL, M, R, TAU_RASTER, VORTEX, VORTEX_INK, live, pool, surface, turned, vortex as whirl } from './wrap'
 import { LOOK } from '../gpu/phosphor'
@@ -219,7 +220,6 @@ let heroN = 0, heroGain = 0.7, occlude = 1, landK = 1, lp = 0, hl = 0, hr = 0 //
 // around the pool as its stones lock; low and fast down the river to the lip; over it and round in an
 // arc to face the falls, held there on the plot they have become; then up and over as it pours down into
 // the plunge pool below (wrap.ts).
-export const DUR = 21.3, SING = -1.2 // the choirs begin to sing at SING
 const MAP_FOV = 1.1, YL = riverY(LIP - 0.2), ZL = riverZ(LIP)
 const on = (x: number, h: number, dz: number, tx: number, fov: number) => [x, riverY(x) + h, riverZ(x) + dz, tx, riverY(tx), riverZ(tx), fov]
 const KEYS: number[][] = [

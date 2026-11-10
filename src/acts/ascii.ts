@@ -5,9 +5,10 @@
 // 2295 Hz, Baudot with its shifts), while the choir is held and crushed at the cell clock to five bits.
 import type { Stereo } from '../audio/audio'
 import { descent, place, sing } from './choir'
+import { ASCII as DUR, LEAD, R3 as AT, WRAP } from './clock' // AT: the choir's clock when the world below begins
 import { GROUP, GROUP_INK, hang, PER, plunge, SHRINK } from './drain'
 import { equation } from './reality'
-import { DUR as WRAP, LEAD, VORTEX, VORTEX_INK, live, surface, vortex } from './wrap'
+import { VORTEX, VORTEX_INK, live, surface, vortex } from './wrap'
 import { TAU, clamp, mix, smooth, type Scene } from './scene'
 
 // Baudot (ITA2, US figures) by code: letters, then figures. '\0' marks a code that prints nothing.
@@ -72,7 +73,6 @@ function crush(T: number, o: Stereo, x: number) {
 // The whirlpool goes on underneath, its drain opening onto the pearls below, and we are pulled down the
 // throat into them (drain.ts): the text spreads over the water like an infection along the spiral, reads
 // the world below as it opens, and is eaten back through by it as we fall in.
-export const DUR = 3.5, AT = LEAD + WRAP + DUR // the choir's clock when the world below begins
 const HOLE = 0.08 // the drain's mouth
 const SPREAD = 0.9, EAT = [DUR - 1.1, DUR - 0.1] // how long the infection takes; when the world eats it back
 const text = (t: number) => smooth(0, SPREAD, t) * (1 - smooth(EAT[0], EAT[1], t)) // how much of the sound is text
