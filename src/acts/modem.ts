@@ -14,8 +14,8 @@ export const ON = 4.6 // the carrier arrives
 const DF = 330 // Hz off, at first: the beat the speakers hear fall to nothing as it locks
 const K = 0.02386, ALPHA = 1.1825, WET = 5 // P.838-3 at 12 GHz, horizontal; km of the path in the rain
 
-export const rain = (t: number) => 45 * smooth(6, 7.1, t) * (1 - smooth(7.5, 8.9, t)) // mm/h
-const clear = (t: number) => mix(13.6, 18.4, smooth(6.5, 9.2, t))
+export const rain = (t: number) => 45 * smooth(6, 7, t) * (1 - smooth(7.2, 8.4, t)) // mm/h
+const clear = (t: number) => mix(13.6, 18.4, smooth(6.4, 8.7, t))
 export const esn0 = (t: number) => clear(t) - K * rain(t) ** ALPHA * WET
 // DVB-S2 quasi-error-free thresholds (EN 302 307-1, AWGN) for the modcods we fly, plus a margin.
 const LADDER: [number, Constellation][] = [[1.0, QPSK], [5.5, PSK8], [11.61, APSK16], [16.05, APSK32]]

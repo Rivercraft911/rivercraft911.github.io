@@ -5,7 +5,7 @@
 
 export const SING = -1.2 // on the valley's clock: T = 0, where the choirs begin to sing
 // how long each scene runs
-export const VALLEY = 21.3, WRAP = 2.5, ASCII = 3.5, INDRA = 3, OPHANIM = 2.5
+export const VALLEY = 20.3, WRAP = 2.5, ASCII = 3.5, INDRA = 3, OPHANIM = 2.5
 // the stutter's cuts, faster and faster (stutter.ts)
 export const LENGTHS = [1.01, 0.95, 0.85, 0.78, 0.72, 0.68, 0.64, 0.6, 0.6, 0.6, 0.5, 0.46, 0.42, 0.4, 0.38, 0.36, 0.35, 0.34, 0.34, 0.34, 0.34, 0.34]
 export const STUTTER = LENGTHS.reduce((a, b) => a + b, 0)

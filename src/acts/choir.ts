@@ -12,7 +12,7 @@ import { clamp, smooth } from './scene'
 
 export { END }
 const GAIN = 1 // the choir's swing, root and all, about what the realities' bends expect
-const FALL = 13.5 // the falls flattening into the plot: the choir is silent before it, then fades in
+const FALL = 12.5 // the falls flattening into the plot: the choir is silent before it, then fades in
 
 // The swell toward the singularity, ∈ [0, 1], steepest at the end.
 const SWELL = END - 30 // where it starts
