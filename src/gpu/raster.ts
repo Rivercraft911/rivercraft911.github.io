@@ -32,7 +32,9 @@ export class Raster {
   scale = 0.5 // the light's resolution against the phosphor's
   chars = '' // the character generator's glyphs, in atlas order
   atlas!: GPUTexture
-  private fields: { pipe: GPURenderPipeline; u: GPUBuffer; data: GPUTexture; group: GPUBindGroup }[] = []
+  private fields: { pipe: GPURenderPipeline; u: GPUBuffer; group: GPUBindGroup }[] = []
+  private data: GPUTexture[] // each field's data texture, there from the start so rows land while the pipelines compile
+  private ready = false
   private light!: GPURenderPipeline
   private cell!: GPURenderPipeline
   private text!: GPURenderPipeline
@@ -68,9 +70,13 @@ export class Raster {
     this.shots = d.createTexture({ size: [4 * SHOT[0], 3 * SHOT[1]], mipLevelCount: MIPS, format: FLOAT, usage: use })
     this.shot = d.createTexture({ size: SHOT, format: FLOAT, usage: use })
     this.shotView = this.shot.createView()
+    this.data = FIELDS.map(({ data: [w, h, b = 1] = [1, 1], shots }) =>
+      shots ? this.shots : d.createTexture({ size: [w, h], format: b > 1 ? 'rg8unorm' : 'r8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST }),
+    )
   }
 
-  // Every pipeline is compiled before the first frame, so no reality hitches when it arrives.
+  // Every pipeline compiles while the first act plays, which needs none of them, so no reality hitches
+  // when it arrives and the first frame waits for none. Until then a field is not swept, but its rows land.
   async compile(acc: GPUTextureFormat) {
     const d = this.device, ADD: GPUBlendState = { color: { srcFactor: 'one', dstFactor: 'one' }, alpha: { srcFactor: 'one', dstFactor: 'one' } }
     const layout = d.createBindGroupLayout({
@@ -90,14 +96,13 @@ export class Raster {
     for (let i = 1; i < MIPS; i++)
       this.mips.push([level(i), d.createBindGroup({ layout: this.mip.getBindGroupLayout(0), entries: [{ binding: 1, resource: this.smp }, { binding: 2, resource: level(i - 1) }] })])
     this.fields = await Promise.all(
-      FIELDS.map(async (f) => {
-        const [w, h, b = 1] = f.data ?? [1, 1]
-        const data = f.shots ? this.shots : d.createTexture({ size: [w, h], format: b > 1 ? 'rg8unorm' : 'r8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST })
+      FIELDS.map(async (f, i) => {
         const u = d.createBuffer({ size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
-        const group = d.createBindGroup({ layout, entries: [{ binding: 0, resource: { buffer: u } }, { binding: 1, resource: this.smp }, { binding: 2, resource: data.createView() }] })
-        return { pipe: await pipe(d.createShaderModule({ code: prelude + f.code }), 'fs', FLOAT, undefined, fl), u, data, group }
+        const group = d.createBindGroup({ layout, entries: [{ binding: 0, resource: { buffer: u } }, { binding: 1, resource: this.smp }, { binding: 2, resource: this.data[i].createView() }] })
+        return { pipe: await pipe(d.createShaderModule({ code: prelude + f.code }), 'fs', FLOAT, undefined, fl), u, group }
       }),
     )
+    this.ready = true
   }
 
   // The character generator: tiles the beam drew into `atlas`, and each one's ink over the GRID, as the
@@ -118,9 +123,16 @@ export class Raster {
 
   // Renders the field (and its text) for this frame, ahead of the phosphor's pass.
   render(enc: GPUCommandEncoder, f: Field | undefined, w: number, h: number, aspect: number, dpr: number, gain: number) {
-    this.on = !!f
+    this.on = false
     if (!f) return
-    const d = this.device, F = this.fields[f.shader], uf = this.uf
+    const d = this.device, uf = this.uf
+    if (f.rows) {
+      const { data, at, n } = f.rows, D = this.data[f.shader], W = D.width, H = D.height, a = at % H, m = Math.min(n, H - a)
+      const B = D.format === 'rg8unorm' ? 2 * W : W
+      d.queue.writeTexture({ texture: D, origin: [0, a] }, data, { bytesPerRow: B }, [W, m])
+      if (n > m) d.queue.writeTexture({ texture: D }, data, { offset: m * B, bytesPerRow: B }, [W, n - m])
+    }
+    if (!this.ready) return // still compiling: its data kept, nothing swept
     const text = !!f.cell && this.chars.length > 0
     const ch = Math.round((f.cell ?? 20) * dpr), cw = Math.round(ch * 0.6)
     const cols = Math.floor(w / cw), rows = Math.floor(h / ch), sc = Math.min(1, this.scale * (f.res ?? 1))
@@ -172,14 +184,8 @@ export class Raster {
       const k = WORLDS.indexOf(b.shader)
       if (k >= 0 && !this.kept[k] && b.shader !== f.shader) sweep(b, this.shotView, SHOT[0], SHOT[1], SHOT[0] / SHOT[1]), keep(k)
     }
-
-    if (f.rows) {
-      const { data, at, n } = f.rows, W = F.data.width, H = F.data.height, a = at % H, m = Math.min(n, H - a)
-      const B = F.data.format === 'rg8unorm' ? 2 * W : W
-      d.queue.writeTexture({ texture: F.data, origin: [0, a] }, data, { bytesPerRow: B }, [W, m])
-      if (n > m) d.queue.writeTexture({ texture: F.data }, data, { offset: m * B, bytesPerRow: B }, [W, n - m])
-    }
-    if (!f.k) return void (this.on = false) // dark: its data kept, nothing swept
+    if (!f.k) return // dark: its data kept, nothing swept
+    this.on = true
     uf[0] = w, uf[1] = h, uf[2] = cw, uf[3] = ch, uf[4] = cols, uf[5] = rows
     uf[6] = Math.floor((w - cols * cw) / 2), uf[7] = Math.floor((h - rows * ch) / 2)
     const ink = f.ink ?? [0.35, 1, 0.55]

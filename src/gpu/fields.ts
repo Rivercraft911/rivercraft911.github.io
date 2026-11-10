@@ -1,4 +1,4 @@
-// The field shaders the raster can sweep, compiled before the first frame. A scene names one by index.
+// The field shaders the raster can sweep, compiled while the first act plays. A scene names one by index.
 import wrap from './fields/wrap.wgsl?raw'
 import film from './fields/film.wgsl?raw'
 import primes from './fields/primes.wgsl?raw'

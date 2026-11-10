@@ -65,7 +65,7 @@ export class Phosphor {
     const adapter = await navigator.gpu?.requestAdapter({ powerPreference: 'high-performance' })
     if (!adapter) throw new Error('WebGPU unavailable')
     const p = new Phosphor(await adapter.requestDevice(), canvas.getContext('webgpu')!, maxSamples)
-    await p.raster.compile(FLOAT)
+    p.raster.compile(FLOAT) // not awaited: the beam's pipelines are all the first frame needs
     return p
   }
 

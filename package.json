@@ -8,7 +8,8 @@
     "fonts": "node scripts/bake-fonts.mjs",
     "shot": "node scripts/shot.mjs",
     "fps": "node scripts/fps.mjs",
-    "clip": "node scripts/clip.mjs"
+    "clip": "node scripts/clip.mjs",
+    "hear": "node scripts/hear.mjs"
   },
   "devDependencies": {
     "@webgpu/types": "^0.1.74",
