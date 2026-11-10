@@ -13,20 +13,22 @@ import { finaleA } from './acts/finaleA'
 import { wrap } from './acts/wrap'
 import { indra } from './acts/indra'
 import { stutter } from './acts/stutter'
+import { preload, zoom } from './acts/zoom'
 import { ophanim } from './acts/ophanim'
 import { ascii, CHARS } from './acts/ascii'
 import { load } from './beam/font'
 import { band, direct } from './band/band'
 import { edit } from './acts/edit'
-import { VALLEY } from './acts/clock'
+import { STUTTER, VALLEY } from './acts/clock'
 import { r01 } from './world/r01'
 
 const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
 const beam = new Beam()
 const audio = new Audio()
-// ?fall plays only the fall, from the lip of the falls on (the pool needs their history); ?ident and ?end the last stretch. ?band and deep
-// links (/<project>, /qsl) skip the intro and land in the band.
+// ?fall plays only the fall, from the lip of the falls on (the pool needs their history); ?zoom the long zoom, from the
+// stutter's last cuts to the Julia set; ?ident and ?end the last stretch. ?band and deep links (/<project>, /qsl) skip
+// the intro and land in the band.
 const hole = finaleA // the finale: the cathedral falls in
 // ?short: the transmission in about 25 s, each scene cut to its best stretch and played a little faster
 const SHORT = [
@@ -47,15 +49,18 @@ const scenes = q.has('specimen')
     : direct()
       ? [band]
       : q.has('fall')
-        ? [valley, wrap, ascii, indra, stutter, ophanim, hole]
-        : q.has('ident')
-          ? [ident]
-          : q.has('end')
-            ? [hole, ident, band]
-            : q.has('short')
-              ? SHORT
-              : [hook, meander, valley, wrap, ascii, indra, stutter, ophanim, hole, ident, band]
+        ? [valley, wrap, ascii, indra, stutter, zoom, ophanim, hole]
+        : q.has('zoom')
+          ? [stutter, zoom, ophanim]
+          : q.has('ident')
+            ? [ident]
+            : q.has('end')
+              ? [hole, ident, band]
+              : q.has('short')
+                ? SHORT
+                : [hook, meander, valley, wrap, ascii, indra, stutter, zoom, ophanim, hole, ident, band]
 const timeline = new Timeline(scenes)
+if (scenes.includes(zoom)) preload() // its pictures, long before it plays
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }
 
@@ -67,7 +72,7 @@ const gpu = await Phosphor.create(canvas, beam.max).catch(() => {
 load('tech').then((face) => gpu.glyphs(face, CHARS)) // the raster's character generator
 
 let on = q.has('auto') || q.has('world') || direct()
-let t = Number(q.get('t') ?? (q.has('fall') ? 11 : 0))
+let t = Number(q.get('t') ?? (q.has('fall') ? 11 : q.has('zoom') ? STUTTER - 4 : 0))
 let speed = q.has('pause') ? 0 : 1
 let last = performance.now()
 let heard = q.has('auto') || q.has('rec') //the speakers wait for a gesture; the band starts without one

@@ -24,9 +24,9 @@ import { BINS } from '../dsp/waterfall'
 export const ROWS = 4096 // the waterfall's ring of rows
 export const SIEVE = [1024, 64] // the primes' sieve: a byte for every 30 integers
 
-// A field's data texture: width, height, and bytes a texel (2: rg8, a 16-bit value split high and low; 4: rgba8);
-// or, for shots, the raster's shot of every world.
-export const FIELDS: { code: string; data?: [number, number, number?]; shots?: true }[] = [
+// A field's data texture: width, height, bytes a texel (2: rg8, a 16-bit value split high and low; 4: rgba8),
+// and mip levels, for pictures (raster.ts pictures); or, for shots, the raster's shot of every world.
+export const FIELDS: { code: string; data?: [number, number, number?, number?]; shots?: true }[] = [
   { code: camera + film + pearls + wrap, data: [BINS, ROWS, 2] }, // the drain opens onto the pearls
   { code: film + primes, data: [SIEVE[0], SIEVE[1]] },
   { code: camera + film + pearls + indra },
@@ -54,3 +54,18 @@ export const R01 = FIELDS.push({ code: camera + film + r01, data: [320, 120, 2] 
 // The finale: the cathedral falls in.
 import holeA from './fields/holeA.wgsl?raw'
 export const HOLEA = FIELDS.push({ code: camera + holeA, shots: true }) - 1
+// The long zoom: River's boards, every picture of them in one atlas, and the table boards.wgsl reads them by.
+import boards from './fields/boards.wgsl?raw'
+import { ATLAS, BOARDS as BOARD, tiles } from '../boards'
+const v4 = (...a: number[]) => `vec4f(${a.map((v) => +v.toFixed(4)).join(', ')})`
+const table = BOARD.flatMap((b, i) => {
+  const [hx = -1, hy = -1, drill = 0, pad = 0] = b.hole ?? [], close = b.close ?? []
+  const out = [v4(b.w, b.h, hx, hy), v4(drill, pad, 1 + close.length, 0)]
+  ;[[0, 0, b.w, b.h], ...close.map(([x, y, mm]) => [x, y, mm, mm])].forEach((m, j) => {
+    const t = tiles[i][j]
+    out.push(v4(...m), v4(t.x, t.y, t.w, t.h))
+  })
+  while (out.length < 12) out.push(v4(0, 0, 0, 0))
+  return out
+})
+export const BOARDS = FIELDS.push({ code: `const BOARD = array<vec4f, ${table.length}>(${table.join(',\n')});\n` + camera + boards, data: [ATLAS[0], ATLAS[1], 4, 10] }) - 1

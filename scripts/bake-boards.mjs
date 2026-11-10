@@ -3,8 +3,9 @@
 // down, so (x / w, y / h) is the picture's uv. KiCad renders a copy of each board, since kicad-cli leaves a lock
 // file beside whatever it opens and the sources are not ours to touch; KIPRJMOD points home so the project's own
 // 3D models still resolve. Parts overhang the outline, so a second render with every model missing finds the
-// outline in pixels. `npm run boards -- <id…>` renders only those (the geometry is cheap and always baked).
-// Needs KiCad 10, ffmpeg and cwebp.
+// outline in pixels. Around the hole the zoom falls through it also renders close-ups, <id>-<n>.webp, each a square
+// of the board seen closer, so the hole is still sharp as it fills the screen. `npm run boards -- <id…>` renders
+// only those (the geometry is cheap and always baked). Needs KiCad 10, ffmpeg and cwebp.
 import { execFileSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
@@ -12,16 +13,24 @@ import { basename, dirname, join } from 'node:path'
 
 const GH = '/Users/river/Documents/github/'
 // In the order the film falls through them. A source is a local file, or a repo path read from its clone when
-// there is one, else fetched. `stackup` recolours the picture, by stackup layer type.
+// there is one, else fetched. `stackup` recolours the picture, by stackup layer type. `hole` is the hole the zoom
+// falls through, [x, y, drill, pad] in mm (pad = drill: unplated), and `close` the close-ups around it, each a
+// square that many mm across, 512 px, or [mm, px].
 const WHITE = { 'Top Silk Screen': '#101010FF', 'Bottom Silk Screen': '#101010FF', 'Top Solder Mask': '#F6F6F1F4', 'Bottom Solder Mask': '#F6F6F1F4' }
 const BOARDS = [
-  { id: 'gnss', title: 'GNSS IQ Breakout', project: 'GNSS front end', file: GH + 'Personal PCBs/GNSS-IQ-Breakout/hardware/GNSS-IQ-Breakout.kicad_pcb' },
+  { id: 'gnss', title: 'GNSS IQ Breakout', project: 'GNSS front end', file: GH + 'Personal PCBs/GNSS-IQ-Breakout/hardware/GNSS-IQ-Breakout.kicad_pcb',
+    hole: [19.45, 17.34, 0.3, 0.6], close: [11.25, 5.6, 2.8, 1.4] }, // a via between the front end and the lock LED
   // moves to the repo Rivercraft911/rava-heart, hardware/HeartArray.kicad_pcb, once that is published
-  { id: 'heart', title: 'Rava Heart', project: 'Rava Heart', stackup: WHITE, file: '/Users/river/Documents/LocalBoards/PCB_Heart/KicadFiles/HeartArray/HeartArray.kicad_pcb' },
-  { id: 'laserbrain', title: 'LaserBrain', project: 'R-01', repo: 'Rivercraft911/R-01_Raster_Laser_Projector', path: 'pcbs/LaserBrain/LaserBrain.kicad_pcb', clone: GH + 'R-01_Raster_Laser_Projector' },
-  { id: 'laserdriver', title: 'LaserDriverRGB', project: 'R-01', repo: 'Rivercraft911/R-01_Raster_Laser_Projector', path: 'pcbs/LaserDriverRGB/LaserDriverRGB.kicad_pcb', clone: GH + 'R-01_Raster_Laser_Projector' },
-  { id: 'strobe', title: 'strobeGlasses MK1', project: 'strobeGlasses', repo: 'Rivercraft911/strobeGlasses', path: 'strobeGlassesMK1/strobeGlassesMK1.kicad_pcb', clone: GH + 'strobeGlasses' },
-  { id: 'peep', title: 'PEEP', project: 'PEEP', repo: 'Rivercraft911/PEEP', path: 'PCB/peep/peep.kicad_pcb', clone: GH + 'PEEP' },
+  { id: 'heart', title: 'Rava Heart', project: 'Rava Heart', stackup: WHITE, file: '/Users/river/Documents/LocalBoards/PCB_Heart/KicadFiles/HeartArray/HeartArray.kicad_pcb',
+    hole: [47, 76.25, 2.2, 3.8], close: [23.5, 11.75, 5.9, 2.9] }, // H3, the mounting hole on the heart's axis
+  { id: 'laserbrain', title: 'LaserBrain', project: 'R-01', repo: 'Rivercraft911/R-01_Raster_Laser_Projector', path: 'pcbs/LaserBrain/LaserBrain.kicad_pcb', clone: GH + 'R-01_Raster_Laser_Projector',
+    hole: [50, 50, 30, 30], close: [[50, 1024]] }, // the 30 mm hole in the middle
+  { id: 'laserdriver', title: 'LaserDriverRGB', project: 'R-01', repo: 'Rivercraft911/R-01_Raster_Laser_Projector', path: 'pcbs/LaserDriverRGB/LaserDriverRGB.kicad_pcb', clone: GH + 'R-01_Raster_Laser_Projector',
+    hole: [2.4, 2.4, 2.2, 3.8], close: [12.5, 6.25, 3.1] }, // H1, the top-left mounting hole
+  { id: 'strobe', title: 'strobeGlasses MK1', project: 'strobeGlasses', repo: 'Rivercraft911/strobeGlasses', path: 'strobeGlassesMK1/strobeGlassesMK1.kicad_pcb', clone: GH + 'strobeGlasses',
+    hole: [25.85, 6, 0.3, 0.6], close: [10.3, 5.15, 2.6, 1.3] }, // a via beside the microcontroller
+  { id: 'peep', title: 'PEEP', project: 'PEEP', repo: 'Rivercraft911/PEEP', path: 'PCB/peep/peep.kicad_pcb', clone: GH + 'PEEP',
+    hole: [4.63, 2.22, 0.3, 0.6], close: [3, 1.5, 0.75] }, // a via in the second contact
   { id: 'coil', title: 'Magnetorquer coil', project: 'SAMWISE', repo: 'stanford-ssi/samwise-avionics', path: 'Universal_Z_MagTorq/Coil_Panel_Z_v1/Coil_Panel_Z.kicad_pcb', clone: GH + 'samwise-avionics' },
 ]
 
@@ -29,6 +38,7 @@ const KICAD = '/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli', FFMPEG =
 const PCM = join(homedir(), 'Documents/KiCad/10.0/3rdparty') // older boards name the plugin libraries by older versions' variables
 const RENDER = 4096 // px, square: the board's long side comes out near 3930, twice the picture's
 const SIDE = 2048, Q = 80 // the picture's long side; WebP quality
+const PAN = 0.0782, ZOOM = 0.25 // a kicad-cli --pan of 1 moves the board this much of its long side; it zooms no further than about 0.3 × that side in mm (both measured)
 const TOL = 0.005 // mm: chords stay this close to their arcs
 const OUT = new URL('../src/boards/', import.meta.url), MEDIA = new URL('../public/media/boards/', import.meta.url)
 const TAU = 2 * Math.PI
@@ -131,32 +141,83 @@ function picture(b, src, home, tmp) {
   writeFileSync(f, src.replace(/\(type "([^"]+)"\)(?:\s*\(color "[^"]*"\))?/g, paint))
   writeFileSync(bare, src.replaceAll('(model "', '(model "/-/')) // models nowhere: no parts
   if (existsSync(pro)) copyFileSync(pro, f.replace(/pcb$/, 'pro')) // its text variables
-  const render = (file, quality, out) => execFileSync(KICAD, ['pcb', 'render', '--side', 'top', '--background', 'transparent', '--quality', quality,
-    '-w', RENDER, '-h', RENDER, '-D', `KIPRJMOD=${dirname(home)}`, '-D', `KICAD8_3RD_PARTY=${PCM}`, '-D', `KICAD9_3RD_PARTY=${PCM}`, '-o', out, file].map(String), { stdio: 'pipe' })
-  render(bare, 'basic', join(tmp, 'bare.png')), render(f, 'high', join(tmp, 'full.png'))
+  const out = join(tmp, 'render.png') // kicad-cli renders a little short of the size it is asked for, by more when small
+  const render = (file, quality, size = RENDER, view = []) => (execFileSync(KICAD, ['pcb', 'render', '--side', 'top', '--background', 'transparent', '--quality', quality,
+    '-w', size, '-h', size, ...view, '-D', `KIPRJMOD=${dirname(home)}`, '-D', `KICAD8_3RD_PARTY=${PCM}`, '-D', `KICAD9_3RD_PARTY=${PCM}`, '-o', out, file].map(String), { stdio: 'pipe' }), rgba(out))
   // the outline is where the bare board is at least half there; the camera frames the outline either way
-  const m = rgba(join(tmp, 'bare.png'))
-  let x0 = m.W, y0 = m.H, x1 = 0, y1 = 0
-  for (let y = 0; y < m.H; y++) for (let x = 0; x < m.W; x++)
-    if (m.px[(y * m.W + x) * 4 + 3] >= 128) (x0 = Math.min(x0, x)), (x1 = Math.max(x1, x)), (y0 = Math.min(y0, y)), (y1 = Math.max(y1, y))
-  if (!x0 || !y0 || x1 === m.W - 1 || y1 === m.H - 1) throw new Error(`${b.id}: the board runs off the render`)
+  const outline = (m) => {
+    let x0 = m.W, y0 = m.H, x1 = 0, y1 = 0
+    for (let y = 0; y < m.H; y++) for (let x = 0; x < m.W; x++)
+      if (m.px[(y * m.W + x) * 4 + 3] >= 128) (x0 = Math.min(x0, x)), (x1 = Math.max(x1, x)), (y0 = Math.min(y0, y)), (y1 = Math.max(y1, y))
+    if (!x0 || !y0 || x1 === m.W - 1 || y1 === m.H - 1) throw new Error(`${b.id}: the board runs off the render`)
+    return [x0, y0, x1, y1]
+  }
   // high quality lays the board on a floor whose shadow is translucent black; it goes, and the holes open
-  const { W, px } = rgba(join(tmp, 'full.png')), cw = x1 - x0 + 1, ch = y1 - y0 + 1, crop = Buffer.alloc(cw * ch * 4)
-  for (let i = 3; i < px.length; i += 4) if (px[i] < 255 && Math.max(px[i - 3], px[i - 2], px[i - 1]) < 8) px[i] = 0
+  const lift = (px) => { for (let i = 3; i < px.length; i += 4) if (px[i] < 255 && Math.max(px[i - 3], px[i - 2], px[i - 1]) < 8) px[i] = 0 }
+  const save = (name, px, w, h, scale = []) => {
+    const raw = join(tmp, 'pic.rgba'), png = join(tmp, 'pic.png'), webp = new URL(`${name}.webp`, MEDIA).pathname
+    writeFileSync(raw, px) // a frame this big through a pipe makes ffmpeg complain
+    execFileSync(FFMPEG, ['-v', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${w}x${h}`, '-i', raw, ...scale, '-y', png])
+    execFileSync(CWEBP, ['-quiet', '-q', Q, '-m', 6, '-sharp_yuv', '-alpha_filter', 'best', '-o', webp, png].map(String))
+    return readFileSync(webp).length
+  }
+  const [x0, y0, x1, y1] = outline(render(bare, 'basic'))
+  const { W, px } = render(f, 'high'), cw = x1 - x0 + 1, ch = y1 - y0 + 1, crop = Buffer.alloc(cw * ch * 4)
+  lift(px)
   for (let y = 0; y < ch; y++) px.copy(crop, y * cw * 4, ((y0 + y) * W + x0) * 4, ((y0 + y) * W + x1 + 1) * 4)
-  const raw = join(tmp, 'pic.rgba'), png = join(tmp, 'pic.png'), webp = new URL(`${b.id}.webp`, MEDIA).pathname
-  writeFileSync(raw, crop) // a frame this big through a pipe makes ffmpeg complain
-  execFileSync(FFMPEG, ['-v', 'error', '-f', 'rawvideo', '-pix_fmt', 'rgba', '-s', `${cw}x${ch}`, '-i', raw, '-vf',
-    `scale=${SIDE}:${SIDE}:force_original_aspect_ratio=decrease:flags=lanczos`, '-y', png])
-  execFileSync(CWEBP, ['-quiet', '-q', Q, '-m', 6, '-sharp_yuv', '-alpha_filter', 'best', '-o', webp, png].map(String))
-  const out = rgba(png)
-  return `${cw}x${ch} → ${out.W}x${out.H} px, ${readFileSync(webp).length} B`
+  const bytes = save(b.id, crop, cw, ch, ['-vf', `scale=${SIDE}:${SIDE}:force_original_aspect_ratio=decrease:flags=lanczos`])
+
+  // The close-ups, each the middle P px of a render a little larger. Zoomed, the render still centres the board's
+  // box and scales as the zoom (at ½ the board fits, so its size there gives the scale), and a pan puts the hole in
+  // the middle; then where the hole lands in the bare render, its own transparent disc, pins the square to the
+  // board's mm, whatever the pan was off by. kicad-cli holds the zoom down, so a closer one renders bigger.
+  const L = Math.max(b.w, b.h), [hx, hy] = b.hole ?? []
+  const close = (b.close ?? []).map((c, j) => {
+    const [mm, P = 512] = [c].flat(), scale = (R) => { const o = outline(render(bare, 'basic', R, ['--zoom', 0.5])); return (2 * Math.max(o[2] - o[0] + 1, o[3] - o[1] + 1)) / L }
+    let R = P + 48, k = scale(R)
+    if (P / mm / k > ZOOM * L) (R = Math.ceil((R * P) / mm / k / ZOOM / L) + 48), (k = scale(R))
+    const Z = P / mm / k, ppm = Z * k, view = ['--zoom', Z, '--pan', `${(-(hx - b.w / 2) / (PAN * L)).toFixed(5)},${((hy - b.h / 2) / (PAN * L)).toFixed(5)},0`]
+    const middle = (m) => {
+      const c = (m.W - P) >> 1, px = Buffer.alloc(P * P * 4)
+      if (c < 0 || m.H !== m.W) throw new Error(`${b.id}: a ${m.W} px close-up`)
+      for (let y = 0; y < P; y++) m.px.copy(px, y * P * 4, ((c + y) * m.W + c) * 4, ((c + y) * m.W + c + P) * 4)
+      return { W: P, H: P, px }
+    }
+    const [bx, by, area] = disc(middle(render(bare, 'basic', R, view)), P / 2, P / 2)
+    const m = middle(render(f, 'high', R, view))
+    lift(m.px), save(`${b.id}-${j}`, m.px, P, P)
+    const box = [hx - bx / ppm, hy - by / ppm, P / ppm, P].map((v) => Math.round(v * 1e4) / 1e4)
+    console.log(`  ${b.id}-${j}: ${mm} mm at ${P} px, zoom ${Z.toFixed(2)} of ${R} px, hole at ${bx.toFixed(1)},${by.toFixed(1)} px, ${(2 * Math.sqrt(area / Math.PI) / ppm).toFixed(3)} mm across`)
+    return box
+  })
+  return [`${cw}x${ch} → ${SIDE} px, ${bytes} B`, close]
+}
+
+// The transparent disc nearest (cx, cy) that does not touch the edge: its centroid and area, px.
+function disc({ W, H, px }, cx, cy) {
+  const seen = new Uint8Array(W * H), open = (i) => px[i * 4 + 3] < 128
+  let best = [0, 0, 0], d = Infinity
+  for (let i = 0; i < W * H; i++) {
+    if (seen[i] || !open(i)) continue
+    const st = [i]
+    let n = 0, sx = 0, sy = 0, edge = false
+    seen[i] = 1
+    while (st.length) {
+      const j = st.pop(), x = j % W, y = (j / W) | 0
+      n++, (sx += x + 0.5), (sy += y + 0.5), (edge ||= !x || !y || x === W - 1 || y === H - 1)
+      for (const k of [x > 0 ? j - 1 : -1, x < W - 1 ? j + 1 : -1, j - W, j + W]) if (k >= 0 && k < W * H && !seen[k] && open(k)) (seen[k] = 1), st.push(k)
+    }
+    const e = Math.hypot(sx / n - cx, sy / n - cy)
+    if (!edge && n > 8 && e < d) (d = e), (best = [sx / n, sy / n, n])
+  }
+  if (!best[2]) throw new Error('no hole in the close-up')
+  return best
 }
 
 const only = process.argv.slice(2), tmp = mkdtempSync(join(tmpdir(), 'boards-'))
 mkdirSync(OUT, { recursive: true }), mkdirSync(MEDIA, { recursive: true })
 try {
-  const list = []
+  const list = [], was = existsSync(new URL('list.json', OUT)) ? JSON.parse(readFileSync(new URL('list.json', OUT), 'utf8')) : []
   for (const b of BOARDS) {
     let home = b.file ?? join(b.clone ?? '', b.path)
     if (!existsSync(home)) {
@@ -165,8 +226,8 @@ try {
     }
     const src = readFileSync(home, 'utf8'), [g, n] = geometry(b, src), json = JSON.stringify(g)
     writeFileSync(new URL(`${b.id}.json`, OUT), json)
-    list.push({ id: g.id, title: g.title, project: g.project, w: g.w, h: g.h })
-    const pic = !only.length || only.includes(b.id) ? picture(b, src, home, tmp) : 'picture kept'
+    const [pic, close] = !only.length || only.includes(b.id) ? picture({ ...b, w: g.w, h: g.h }, src, home, tmp) : ['picture kept', was.find((w) => w.id === b.id)?.close]
+    list.push({ id: g.id, title: g.title, project: g.project, w: g.w, h: g.h, ...(b.hole && { hole: b.hole, close }) })
     console.log(b.id, `${g.w}x${g.h} mm`, `${g.tracks.length}/${n} tracks`, `${g.vias.length} vias`, `${g.layers.length} layers`, `${json.length} B;`, pic)
   }
   writeFileSync(new URL('list.json', OUT), JSON.stringify(list))

@@ -21,6 +21,10 @@ export type Field = {
   bake?: Field[] // worlds to render into their shots, for any the raster never swept itself
 }
 
+// Pictures on their way into a field's data texture (an rgba8 one with mips), each an image decoded off the main
+// thread and copied in on the GPU, a few a frame, so the scene they are for never waits and no frame stalls on them.
+export const pictures: { shader: number; img: ImageBitmap; x: number; y: number; mip: number }[] = []
+
 const FLOAT: GPUTextureFormat = 'rgba16float'
 export const TILE = [24, 40] // a glyph's tile in the atlas, px
 export const GRID = [6, 10] // a cell's shape: its light over this grid, and a glyph's ink over the same
@@ -70,8 +74,15 @@ export class Raster {
     this.shots = d.createTexture({ size: [4 * SHOT[0], 3 * SHOT[1]], mipLevelCount: MIPS, format: FLOAT, usage: use })
     this.shot = d.createTexture({ size: SHOT, format: FLOAT, usage: use })
     this.shotView = this.shot.createView()
-    this.data = FIELDS.map(({ data: [w, h, b = 1] = [1, 1], shots }) =>
-      shots ? this.shots : d.createTexture({ size: [w, h], format: b > 2 ? 'rgba8unorm' : b > 1 ? 'rg8unorm' : 'r8unorm', usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST }),
+    this.data = FIELDS.map(({ data: [w, h, b = 1, mips = 1] = [1, 1], shots }) =>
+      shots
+        ? this.shots
+        : d.createTexture({
+            size: [w, h],
+            mipLevelCount: mips,
+            format: b > 2 ? 'rgba8unorm' : b > 1 ? 'rg8unorm' : 'r8unorm',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | (mips > 1 ? GPUTextureUsage.RENDER_ATTACHMENT : 0), // a picture's copy-in needs it
+          }),
     )
   }
 
@@ -124,6 +135,12 @@ export class Raster {
   // Renders the field (and its text) for this frame, ahead of the phosphor's pass.
   render(enc: GPUCommandEncoder, f: Field | undefined, w: number, h: number, aspect: number, dpr: number, gain: number) {
     this.on = false
+    for (let px = 0; pictures.length && px < 1 << 20; ) { // about a megapixel a frame
+      const { shader, img, x, y, mip } = pictures.shift()!
+      this.device.queue.copyExternalImageToTexture({ source: img }, { texture: this.data[shader], origin: [x, y], mipLevel: mip, premultipliedAlpha: true }, [img.width, img.height])
+      px += img.width * img.height
+      img.close()
+    }
     if (!f) return
     const d = this.device, uf = this.uf
     if (f.rows) {
