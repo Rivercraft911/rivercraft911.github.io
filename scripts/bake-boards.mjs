@@ -20,8 +20,7 @@ const WHITE = { 'Top Silk Screen': '#101010FF', 'Bottom Silk Screen': '#101010FF
 const BOARDS = [
   { id: 'gnss', title: 'GNSS IQ Breakout', project: 'GNSS front end', file: GH + 'Personal PCBs/GNSS-IQ-Breakout/hardware/GNSS-IQ-Breakout.kicad_pcb',
     hole: [19.45, 17.34, 0.3, 0.6], close: [11.25, 5.6, 2.8, 1.4] }, // a via between the front end and the lock LED
-  // moves to the repo Rivercraft911/rava-heart, hardware/HeartArray.kicad_pcb, once that is published
-  { id: 'heart', title: 'Rava Heart', project: 'Rava Heart', stackup: WHITE, file: '/Users/river/Documents/LocalBoards/PCB_Heart/KicadFiles/HeartArray/HeartArray.kicad_pcb',
+  { id: 'heart', title: 'Rava Heart', project: 'Rava Heart', stackup: WHITE, repo: 'Rivercraft911/rava-heart', path: 'hardware/HeartArray.kicad_pcb', clone: GH + 'rava-heart',
     hole: [47, 76.25, 2.2, 3.8], close: [23.5, 11.75, 5.9, 2.9] }, // H3, the mounting hole on the heart's axis
   { id: 'laserbrain', title: 'LaserBrain', project: 'R-01', repo: 'Rivercraft911/R-01_Raster_Laser_Projector', path: 'pcbs/LaserBrain/LaserBrain.kicad_pcb', clone: GH + 'R-01_Raster_Laser_Projector',
     hole: [50, 50, 30, 30], close: [[50, 1024]] }, // the 30 mm hole in the middle
