@@ -12,7 +12,6 @@ import { clamp, view, TAU, type Scene, type Frame } from '../acts/scene'
 import { Path } from '../beam/path'
 import { PLACES, RIVER } from './places'
 import { ctx, dot, frame, len, look, seen, site, stand, trace, turn, unit, type V } from './ctx'
-import { mount, page, route, within } from './pages'
 
 const p = ctx.p
 const cam = new Float32Array(16)
@@ -35,7 +34,6 @@ const DEBUG = ['d', 'pitch', 'yaw', 'at'].some((k) => dbg.has(k))
 // ---- models: River's hardware, as baked (scripts/bake-models.mjs) --------------------------------------------
 const models = ctx.models
 export function attach(d: GPUDevice) {
-  mount((k) => go(k, lastBuild), () => active) // the words: the index, a deep link's place, the history
   const base = `${import.meta.env.BASE_URL}media/models/`
   fetch(`${base}list.json`)
     .then((r) => (r.ok ? r.json() : []))
@@ -114,8 +112,6 @@ export function go(k: number, t: number) {
   restAt(k, to)
   const arc = Math.acos(clamp(dot(unit([...from.eye]), unit([...to.eye])), -1, 1))
   flight = 0, fstart = t, flen = 1.4 + 1.1 * arc + 0.5 * Math.abs(Math.log(len(from.eye) / len(to.eye)))
-  page(k, flen) // its page comes in as the camera arrives
-  route(k)
 }
 
 // ---- the pointer ---------------------------------------------------------------------------------------------
@@ -150,11 +146,9 @@ addEventListener('wheel', (e) => {
 addEventListener('keydown', (e) => {
   if (!active) return
   const n = PLACES.length + 1
-  if (e.key === ' ' && within(e.target)) return void e.stopImmediatePropagation() // space scrolls the page, not pause
   if (e.key === 'Escape' && focus >= 0) go(-1, lastBuild)
   else if (e.key === 'ArrowRight') go(((focus + 2) % n) - 1, lastBuild)
   else if (e.key === 'ArrowLeft') go(((focus + n) % n) - 1, lastBuild)
-  else if (/^[1-9]$/.test(e.key) && +e.key <= PLACES.length) go(+e.key - 1, lastBuild) // the index's numbers
   else return
   e.stopImmediatePropagation()
 }, true)
