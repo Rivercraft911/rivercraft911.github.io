@@ -5,7 +5,7 @@
 // Solid things (mesh.ts) stand in it, depth-tested against it, seen through the same lens.
 import prelude from './field.wgsl?raw'
 import rasterWGSL from './raster.wgsl?raw'
-import { FIELDS } from './fields'
+import { FIELDS, PLANET } from './fields'
 import { Mesh, type Solids } from './mesh'
 
 export type Field = {
@@ -54,6 +54,9 @@ export class Raster {
   private blankDist: GPUTexture
   private turn = 0
   private solidView?: GPUTextureView | null = null // the mesh pass's light the light group was made with (null: none yet)
+  private shadeView?: GPUTextureView // and the traced ground's
+  private none!: GPUTextureView
+  private ball = new Float32Array(4)
   readonly mesh: Mesh
   private cells?: GPUTexture
   private groups: GPUBindGroup[] = []
@@ -73,6 +76,7 @@ export class Raster {
     this.back = d.createBuffer({ size: 8192, usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST })
     this.blank = d.createTexture({ size: [1, 1], format: FLOAT, usage: GPUTextureUsage.TEXTURE_BINDING })
     this.blankDist = d.createTexture({ size: [1, 1], format: 'r16float', usage: GPUTextureUsage.TEXTURE_BINDING })
+    this.none = this.blank.createView()
     this.mesh = new Mesh(d)
     this.data = FIELDS.map(({ data: [w, h, b = 1, mips = 1] = [1, 1] }) =>
       d.createTexture({
@@ -198,15 +202,20 @@ export class Raster {
     d.queue.writeBuffer(this.u, 0, uf)
 
     sweep(f, this.views[0], this.views[2], fw, fh, aspect)
-    this.mesh.render(enc, f.solids, w, h, this.views[2]) // read out as text, a solid thing is glyphs too
+    // the planet's field says where its ground is (planet.wgsl's p[4]), for the solids' traced light
+    if (f.shader === PLANET) for (let i = 0; i < 4; i++) this.ball[i] = f.p[16 + i]
+    // read out as text, a solid thing is glyphs too, and its light is not traced
+    this.mesh.render(enc, f.solids, w, h, this.views[2], text ? undefined : this.views[0], f.shader === PLANET ? this.ball : undefined)
     if (!text) {
       if (this.half?.width !== Math.max(1, w >> 1) || this.half.height !== Math.max(1, h >> 1)) {
         this.half?.destroy()
         this.half = d.createTexture({ size: [Math.max(1, w >> 1), Math.max(1, h >> 1)], format: FLOAT, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING })
         this.solidView = null
       }
-      if (this.mesh.view !== this.solidView) {
-        const sv = (this.solidView = this.mesh.view) ?? this.blank.createView()
+      const shade = this.mesh.ground ?? this.none
+      if (this.mesh.view !== this.solidView || shade !== this.shadeView) {
+        const sv = (this.solidView = this.mesh.view) ?? this.none
+        this.shadeView = shade
         const scene: GPUBindGroupEntry[] = [
           { binding: 0, resource: { buffer: this.u } },
           { binding: 1, resource: this.smp },
@@ -214,6 +223,7 @@ export class Raster {
           { binding: 6, resource: sv },
           { binding: 7, resource: this.mesh.distView ?? this.blankDist.createView() },
           { binding: 8, resource: this.views[2] },
+          { binding: 10, resource: shade },
         ]
         this.halfGroup = d.createBindGroup({ layout: this.halfPipe.getBindGroupLayout(0), entries: scene })
         this.groups[0] = d.createBindGroup({ layout: this.light.getBindGroupLayout(0), entries: [...scene, { binding: 9, resource: this.half.createView() }] })

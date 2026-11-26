@@ -1,10 +1,12 @@
 // Solid things, lit: River's hardware as its CAD says it is (KiCad's and Blender's GLB), drawn through the camera the
 // raster's fields see through, depth-tested against them, and handed to the raster as light, so it persists, halates
 // and tone-maps with everything else. The sun casts real shadows; solder mask is a translucent layer over the copper,
-// as it is on a board.
+// as it is on a board. What stands near the eye is path traced as well (trace.ts): the rasteriser draws its edges and
+// its sunlit sheen, the tracer says how much of the sun each point sees and what light reaches it from everywhere else.
 import meshWGSL from './mesh.wgsl?raw'
+import { Trace, keep, type Traced } from './trace'
 
-export type Model = { vb: GPUBuffer; solid: number; clear: number; lo: number[]; hi: number[] }
+export type Model = { vb: GPUBuffer; solid: number; clear: number; lo: number[]; hi: number[]; traced?: Traced }
 
 // One model in the scene: m is three rows of its transform, model → world, the world being the eye's: the eye at the
 // origin, so the scene keeps its own positions in doubles and subtracts the eye before it hands them over.
@@ -20,6 +22,7 @@ export type Solids = {
   up: ArrayLike<number> // which way is up, here
   fog?: ArrayLike<number> // the air's colour and thickness per unit length
   shadow?: ArrayLike<number> // the sphere (centre, radius) of what casts shadows; none, no shadows
+  ground?: ArrayLike<number> // the sphere (centre, radius) it all stands on, for the traced light; none, no ground
   focus?: number // the lens: the distance it is focused at, world units
   aperture?: number // and its blur at infinity, px; 0 or none, a pinhole (raster.wgsl does the blur)
 }
@@ -41,13 +44,18 @@ export class Mesh {
   private shade!: GPURenderPipeline
   private ready = false
   private u: GPUBuffer
-  private uf = new Float32Array(15 * 4)
+  private uf = new Float32Array(16 * 4)
   private inst: GPUBuffer
   private ii = new Float32Array(MAX * 16)
   private shadow: GPUTexture
   private cmp: GPUSampler
   private g0!: GPUBindGroup
-  private g1?: GPUBindGroup
+  private g1: (GPUBindGroup | undefined)[] = [] // one for each of the tracer's two histories, and one for none
+  private gen = -1
+  private blank: GPUTextureView[]
+  private seen = new Uint8Array(MAX) // which items the camera can see, and which can cast into the sun's map
+  private casts = new Uint8Array(MAX)
+  readonly trace: Trace
   private l1!: GPUBindGroupLayout
   private color?: GPUTexture // the resolved light, read by the raster's composite
   private msaa?: GPUTexture
@@ -62,6 +70,7 @@ export class Mesh {
   private n = 0
   private dirty = true
   view?: GPUTextureView
+  ground?: GPUTextureView // the traced ground's light against its light in the open, for the raster's composite; none, untraced
 
   constructor(readonly device: GPUDevice) {
     const d = device
@@ -69,6 +78,8 @@ export class Mesh {
     this.inst = d.createBuffer({ size: this.ii.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST })
     this.shadow = d.createTexture({ size: [SHADOW, SHADOW], format: 'depth32float', usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING })
     this.cmp = d.createSampler({ compare: 'less', magFilter: 'linear', minFilter: 'linear' })
+    this.blank = (['rgba16float', 'rgba32float'] as const).map((format) => d.createTexture({ size: [1, 1], format, usage: GPUTextureUsage.TEXTURE_BINDING }).createView())
+    this.trace = new Trace(d)
   }
 
   async compile() {
@@ -84,6 +95,8 @@ export class Mesh {
         { binding: 0, visibility: S.FRAGMENT, texture: { sampleType: 'depth' } },
         { binding: 1, visibility: S.FRAGMENT, sampler: { type: 'comparison' } },
         { binding: 2, visibility: S.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
+        { binding: 3, visibility: S.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
+        { binding: 4, visibility: S.FRAGMENT, texture: { sampleType: 'unfilterable-float' } },
       ],
     })
     this.g0 = d.createBindGroup({ layout: l0, entries: [{ binding: 0, resource: { buffer: this.u } }, { binding: 1, resource: { buffer: this.inst } }] })
@@ -107,6 +120,7 @@ export class Mesh {
     })
     const over: GPUBlendState = { color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' }, alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' } }
     const multisample = { count: this.samples }
+    this.trace.compile() // not awaited: until it is ready the rasteriser's own light stands
     ;[this.solid, this.clear, this.prime, this.shade] = await Promise.all([
       d.createRenderPipelineAsync({ layout, vertex: { module, entryPoint: 'vs', buffers }, fragment: color('solidFS'), depthStencil: depth(true, 'greater'), multisample }),
       d.createRenderPipelineAsync({ layout, vertex: { module, entryPoint: 'vs', buffers }, fragment: color('clearFS', over, GPUColorWrite.ALL, 0), depthStencil: depth(false, 'greater'), multisample }),
@@ -120,8 +134,10 @@ export class Mesh {
     this.ready = true
   }
 
-  // This frame's solids into `view`, against the field's depth in `dist` (its ray lengths, at its own size).
-  render(enc: GPUCommandEncoder, s: Solids | undefined, w: number, h: number, dist: GPUTextureView) {
+  // This frame's solids into `view`, against the field's depth in `dist` (its ray lengths, at its own size). `light`
+  // is what the field drew, if the solids' light may be traced, with it as the colour of the `ground` (a sphere: its
+  // centre and radius), where the scene names none.
+  render(enc: GPUCommandEncoder, s: Solids | undefined, w: number, h: number, dist: GPUTextureView, light?: GPUTextureView, ground?: ArrayLike<number>) {
     if (!this.ready) return
     const d = this.device
     if (this.color?.width !== w || this.color.height !== h) {
@@ -136,46 +152,62 @@ export class Mesh {
       this.distView = this.dist.createView()
       this.dirty = true
     }
-    if (this.field !== dist) {
-      this.field = dist
-      this.g1 = d.createBindGroup({ layout: this.l1, entries: [{ binding: 0, resource: this.shadow.createView() }, { binding: 1, resource: this.cmp }, { binding: 2, resource: dist }] })
-    }
+    const items = s?.items ?? [], T = this.trace
+    const traced = !!light && items.length > 0 ? T.render(enc, s!, w, h, light, s!.ground ?? ground) : T.stop()
+    this.ground = traced ? T.shade : undefined
+    if (this.field !== dist || this.gen !== T.gen) (this.field = dist), (this.gen = T.gen), (this.g1.length = 0)
+    const gi = traced ? T.flip : 2
+    const g1 = (this.g1[gi] ??= d.createBindGroup({
+      layout: this.l1,
+      entries: [this.shadow.createView(), this.cmp, dist, traced ? T.lit! : this.blank[0], traced ? T.geo! : this.blank[1]].map((resource, binding) => ({ binding, resource })),
+    }))
     const out: GPURenderPassColorAttachment = { view: this.msaa ? this.msaa.createView() : this.view!, resolveTarget: this.msaa ? this.view : undefined, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }
     const far: GPURenderPassColorAttachment = { view: this.distMS ? this.distMS.createView() : this.distView!, resolveTarget: this.distMS ? this.distView : undefined, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }
-    const items = s?.items ?? []
     if (!items.length) {
       if (this.dirty) enc.beginRenderPass({ colorAttachments: [out, far] }).end(), (this.dirty = false)
       return
     }
     this.dirty = true
-    this.write(s!, w, h)
-    const n = Math.min(MAX, items.length)
+    this.write(s!, w, h, traced)
+    const n = Math.min(MAX, items.length), c = s!.cam, sh = s!.shadow, L = s!.sun, tx = w / h / c[3], ty = 1 / c[3]
     for (let i = 0; i < n; i++) {
-      const m = items[i].m, o = i * 16
+      const M = items[i].model, m = items[i].m, o = i * 16
       for (let j = 0; j < 12; j++) this.ii[o + j] = m[j]
       this.ii[o + 12] = items[i].k ?? 1
       this.ii[o + 13] = items[i].glow ?? 0
-    }
-    d.queue.writeBuffer(this.inst, 0, this.ii, 0, n * 16)
-    const each = (p: GPURenderPassEncoder, clear: boolean) => {
-      for (let i = 0; i < n; i++) {
-        const m = items[i].model, c = clear ? m.clear : m.solid
-        if (c) p.setVertexBuffer(0, m.vb), p.draw(c, 1, clear ? m.solid : 0, i)
+      this.ii[o + 14] = traced ? T.fades[i] : 0
+      // Only what the camera can see is drawn, and only what stands in the sun's map is drawn into it: the sphere
+      // round the model against the view's four sides, and against the column of sunlight through what casts.
+      const cx = (M.lo[0] + M.hi[0]) / 2, cy = (M.lo[1] + M.hi[1]) / 2, cz = (M.lo[2] + M.hi[2]) / 2
+      const x = m[0] * cx + m[1] * cy + m[2] * cz + m[3], y = m[4] * cx + m[5] * cy + m[6] * cz + m[7], z = m[8] * cx + m[9] * cy + m[10] * cz + m[11]
+      const r = 0.5 * Math.hypot(M.hi[0] - M.lo[0], M.hi[1] - M.lo[1], M.hi[2] - M.lo[2]) * Math.hypot(m[0], m[4], m[8])
+      const u = x * c[4] + y * c[5] + z * c[6], v = x * c[8] + y * c[9] + z * c[10], f = x * c[12] + y * c[13] + z * c[14]
+      this.seen[i] = +(f > -r && Math.abs(u) - f * tx < r * Math.hypot(1, tx) && Math.abs(v) - f * ty < r * Math.hypot(1, ty))
+      if (sh) {
+        const dx = x - sh[0], dy = y - sh[1], dz = z - sh[2], along = dx * L[0] + dy * L[1] + dz * L[2], R = sh[3] + r
+        this.casts[i] = +(Math.abs(along) < R && dx * dx + dy * dy + dz * dz - along * along < R * R)
       }
     }
-    if (s!.shadow) {
+    d.queue.writeBuffer(this.inst, 0, this.ii, 0, n * 16)
+    const each = (p: GPURenderPassEncoder, clear: boolean, which: Uint8Array) => {
+      for (let i = 0; i < n; i++) {
+        const m = items[i].model, c = clear ? m.clear : m.solid
+        if (c && which[i]) p.setVertexBuffer(0, m.vb), p.draw(c, 1, clear ? m.solid : 0, i)
+      }
+    }
+    if (sh) {
       const p = enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: this.shadow.createView(), depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'store' } })
-      p.setPipeline(this.shade), p.setBindGroup(0, this.g0), each(p, false), p.end()
+      p.setPipeline(this.shade), p.setBindGroup(0, this.g0), each(p, false, this.casts), p.end()
     }
     const p = enc.beginRenderPass({ colorAttachments: [out, far], depthStencilAttachment: { view: this.depth!.createView(), depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'discard' } })
-    p.setBindGroup(0, this.g0), p.setBindGroup(1, this.g1!)
+    p.setBindGroup(0, this.g0), p.setBindGroup(1, g1)
     p.setPipeline(this.prime), p.draw(3)
-    p.setPipeline(this.solid), each(p, false)
-    p.setPipeline(this.clear), each(p, true)
+    p.setPipeline(this.solid), each(p, false, this.seen)
+    p.setPipeline(this.clear), each(p, true, this.seen)
     p.end()
   }
 
-  private write(s: Solids, w: number, h: number) {
+  private write(s: Solids, w: number, h: number, traced: boolean) {
     const u = this.uf, c = s.cam, j = HALTON[this.n++ % 16], sk = s.sky, f = s.fog ?? [0, 0, 0, 0]
     u.set([c[4], c[5], c[6], c[3], c[8], c[9], c[10], w / h, c[12], c[13], c[14], s.near, (2 * j[0]) / w, (2 * j[1]) / h, w, h])
     u.set([s.sun[0], s.sun[1], s.sun[2], s.sun[3], s.sunc[0], s.sunc[1], s.sunc[2], s.sunc[3]], 16)
@@ -192,102 +224,35 @@ export class Mesh {
       const row = (x: number, y: number, z: number, q: number, o: number) => [x * q, y * q, z * q, o - (x * cx + y * cy + z * cz) * q]
       u.set([...row(xx, xy, xz, 1 / r, 0), ...row(yx, yy, yz, 1 / r, 0), ...row(-L[0], -L[1], -L[2], 0.5 / r, 0.5), 1, (2 * r) / SHADOW, 0, 0], 44)
     }
+    const T = this.trace
+    u[60] = T.w, u[61] = T.h, u[62] = +traced
     this.device.queue.writeBuffer(this.u, 0, u)
   }
 }
 
 // A GLB, read once and kept: every triangle of every primitive in one buffer, its material baked into its
-// vertices, the opaque first and the translucent (solder mask) after, so a model is two draws.
+// vertices, the opaque first and the translucent (solder mask) after, so a model is two draws. It is read on another
+// thread (bvh.worker.ts), which also builds the hierarchy the tracer's rays go through, so no frame waits on either.
 const cache = new Map<string, Promise<Model>>()
+type Read = { id: number; error?: string; vb: ArrayBuffer; solid: number; clear: number; lo: number[]; hi: number[]; nodes: ArrayBuffer; tris: ArrayBuffer; mats: ArrayBuffer }
+const waiting = new Map<number, [(r: Read) => void, (e: Error) => void]>()
+let worker: Worker | undefined
 export function model(device: GPUDevice, url: string) {
   let m = cache.get(url)
-  if (!m) cache.set(url, (m = fetch(url).then((r) => r.arrayBuffer()).then((b) => read(device, b))))
+  if (m) return m
+  if (!worker) {
+    worker = new Worker(new URL('./bvh.worker.ts', import.meta.url), { type: 'module' })
+    worker.onmessage = (e: MessageEvent<Read>) => {
+      const w = waiting.get(e.data.id)!
+      waiting.delete(e.data.id)
+      e.data.error ? w[1](new Error(e.data.error)) : w[0](e.data)
+    }
+  }
+  const id = cache.size
+  cache.set(url, (m = new Promise<Read>((ok, no) => (waiting.set(id, [ok, no]), worker!.postMessage({ id, url: new URL(url, location.href).href }))).then((r) => {
+    const vb = device.createBuffer({ size: r.vb.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST })
+    device.queue.writeBuffer(vb, 0, r.vb)
+    return { vb, solid: r.solid, clear: r.clear, lo: r.lo, hi: r.hi, traced: keep(device, r.nodes, r.tris, r.mats) }
+  })))
   return m
-}
-
-type Prim = { M: number[]; P: Float32Array; N?: Float32Array; I: Uint32Array; col: number[]; metal: number; rough: number }
-
-function read(device: GPUDevice, buf: ArrayBuffer): Model {
-  const v = new DataView(buf), jl = v.getUint32(12, true)
-  const j = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jl)))
-  const bin = 28 + jl
-  const acc = (i: number) => {
-    const a = j.accessors[i], bv = j.bufferViews[a.bufferView], n = ({ SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 } as Record<string, number>)[a.type]
-    const size = a.componentType === 5123 ? 2 : a.componentType === 5121 ? 1 : 4, stride = bv.byteStride ?? n * size
-    const o = bin + (bv.byteOffset ?? 0) + (a.byteOffset ?? 0), out = a.componentType === 5126 ? new Float32Array(a.count * n) : new Uint32Array(a.count * n)
-    for (let k = 0; k < a.count; k++)
-      for (let c = 0; c < n; c++) {
-        const at = o + k * stride + c * size
-        out[k * n + c] = a.componentType === 5126 ? v.getFloat32(at, true) : size === 4 ? v.getUint32(at, true) : size === 2 ? v.getUint16(at, true) : v.getUint8(at)
-      }
-    return out
-  }
-  const prims: Prim[] = []
-  const walk = (ni: number, parent: number[]) => {
-    const n = j.nodes[ni], M = mul(parent, local(n))
-    for (const p of n.mesh != null ? j.meshes[n.mesh].primitives : []) {
-      if ((p.mode ?? 4) !== 4) continue
-      const P = acc(p.attributes.POSITION) as Float32Array, pb = j.materials?.[p.material]?.pbrMetallicRoughness ?? {}
-      const I = p.indices != null ? (acc(p.indices) as Uint32Array) : Uint32Array.from({ length: P.length / 3 }, (_, i) => i)
-      // glTF's default is metal; KiCad leaves the factors off its plastics, which are not
-      prims.push({ M, P, N: p.attributes.NORMAL != null ? (acc(p.attributes.NORMAL) as Float32Array) : undefined, I, col: pb.baseColorFactor ?? [0.8, 0.8, 0.8, 1], metal: pb.metallicFactor ?? 0, rough: pb.roughnessFactor ?? 0.5 })
-    }
-    for (const c of n.children ?? []) walk(c, M)
-  }
-  for (const r of j.scenes?.[j.scene ?? 0]?.nodes ?? j.nodes.map((_: unknown, i: number) => i)) walk(r, I4)
-
-  const clear = (p: Prim) => p.col[3] < 0.99
-  const count = (want: boolean) => prims.reduce((a, p) => a + (clear(p) === want ? p.I.length - (p.I.length % 3) : 0), 0)
-  const ns = count(false), nc = count(true)
-  const out = new ArrayBuffer((ns + nc) * STRIDE), f = new Float32Array(out), b = new Uint8Array(out)
-  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity]
-  let at = 0
-  for (const want of [false, true])
-    for (const p of prims) {
-      if (clear(p) !== want) continue
-      const { M, P, N, I } = p, gamma = p.col.slice(0, 3).map((x) => Math.round(255 * Math.sqrt(Math.min(1, Math.max(0, x)))))
-      for (let t = 0; t + 2 < I.length; t += 3) {
-        let fx = 0, fy = 0, fz = 0 // a face's own normal, where the mesh gives none
-        if (!N) {
-          const a = I[t] * 3, e = I[t + 1] * 3, c = I[t + 2] * 3
-          const ux = P[e] - P[a], uy = P[e + 1] - P[a + 1], uz = P[e + 2] - P[a + 2], vx = P[c] - P[a], vy = P[c + 1] - P[a + 1], vz = P[c + 2] - P[a + 2]
-          ;(fx = uy * vz - uz * vy), (fy = uz * vx - ux * vz), (fz = ux * vy - uy * vx)
-        }
-        for (let q = 0; q < 3; q++, at++) {
-          const k = I[t + q] * 3, x = P[k], y = P[k + 1], z = P[k + 2], o = at * 8
-          for (let r = 0; r < 3; r++) {
-            const w = (f[o + r] = M[r] * x + M[4 + r] * y + M[8 + r] * z + M[12 + r])
-            lo[r] = Math.min(lo[r], w), (hi[r] = Math.max(hi[r], w))
-          }
-          const nx = N ? N[k] : fx, ny = N ? N[k + 1] : fy, nz = N ? N[k + 2] : fz
-          const mx = M[0] * nx + M[4] * ny + M[8] * nz, my = M[1] * nx + M[5] * ny + M[9] * nz, mz = M[2] * nx + M[6] * ny + M[10] * nz
-          const l = Math.hypot(mx, my, mz) || 1
-          f[o + 3] = mx / l, f[o + 4] = my / l, f[o + 5] = mz / l
-          const u = at * STRIDE + 24
-          b[u] = gamma[0], b[u + 1] = gamma[1], b[u + 2] = gamma[2], b[u + 3] = Math.round(255 * p.col[3])
-          b[u + 4] = Math.round(255 * p.metal), b[u + 5] = Math.round(255 * p.rough)
-        }
-      }
-    }
-  const vb = device.createBuffer({ size: Math.max(out.byteLength, 4), usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST })
-  device.queue.writeBuffer(vb, 0, out)
-  return { vb, solid: ns, clear: nc, lo, hi }
-}
-
-// glTF's node transforms: a column-major matrix, or translation · rotation · scale.
-const I4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
-function local(n: { matrix?: number[]; translation?: number[]; rotation?: number[]; scale?: number[] }) {
-  if (n.matrix) return n.matrix
-  const [x, y, z, w] = n.rotation ?? [0, 0, 0, 1], [sx, sy, sz] = n.scale ?? [1, 1, 1], [tx, ty, tz] = n.translation ?? [0, 0, 0]
-  return [
-    (1 - 2 * (y * y + z * z)) * sx, 2 * (x * y + z * w) * sx, 2 * (x * z - y * w) * sx, 0,
-    2 * (x * y - z * w) * sy, (1 - 2 * (x * x + z * z)) * sy, 2 * (y * z + x * w) * sy, 0,
-    2 * (x * z + y * w) * sz, 2 * (y * z - x * w) * sz, (1 - 2 * (x * x + y * y)) * sz, 0,
-    tx, ty, tz, 1,
-  ]
-}
-function mul(a: number[], b: number[]) {
-  const o = new Array(16).fill(0)
-  for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k]
-  return o
 }

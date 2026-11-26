@@ -35,6 +35,7 @@ const Y = vec3f(0.2290, 0.6917, 0.0793);
 @group(0) @binding(6) var solids: texture_2d<f32>; // the mesh pass's light (mesh.ts), premultiplied, at the phosphor's size
 @group(0) @binding(7) var near: texture_2d<f32>;   // how far each pixel's solid is
 @group(0) @binding(8) var far: texture_2d<f32>;    // how far the field's light came from (field.wgsl), at the field's size
+@group(0) @binding(10) var shade: texture_2d<f32>; // the traced ground (trace.wgsl): its light against its light in the open, × whether it is ground
 
 // The field as light, linearly reconstructed at the phosphor's resolution, with whatever solid thing stands in front
 // of it laid over it by how much of each pixel it covers; and how far away that is.
@@ -43,7 +44,11 @@ fn at(px: vec2f) -> vec4f {
   let m = textureLoad(solids, vec2i(q), 0);
   let D = vec2f(textureDimensions(far));
   let d = select(textureLoad(far, vec2i(q / r.res * D), 0).r, textureLoad(near, vec2i(q), 0).r, m.a > 0.5);
-  return vec4f(textureSampleLevel(src, smp, q / r.res, 0.0).rgb * (1.0 - m.a) + m.rgb, d);
+  // the ground the field drew, in the shadow and the bounced light of what stands on it
+  let S = vec2f(textureDimensions(shade));
+  let g = textureSampleLevel(shade, smp, clamp(q / r.res, 0.5 / S, 1.0 - 0.5 / S), 0.0);
+  let lit = select(vec3f(1.0), g.rgb / g.a, g.a > 0.02);
+  return vec4f(textureSampleLevel(src, smp, q / r.res, 0.0).rgb * lit * (1.0 - m.a) + m.rgb, d);
 }
 
 // A thin lens's circle of confusion, px: zero at the focus, the full aperture at infinity.
