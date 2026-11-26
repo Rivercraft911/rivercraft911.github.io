@@ -168,7 +168,7 @@ export class Raster {
       this.views[1] = this.cells.createView()
       this.views[2] = this.dist.createView()
       // [0] the light (made below, with the solids' light), [1] the cells, [2] the text
-      this.groups = text ? [this.groups[0], group(this.cell, [[0, u], [2, v], [5, { buffer: this.glyph }]]), group(this.text, [[0, u], [1, s], [2, v], [3, this.views[1]], [4, this.atlas.createView()]])] : []
+      this.groups = text ? [this.groups[0], this.groups[1], group(this.text, [[0, u], [1, s], [2, v], [3, this.views[1]], [4, this.atlas.createView()]])] : [] // [1] the cells, made below with the solids' light
       this.mode = +text
     }
 
@@ -198,8 +198,8 @@ export class Raster {
     d.queue.writeBuffer(this.u, 0, uf)
 
     sweep(f, this.views[0], this.views[2], fw, fh, aspect)
+    this.mesh.render(enc, f.solids, w, h, this.views[2]) // read out as text, a solid thing is glyphs too
     if (!text) {
-      this.mesh.render(enc, f.solids, w, h, this.views[2])
       if (this.half?.width !== Math.max(1, w >> 1) || this.half.height !== Math.max(1, h >> 1)) {
         this.half?.destroy()
         this.half = d.createTexture({ size: [Math.max(1, w >> 1), Math.max(1, h >> 1)], format: FLOAT, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING })
@@ -221,6 +221,11 @@ export class Raster {
       if (uf[20] > 0) pass(this.half.createView(), this.halfPipe, this.halfGroup!) // the lens is open: its taps' scene
     }
     if (!text) return
+    if (this.mesh.view !== this.solidView) {
+      const sv = (this.solidView = this.mesh.view) ?? this.blank.createView()
+      const e: GPUBindGroupEntry[] = [{ binding: 0, resource: { buffer: this.u } }, { binding: 2, resource: this.views[0] }, { binding: 5, resource: { buffer: this.glyph } }, { binding: 6, resource: sv }]
+      this.groups[1] = d.createBindGroup({ layout: this.cell.getBindGroupLayout(0), entries: e })
+    }
     pass(this.views[1], this.cell, this.groups[1])
     if (f.read && !this.reading) {
       enc.copyTextureToBuffer({ texture: this.cells!, origin: [0, rows >> 1] }, { buffer: this.back, bytesPerRow: 8192 }, [Math.min(cols, 512), 1])

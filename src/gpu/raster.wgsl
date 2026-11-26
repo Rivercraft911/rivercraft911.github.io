@@ -89,6 +89,9 @@ const SHARP = 1.8;
     var s = vec4f(0.0);
     for (var j = 0; j < m * m; j++) { s += textureLoad(src, c + vec2i(i % 6, i / 6) * m + vec2i(j % m, j / m), 0); }
     s /= f32(m * m);
+    // a solid thing standing in front of the field is read out too, over the same sixtieth of the cell
+    let o = textureLoad(solids, vec2i(r.off + (floor(pos.xy) + (vec2f(f32(i % 6), f32(i / 6)) + 0.5) / vec2f(6.0, 10.0)) * r.cell), 0);
+    s = vec4f(s.rgb * (1.0 - o.a) + o.rgb, max(s.a, o.a));
     let v = (1.0 - exp(-r.lift * dot(s.rgb, Y))) * s.a; // only the text part of it asks for ink
     d[i / 4][i % 4] = v;
     hi = max(hi, v);
