@@ -59,7 +59,7 @@ export type Pose = { eye: V; at: V; up: V }
 const pose = (): Pose => ({ eye: [0, 0, 3], at: [0, 0, 0], up: [0, 1, 0] })
 const now = pose(), from = pose(), to = pose()
 let focus = -1 // the place we are at, or home
-let flight = -1, fstart = 0, flen = 1 // flying from `from` toward `focus` since fstart, for flen seconds
+let flight = -1, fstart = 0, flen = 1, farther = 0 // flying from `from` toward `focus` since fstart, for flen seconds, over an arc of `farther` rad
 export const HOME = { d: 5.2, pitch: 0.38, yaw: 0.6 } // where the reveal leaves the eye, and Escape takes it
 const rest = { ...HOME } // where the eye is about what it looks at
 const want = { ...HOME } // and where the pointer has asked it to be
@@ -116,6 +116,7 @@ export function go(k: number, t: number, quiet = false) {
   want.d = rest.d = d, want.pitch = rest.pitch = pitch, want.yaw = rest.yaw = yaw
   restAt(k, to)
   const arc = Math.acos(clamp(dot(unit([...from.eye]), unit([...to.eye])), -1, 1))
+  farther = arc
   flight = 0, fstart = t, flen = 1.4 + 1.1 * arc + 0.5 * Math.abs(Math.log(len(from.eye) / len(to.eye)))
   page(k, flen) // its page comes in as the camera arrives
   if (!quiet) route(k) // a visitor's flight is their history; the world showing itself is not
@@ -269,8 +270,8 @@ function debugPose(t: number) {
 // One frame of the planet, seen from `pose` at planet time t, with place `focus` the one looked at (its spectacle in
 // full, its equation up) and the lens open by `lens` (0 a pinhole, 1 a macro lens's). The world draws with it, and so
 // does the intro, which flies its own camera through the same places.
-const fw: V = [0, 0, 0], side = [0, 0]
-export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number, lens: number, marked = false) {
+const fw: V = [0, 0, 0], side = [0, 0], INK = [0.55, 0.85, 1]
+export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number, lens: number, marked = false, text = 0) {
   const { eye, at } = pose, up_ = pose.up
   E[0] = eye[0], E[1] = eye[1], E[2] = eye[2]
   const alt = Math.max(len(E) - 1, 1e-3), fov = clamp(0.62 - 0.04 * Math.log10(0.3 / alt), 0.5, 0.75)
@@ -285,7 +286,9 @@ export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number
   cam.set(p.subarray(0, 16))
   if (dbg.has('at')) L.splice(0, 3, ...L0)
   else clock(t, L)
-  air(p, E, L, t, EXPOSE)
+  air(p, E, L, t, EXPOSE, text)
+  F.cell = text > 0.02 ? 12 : undefined
+  F.ink = INK
 
   // the monuments, the places' own drawing, and the sun on them
   ctx.t = t, ctx.dt = dt, ctx.f = f, ctx.focus = focus
@@ -365,7 +368,9 @@ export const planet: Scene = {
 
     const c = covered(), ease = 1 - Math.exp(-4 * dt)
     side[0] += (c[0] - side[0]) * ease, side[1] += (c[1] - side[1]) * ease
-    paint(f, now, t, dt, focus, DEBUG ? +(dbg.get('ap') ?? 0) : focus >= 0 && flight < 0 ? 1 : 0, true)
+    // a long flight goes through the glyphs the film came down through: the world read out as text, most at mid-arc
+    const glyphs = flight >= 0 ? clamp((farther - 0.5) / 0.7) * Math.sin(Math.PI * flight) ** 2 * 0.85 : 0
+    paint(f, now, t, dt, focus, DEBUG ? +(dbg.get('ap') ?? 0) : focus >= 0 && flight < 0 ? 1 : 0, true, glyphs)
     return sound()
   },
 }
