@@ -108,7 +108,7 @@ function fly(a: Pose, b: Pose, s: number, o: Pose) {
   unit(o.up)
 }
 
-export function go(k: number, t: number) {
+export function go(k: number, t: number, quiet = false) {
   if (k === focus && flight < 0) return
   for (const key of ['eye', 'at', 'up'] as const) for (let i = 0; i < 3; i++) from[key][i] = now[key][i]
   focus = k
@@ -118,8 +118,17 @@ export function go(k: number, t: number) {
   const arc = Math.acos(clamp(dot(unit([...from.eye]), unit([...to.eye])), -1, 1))
   flight = 0, fstart = t, flen = 1.4 + 1.1 * arc + 0.5 * Math.abs(Math.log(len(from.eye) / len(to.eye)))
   page(k, flen) // its page comes in as the camera arrives
-  route(k)
+  if (!quiet) route(k) // a visitor's flight is their history; the world showing itself is not
 }
+
+// Left alone, the world shows itself: half a minute untouched at home and it starts touring River's places, a dozen
+// seconds at each, its pages opening as it arrives. Any sign of someone there (a pointer, a wheel, a key) and it
+// stands down where it is, and they carry on from there.
+const ATTRACT = ['valley', 'launch', 'lighthouse', 'bench', 'hearts', 'receiver', 'station', 'core'].map((id) => PLACES.findIndex((P) => P.id === id))
+const AFTER = 25, DWELL = 12
+let touring = false, showing = -1
+for (const ev of ['pointermove', 'pointerdown', 'wheel', 'keydown'])
+  addEventListener(ev, () => ((idle = 0), (touring = false)), { capture: true, passive: true })
 
 // ---- the pointer ---------------------------------------------------------------------------------------------
 let active = false, lastSeen = 0, lastBuild = 0, dragging = false, moved = 0, px = 0, py = 0, idle = 0, hover = -1
@@ -341,7 +350,12 @@ export const planet: Scene = {
     }
     // the pointer's asks, followed the way an operator follows: quickly, never at once
     const fol = 1 - Math.exp(-dt * 6)
-    if (focus < 0 && idle > 4) want.yaw += dt * 0.04
+    if (idle > 4) want.yaw += dt * (focus < 0 ? 0.04 : 0.03) // drifting round whatever is looked at
+    if (!DEBUG && !touring && focus < 0 && flight < 0 && idle > AFTER) (touring = true), (showing = -1)
+    if (touring) {
+      const n = Math.floor((idle - AFTER) / DWELL)
+      if (n !== showing) (showing = n), go(ATTRACT[n % ATTRACT.length], t, true)
+    }
     rest.d += (want.d - rest.d) * fol, rest.pitch += (want.pitch - rest.pitch) * fol, rest.yaw += (want.yaw - rest.yaw) * fol
     restAt(focus, to)
     if (flight >= 0 && (flight = (t - fstart) / flen) >= 1) flight = -1
