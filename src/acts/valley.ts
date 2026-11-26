@@ -260,18 +260,30 @@ function crane(t: number) {
   occlude = smooth(0.4, 0.75, fwd.x) * smooth(-0.9, -0.7, fwd.y)
 }
 
-// The river on the map, as the meander must leave it: the same stretch through the same lens.
-export const MEANDER = 1.95 // how long the meander runs before us: its current's phase carries on from there
+// The river on the map, as the meander must leave it: the same stretch through the same lens. map() aims
+// the camera there, and SPRING is where the river begins.
+export const MEANDER = 4.2 // how long the meander runs before us: its current's phase carries on from there
 export const glow = (u: number, t: number) => 0.65 + 0.35 * Math.cos(TAU * (6 * u - 2.5 * t))
-export function mapped(p: Path, t: number) {
-  crane(0)
-  p.clear()
-  for (let x = X0; x <= XM; x += 0.1) {
-    cam.project(x, riverY(x), riverZ(x), p3)
-    p.color(WATER[0], WATER[1], WATER[2], glow((x - X0) / (XM - X0), t))
-    x > X0 ? p.lineTo(p3.x, p3.y) : p.moveTo(p3.x, p3.y)
+export const SPRING = X0, map = () => crane(0)
+export const reach = (x: number) => (x - X0) / (XM - X0) // 0 at the spring, 1 where the meander's three bends end
+
+// The land on the map: contour lines every CI metres above the water, LEVELS to a bank. Each is where a
+// walk straight out from the river first stands that high, so they nest and never cross; the lowest is
+// the bank itself. contour() is the z of level l on a side (±1) at x, NaN where the land never gets there.
+export const LEVELS = 14
+const CI = 0.35, CDX = 0.2, CN = Math.ceil((XM + 8 - X0) / CDX) + 1, CZ = new Float32Array(2 * LEVELS * CN).fill(NaN)
+for (let i = 0; i < CN; i++)
+  for (const side of [-1, 1]) {
+    const x = X0 + i * CDX, o = ((side + 1) / 2) * LEVELS * CN + i
+    for (let d = 0.1, l = 0, was = 0; d < 32 && l < LEVELS; d += 0.1) {
+      const h = height(x, riverZ(x) + side * d) - riverY(x)
+      for (; l < LEVELS && h >= (l + 0.5) * CI; l++) CZ[o + l * CN] = riverZ(x) + side * (d - (0.1 * (h - (l + 0.5) * CI)) / (h - was))
+      was = Math.max(was, h)
+    }
   }
-  return p
+export function contour(side: number, l: number, x: number) {
+  const f = clamp((x - X0) / CDX, 0, CN - 1.001), i = Math.floor(f), o = ((side + 1) / 2) * LEVELS * CN + l * CN + i
+  return CZ[o] + (CZ[o + 1] - CZ[o]) * (f - i)
 }
 
 const col = (x: number) => Math.max(0, Math.min(HB - 1, Math.round(((x / view.a) * 0.45 + 0.5) * (HB - 1))))
