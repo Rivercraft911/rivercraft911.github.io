@@ -202,7 +202,7 @@ function drawOrbits(t: number) {
   }
   for (let pl = 0; pl < 6; pl++) {
     const raan = (pl * TAU) / 6, inc = (55 * Math.PI) / 180
-    shell(4.17, raan, inc, [0.35, 0.55, 1, 0.3])
+    shell(4.17, raan, inc, [0.35, 0.55, 1, 0.16])
     for (let sv = 0; sv < 4; sv++) if (look(ring(4.17, raan, inc, (sv * TAU) / 4 + (pl * TAU) / 24 + 0.05 * t, q3))) orbits.color(0.75, 0.9, 1, 1).dot(seen.x, seen.y, 0.01)
   }
   shell(1.086, 0.4, (97.6 * Math.PI) / 180, [0.75, 0.6, 1, 0.45])
@@ -284,7 +284,14 @@ export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number
   f.rate = 2.4e6, f.field = F, f.look = { tau: 0.025 } // a place may take the field over (the core, from inside)
   PLACES.forEach((P, k) => {
     for (const m of P.monuments) stand(m.id, sites[k], m.size, m.at, m.turn, m.lift, m.flip)
+    const from = f.ch.length
     P.draw?.(k)
+    // every place keeps running, but only the one looked at is drawn at full strength: the rest recede
+    const dim = k === focus ? 1 : focus < 0 ? 0.5 : 0.3
+    for (let i = from; i < f.ch.length && dim < 1; i++) {
+      const v = (f.ch[i] as { path?: Path }).path?.v
+      if (v) for (let j = 2; j < v.length; j += 8) v[j] *= dim
+    }
   })
   if (DEBUG) stand('peep', PEEP, 0.08, undefined, 0.4, 0.002)
   const near = focus >= 0 ? sites[focus] : DEBUG ? PEEP : sites[0]
