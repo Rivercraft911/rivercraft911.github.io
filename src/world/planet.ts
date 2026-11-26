@@ -13,7 +13,7 @@ import { Path } from '../beam/path'
 import { PLACES, RIVER } from './places'
 import { ctx, dot, frame, len, look, seen, site, stand, trace, turn, unit, type V } from './ctx'
 import { covered, mount, page, route, within } from './pages'
-import { sound } from './sound'
+import { GAP, sound, stroke } from './sound'
 
 const p = ctx.p
 const cam = new Float32Array(16)
@@ -172,7 +172,7 @@ requestAnimationFrame(watch)
 const sites = PLACES.map((P) => site(P.lat, P.lon))
 
 // ---- the beam's share: the river, the orbits, the places --------------------------------------------------------
-const river = new Path(), orbits = new Path(), marks = new Path()
+const river = new Path(), orbits = new Path(), marks = new Path(), bolts = new Path()
 const E = ctx.E, q3: V = [0, 0, 0]
 // The river, where the valley is: the intro's own meander, laid on the ground.
 const RW = (() => {
@@ -314,7 +314,16 @@ export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number
   drawOrbits(t)
   if (marked) drawMarks()
   else marks.clear()
-  if (f.field === F) f.ch.push({ w: 0.2, path: river }, { w: 0.5, path: orbits }, { w: 0.1, path: marks })
+  // lightning in the storm's arms: the strokes the speakers hear as sferics (sound.ts), seen as the cloud lit from
+  // inside by a return stroke and its restrikes, ~45 ms apart, fading in a third of a second
+  bolts.clear()
+  for (let j = Math.floor(t / GAP) + 1, n = 0; n < 3; n++, j--) {
+    const S = stroke(j), age = t - S.t, k = age < 0 ? 0 : Math.max(0, Math.cos((age * TAU) / 0.045)) ** 3 * Math.exp(-age / 0.1)
+    if (k < 0.04) continue
+    q3[0] = S.s[0] * 1.006, q3[1] = S.s[1] * 1.006, q3[2] = S.s[2] * 1.006
+    if (look(q3)) bolts.color(0.8, 0.88, 1, 2.4 * k).dot(seen.x, seen.y, 0.003 + 0.012 * k)
+  }
+  if (f.field === F) f.ch.push({ w: 0.2, path: river }, { w: 0.5, path: orbits }, { w: 0.1, path: marks }, { w: 0.04, path: bolts })
 }
 
 export const planet: Scene = {
