@@ -69,23 +69,6 @@ fn coc(d: f32) -> f32 { return min(r.aper * abs(1.0 - r.focus / max(d, 1e-6)), 4
   return vec4f(acc.rgb / acc.a * r.gain, 0.0);
 }
 
-// A world's shot (raster.ts SHOT): the field's frame shrunk to 512 × 320, four taps a pixel so its detail
-// averages instead of aliasing.
-@fragment fn shotFS(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-  let uv = pos.xy / vec2f(512.0, 320.0);
-  let d = 0.25 / vec2f(512.0, 320.0);
-  var c = vec3f(0.0);
-  for (var i = 0; i < 4; i++) {
-    c += textureSampleLevel(src, smp, uv + d * (vec2f(f32(i & 1), f32(i >> 1)) * 2.0 - 1.0), 0.0).rgb;
-  }
-  return vec4f(0.25 * c, 1.0);
-}
-
-// A shot's next mip: each texel the mean of the four under it, one bilinear tap at their shared corner.
-@fragment fn mipFS(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-  return vec4f(textureSampleLevel(src, smp, 2.0 * pos.xy / vec2f(textureDimensions(src)), 0.0).rgb, 1.0);
-}
-
 // One fragment per cell. The field was rendered at 6 × 10 pixels a cell (each fine × fine): the cell's shape, as the ink it
 // asks for (light saturates into coverage), each sample raised to a power over the cell's darkest-to-
 // brightest so an edge reads as an edge. The glyph whose ink over the same grid is nearest wins, so dim

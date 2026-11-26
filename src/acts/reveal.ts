@@ -8,11 +8,12 @@ import type { Field } from '../gpu/raster'
 import { Path } from '../beam/path'
 import { aim } from './reality'
 import { ident } from './ident'
+import { place, sing } from './choir'
+import { REVEAL, RV } from './clock'
 import { TAU, clamp, smooth, type Scene } from './scene'
 import { ctx, look, seen, trace, unit, type V } from '../world/ctx'
 import { HOME, EXPOSE, clock } from '../world/planet'
 
-export const REVEAL = 7
 const H0 = 0.02 // altitude at the start, radii: down in the eye, its dark water filling the frame
 const W0 = 1.1 // the turning we arrive with, rad/s, as the whirlpool's camera had it
 const p = ctx.p
@@ -85,6 +86,8 @@ export const reveal: Scene = {
   dur: REVEAL,
   build(t, f) {
     planet(t, T0 + t, f)
+    place(RV + t)
+    return (tt, o) => sing(RV + tt, o) // the choir swells all the way out, and is cut as the planet comes whole
   },
 }
 // The name, written over the planet as it hangs where the world will pick it up.

@@ -12,6 +12,7 @@ import { clamp, view, TAU, type Scene, type Frame } from '../acts/scene'
 import { Path } from '../beam/path'
 import { PLACES, RIVER } from './places'
 import { ctx, dot, frame, len, look, seen, site, stand, trace, turn, unit, type V } from './ctx'
+import { covered, mount, page, route, within } from './pages'
 
 const p = ctx.p
 const cam = new Float32Array(16)
@@ -34,6 +35,7 @@ const DEBUG = ['d', 'pitch', 'yaw', 'at'].some((k) => dbg.has(k))
 // ---- models: River's hardware, as baked (scripts/bake-models.mjs) --------------------------------------------
 const models = ctx.models
 export function attach(d: GPUDevice) {
+  mount((k) => go(k, lastBuild), () => active) // the words: the index, a deep link's place, the history
   const base = `${import.meta.env.BASE_URL}media/models/`
   fetch(`${base}list.json`)
     .then((r) => (r.ok ? r.json() : []))
@@ -72,9 +74,11 @@ function restAt(k: number, o: Pose) {
     return o
   }
   const P = PLACES[k]
-  site(P.lat, P.lon, n0), frame(n0, e0, N0)
+  // a place that moves (a satellite, a rocket) is looked at where it is now
+  const r = P.where ? len(P.where(n0, lastBuild)) : (site(P.lat, P.lon, n0), 1.01)
+  unit(n0), frame(n0, e0, N0)
   for (let i = 0; i < 3; i++) {
-    o.at[i] = n0[i] * 1.01
+    o.at[i] = n0[i] * r
     o.up[i] = n0[i]
     o.eye[i] = o.at[i] + d * (c * (Math.sin(yaw) * e0[i] + Math.cos(yaw) * N0[i]) + s * n0[i])
   }
@@ -112,6 +116,8 @@ export function go(k: number, t: number) {
   restAt(k, to)
   const arc = Math.acos(clamp(dot(unit([...from.eye]), unit([...to.eye])), -1, 1))
   flight = 0, fstart = t, flen = 1.4 + 1.1 * arc + 0.5 * Math.abs(Math.log(len(from.eye) / len(to.eye)))
+  page(k, flen) // its page comes in as the camera arrives
+  route(k)
 }
 
 // ---- the pointer ---------------------------------------------------------------------------------------------
@@ -146,9 +152,11 @@ addEventListener('wheel', (e) => {
 addEventListener('keydown', (e) => {
   if (!active) return
   const n = PLACES.length + 1
+  if (e.key === ' ' && within(e.target)) return void e.stopImmediatePropagation() // space scrolls the page, not pause
   if (e.key === 'Escape' && focus >= 0) go(-1, lastBuild)
   else if (e.key === 'ArrowRight') go(((focus + 2) % n) - 1, lastBuild)
   else if (e.key === 'ArrowLeft') go(((focus + n) % n) - 1, lastBuild)
+  else if (/^[1-9]$/.test(e.key) && +e.key <= PLACES.length) go(+e.key - 1, lastBuild) // the index's numbers
   else return
   e.stopImmediatePropagation()
 }, true)
@@ -243,11 +251,19 @@ function debugPose(t: number) {
 // One frame of the planet, seen from `pose` at planet time t, with place `focus` the one looked at (its spectacle in
 // full, its equation up) and the lens open by `lens` (0 a pinhole, 1 a macro lens's). The world draws with it, and so
 // does the intro, which flies its own camera through the same places.
+const fw: V = [0, 0, 0], side = [0, 0]
 export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number, lens: number, marked = false) {
   const { eye, at } = pose, up_ = pose.up
   E[0] = eye[0], E[1] = eye[1], E[2] = eye[2]
-  const alt = Math.max(len(E) - 1, 1e-3)
-  aim(p, [0, 0, 0], [at[0] - E[0], at[1] - E[1], at[2] - E[2]], up_, clamp(0.62 - 0.04 * Math.log10(0.3 / alt), 0.5, 0.75))
+  const alt = Math.max(len(E) - 1, 1e-3), fov = clamp(0.62 - 0.04 * Math.log10(0.3 / alt), 0.5, 0.75)
+  fw[0] = at[0] - E[0], fw[1] = at[1] - E[1], fw[2] = at[2] - E[2]
+  aim(p, [0, 0, 0], fw, up_, fov)
+  if (marked && (side[0] || side[1])) {
+    // a page covers part of the screen: look past the subject, so it stands in the open part
+    const h = len(fw) * Math.tan(fov / 2), dx = h * side[0] * view.a, dy = -h * side[1]
+    for (let i = 0; i < 3; i++) fw[i] += dx * p[4 + i] + dy * p[8 + i]
+    aim(p, [0, 0, 0], fw, up_, fov)
+  }
   cam.set(p.subarray(0, 16))
   if (dbg.has('at')) L.splice(0, 3, ...L0)
   else clock(t, L)
@@ -257,6 +273,7 @@ export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number
   ctx.t = t, ctx.dt = dt, ctx.f = f, ctx.focus = focus
   ctx.L[0] = L[0], ctx.L[1] = L[1], ctx.L[2] = L[2]
   ctx.items.length = 0
+  f.rate = 2.4e6, f.field = F, f.look = { tau: 0.025 } // a place may take the field over (the core, from inside)
   PLACES.forEach((P, k) => {
     for (const m of P.monuments) stand(m.id, sites[k], m.size, m.at, m.turn, m.lift, m.flip)
     P.draw?.(k)
@@ -264,9 +281,12 @@ export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number
   if (DEBUG) stand('peep', PEEP, 0.08, undefined, 0.4, 0.002)
   const near = focus >= 0 ? sites[focus] : DEBUG ? PEEP : sites[0]
   const sh = solids.shadow as number[], up = solids.up as number[], sun = solids.sun as number[]
-  sh[0] = near[0] * 1.01 - E[0], sh[1] = near[1] * 1.01 - E[1], sh[2] = near[2] * 1.01 - E[2], sh[3] = 0.12
-  up[0] = near[0], up[1] = near[1], up[2] = near[2]
-  sun[0] = L[0], sun[1] = L[1], sun[2] = L[2], sun[3] = 22 * clamp(dot(near, L) * 4 + 0.6, 0, 1)
+  const mv = focus >= 0 ? PLACES[focus].where?.(q3, t) : undefined, hr = mv ? len(mv) / 1.01 : 1 // shadows follow a place that moves
+  if (mv) unit(mv)
+  const near_ = mv ?? near
+  sh[0] = near_[0] * 1.01 * hr - E[0], sh[1] = near_[1] * 1.01 * hr - E[1], sh[2] = near_[2] * 1.01 * hr - E[2], sh[3] = 0.12
+  up[0] = near_[0], up[1] = near_[1], up[2] = near_[2]
+  sun[0] = L[0], sun[1] = L[1], sun[2] = L[2], sun[3] = 22 * clamp(dot(near_, L) * 4 + 0.6, 0, 1)
   // the lens: on the place, at the camera's distance, opening like a macro lens's as the camera comes close
   const fd = Math.hypot(at[0] - E[0], at[1] - E[1], at[2] - E[2])
   solids.focus = fd
@@ -277,10 +297,7 @@ export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number
   drawOrbits(t)
   if (marked) drawMarks()
   else marks.clear()
-  f.ch.push({ w: 0.2, path: river }, { w: 0.5, path: orbits }, { w: 0.1, path: marks })
-  f.rate = 2.4e6
-  f.field = F
-  f.look = { tau: 0.025 }
+  if (f.field === F) f.ch.push({ w: 0.2, path: river }, { w: 0.5, path: orbits }, { w: 0.1, path: marks })
 }
 
 export const planet: Scene = {
@@ -290,6 +307,7 @@ export const planet: Scene = {
     const dt = clamp(t - last, 0, 0.1)
     last = t
     idle += dt
+    if (dbg.has('go') && !(globalThis as { went?: boolean }).went && ((globalThis as { went?: boolean }).went = true)) go(PLACES.findIndex((P) => P.id === dbg.get('go')), t) // ?go=<id>: straight to a place
     if (clickAt) {
       const k = pick(clickAt[0], clickAt[1])
       clickAt = null
@@ -305,6 +323,8 @@ export const planet: Scene = {
     else if (flight >= 0) fly(from, to, flight, now)
     else for (const key of ['eye', 'at', 'up'] as const) for (let i = 0; i < 3; i++) now[key][i] = to[key][i]
 
+    const c = covered(), ease = 1 - Math.exp(-4 * dt)
+    side[0] += (c[0] - side[0]) * ease, side[1] += (c[1] - side[1]) * ease
     paint(f, now, t, dt, focus, DEBUG ? +(dbg.get('ap') ?? 0) : focus >= 0 && flight < 0 ? 1 : 0, true)
   },
 }

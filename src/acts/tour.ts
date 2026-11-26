@@ -6,16 +6,18 @@
 // closer than 0.6 s. Every cut lands on the splice's beat, and each place bends the choir its own way.
 // ?w=<n> pins cut n, for review.
 import { place, sing, type Mood } from './choir'
-import { R3 as AT } from './clock'
+import { CUTS, R3 as AT, TOUR } from './clock'
 import { jump, splice } from './reality'
 import { smooth, type Scene } from './scene'
 import { PLACES } from '../world/places'
 import { frame, site, type V } from '../world/ctx'
 import { clock, paint, type Pose } from '../world/planet'
+import { shot as s1 } from '../world/sites/station'
+import { shot as s2 } from '../world/sites/receiver'
+import { shot as s3 } from '../world/sites/launch'
+const SHOTS: Record<string, (k: number, tc: number, pose: Pose, t: number) => void> = { station: s1, receiver: s2, launch: s3 }
 
 const ORDER = ['launch', 'lighthouse', 'bench', 'hearts', 'receiver', 'station', 'valley'].map((id) => PLACES.findIndex((P) => P.id === id))
-export const CUTS = [1.0, 0.9, 0.8, 0.75, 0.7, 0.65, 0.6, 0.45, 0.4, 0.36, 0.34, 0.3, 0.3, 0.3]
-export const TOUR = CUTS.reduce((a, b) => a + b, 0)
 const STARTS = CUTS.map((_, i) => CUTS.slice(0, i).reduce((a, b) => a + b, 0))
 const PIN = Number(new URLSearchParams(location.search).get('w') ?? -1)
 const cut = (t: number) => {
@@ -61,6 +63,7 @@ export const tour: Scene = {
   build(t, f) {
     const i = cut(t), tc = t - STARTS[i], k = ORDER[i % ORDER.length]
     close(k, i, tc)
+    SHOTS[PLACES[k].id]?.(k, tc, pose, GOLD[i % ORDER.length] + t)
     paint(f, pose, GOLD[i % ORDER.length] + t, 1 / 60, k, 1)
     jump(tc, f, CUTS[i] >= 0.6, 0)
     place(t + AT)

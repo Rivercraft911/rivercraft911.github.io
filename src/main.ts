@@ -9,67 +9,57 @@ import { hook } from './acts/hook'
 import { meander } from './acts/meander'
 import { valley } from './acts/valley'
 import { ident } from './acts/ident'
-import { finaleA } from './acts/finaleA'
 import { wrap } from './acts/wrap'
-import { indra } from './acts/indra'
-import { stutter } from './acts/stutter'
-import { preload, zoom } from './acts/zoom'
-import { ophanim } from './acts/ophanim'
 import { ascii, CHARS } from './acts/ascii'
+import { tour } from './acts/tour'
+import { reveal, named } from './acts/reveal'
 import { load } from './beam/font'
-import { band, direct } from './band/band'
 import { edit } from './acts/edit'
-import { STUTTER, VALLEY } from './acts/clock'
+import { ASCII, REVEAL, TOUR, VALLEY, WRAP } from './acts/clock'
 import { r01 } from './world/r01'
 import { attach, planet } from './world/planet'
-import { reveal, named } from './acts/reveal'
-import { tour } from './acts/tour'
+import { deep } from './world/pages'
 
 const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
 const beam = new Beam()
 const audio = new Audio()
-// ?fall plays only the fall, from the lip of the falls on (the pool needs their history); ?zoom the long zoom, from the
-// stutter's last cuts to the Julia set; ?ident and ?end the last stretch. ?band and deep links (/<project>, /qsl) skip
-// the intro and land in the band.
-const hole = finaleA // the finale: the cathedral falls in
-// ?short: the transmission in about 25 s, each scene cut to its best stretch and played a little faster
+// The transmission: the scope's opening, the valley and its falls, the whirlpool and its text, the tour through River's
+// places, the climb out of the storm, the name, and the planet, which is the portfolio. ?fall plays it from the lip of
+// the falls on (the pool needs their history); ?tour from the tour; ?reveal from the climb; ?ident the name. A deep
+// link to a place (/<project>) skips it all and lands there.
+const FILM = [hook, meander, valley, wrap, ascii, tour, reveal, named, planet]
+// ?short: the transmission in about half the time, each scene cut to its best stretch and played a little faster
 const SHORT = [
-  edit(hook, [[0.45, 2, 1]]), // the opening is already short
-  edit(meander, [[0, 1.95, 1]]),
-  edit(valley, [[0, 10.2, 3.2], [14.3, VALLEY, 2]]), // the opening and the flight, then straight to the falls landing
-  edit(wrap, [[0, 2.5, 1.6]]),
-  edit(ascii, [[0, 3.5, 2]]),
-  edit(stutter, [[2, 6, 1]]), // the cuts as they are: they land on beats
-  edit(hole, [[1.6, 8.2, 1.8]]),
-  edit(ident, [[0, 7.2, 2]]),
-  band,
+  edit(hook, [[0.45, 3.7, 1.6]]),
+  edit(meander, [[0, 4.2, 2]]),
+  edit(valley, [[0, 8.5, 2.6], [8.5, VALLEY, 1.4]]), // the valley and its storm quickly, the falls nearly as they are
+  edit(wrap, [[0, WRAP, 1.3]]),
+  edit(ascii, [[0, ASCII, 1.6]]),
+  edit(tour, [[0, TOUR, 1.2]]),
+  edit(reveal, [[0, REVEAL, 1.3]]),
+  edit(named, [[0, ident.dur, 1.6]]),
+  planet,
 ]
+const from = (s: typeof hook) => FILM.slice(FILM.indexOf(s))
 const scenes = q.has('specimen')
   ? [specimen]
   : q.get('world') === 'r01'
     ? [r01]
-    : q.get('world') === 'planet'
-    ? [planet]
-    : q.has('reveal')
-    ? [reveal, named, planet]
-    : q.has('tour')
-    ? [tour, reveal, named, planet]
-    : direct()
-      ? [band]
+    : q.get('world') === 'planet' || deep() >= 0 // a deep link to a place: the world, there
+      ? [planet]
       : q.has('fall')
-        ? [valley, wrap, ascii, indra, stutter, zoom, ophanim, hole]
-        : q.has('zoom')
-          ? [stutter, zoom, ophanim]
-          : q.has('ident')
-            ? [ident]
-            : q.has('end')
-              ? [hole, ident, band]
+        ? from(valley)
+        : q.has('tour')
+          ? from(tour)
+          : q.has('reveal')
+            ? from(reveal)
+            : q.has('ident')
+              ? from(named)
               : q.has('short')
                 ? SHORT
-                : [hook, meander, valley, wrap, ascii, indra, stutter, zoom, ophanim, hole, ident, band]
+                : FILM
 const timeline = new Timeline(scenes)
-if (scenes.includes(zoom)) preload() // its pictures, long before it plays
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }
 
@@ -81,11 +71,11 @@ const gpu = await Phosphor.create(canvas, beam.max).catch(() => {
 load('tech').then((face) => gpu.glyphs(face, CHARS)) // the raster's character generator
 attach(gpu.device) // the planet's models start loading now, long before it is reached
 
-let on = q.has('auto') || q.has('world') || direct()
-let t = Number(q.get('t') ?? (q.has('fall') ? 11 : q.has('zoom') ? STUTTER - 4 : 0))
+let on = q.has('auto') || q.has('world') || deep() >= 0
+let t = Number(q.get('t') ?? (q.has('fall') ? 11 : 0))
 let speed = q.has('pause') ? 0 : 1
 let last = performance.now()
-let heard = q.has('auto') || q.has('rec') //the speakers wait for a gesture; the band starts without one
+let heard = q.has('auto') || q.has('rec') // the speakers wait for a gesture
 
 function power() {
   if (heard) return
@@ -95,8 +85,8 @@ function power() {
 
 addEventListener('pointerdown', power)
 
-// The way out, for whoever has somewhere to be: straight to the band, past everything before it.
-const out = scenes.length > 1 && scenes.at(-1) === band ? timeline.starts[scenes.length - 1] : 0
+// The way out, for whoever has somewhere to be: straight to the planet, past everything before it.
+const out = scenes.length > 1 && scenes.at(-1) === planet ? timeline.starts[scenes.length - 1] : 0
 const skip = document.querySelector<HTMLElement>('#skip')!, leave = skip.querySelector('button')!
 leave.textContent = Math.random() < 0.5 ? 'I hate fun (skip)' : 'I have important things to do (skip)'
 leave.onclick = () => (t = Math.max(t, out))
@@ -180,7 +170,7 @@ function tick(now: number) {
   beam.rate = Math.min(Q.rate, frame.rate ?? 1.2e6)
   Object.assign(look, LOOK, frame.look)
   beam.frame(frame.ch, t - dt, dt)
-  gpu.draw(beam, view.a, dt, look, frame.field, dpr)
+  gpu.draw(beam, view.a, dt, look, frame.field, dpr, frame.drops, tier)
 
   if (on) for (let i = 0; i < space.length; i += 3) audio.place(i / 3, space[i], space[i + 1], space[i + 2])
   if (on) audio.feed(t, voice) // the voice is a function of time: it plays this frame's scene ahead
