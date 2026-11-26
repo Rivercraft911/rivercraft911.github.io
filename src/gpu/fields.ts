@@ -69,3 +69,6 @@ const table = BOARD.flatMap((b, i) => {
   return out
 })
 export const BOARDS = FIELDS.push({ code: `const BOARD = array<vec4f, ${table.length}>(${table.join(',\n')});\n` + camera + boards, data: [ATLAS[0], ATLAS[1], 4, 10] }) - 1
+// The world after the ident: River's planet, its air, its storm and its aurora.
+import planet from './fields/planet.wgsl?raw'
+export const PLANET = FIELDS.push({ code: camera + planet }) - 1

@@ -21,6 +21,7 @@ import { band, direct } from './band/band'
 import { edit } from './acts/edit'
 import { STUTTER, VALLEY } from './acts/clock'
 import { r01 } from './world/r01'
+import { attach, planet } from './world/planet'
 
 const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
@@ -46,6 +47,8 @@ const scenes = q.has('specimen')
   ? [specimen]
   : q.get('world') === 'r01'
     ? [r01]
+    : q.get('world') === 'planet'
+    ? [planet]
     : direct()
       ? [band]
       : q.has('fall')
@@ -70,6 +73,7 @@ const gpu = await Phosphor.create(canvas, beam.max).catch(() => {
 })
 
 load('tech').then((face) => gpu.glyphs(face, CHARS)) // the raster's character generator
+attach(gpu.device) // the planet's models start loading now, long before it is reached
 
 let on = q.has('auto') || q.has('world') || direct()
 let t = Number(q.get('t') ?? (q.has('fall') ? 11 : q.has('zoom') ? STUTTER - 4 : 0))
