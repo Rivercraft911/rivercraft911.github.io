@@ -22,6 +22,7 @@ import { edit } from './acts/edit'
 import { STUTTER, VALLEY } from './acts/clock'
 import { r01 } from './world/r01'
 import { attach, planet } from './world/planet'
+import { reveal, named } from './acts/reveal'
 
 const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
@@ -49,6 +50,8 @@ const scenes = q.has('specimen')
     ? [r01]
     : q.get('world') === 'planet'
     ? [planet]
+    : q.has('reveal')
+    ? [reveal, named, planet]
     : direct()
       ? [band]
       : q.has('fall')

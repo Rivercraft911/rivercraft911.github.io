@@ -26,7 +26,7 @@ const solids: Solids = {
   shadow: [0, 0, 0, 0.1],
 }
 const F: Field = { shader: PLANET, k: 1, p, solids, res: 2 }
-const EXPOSE = 0.11
+export const EXPOSE = 0.11
 // ?d=&pitch=&yaw=&at=x,y,z|peep: a fixed camera, for looking hard at the planet (`at` also stops the sun)
 const dbg = new URLSearchParams(location.search)
 const DEBUG = ['d', 'pitch', 'yaw', 'at'].some((k) => dbg.has(k))
@@ -58,7 +58,7 @@ const pose = (): Pose => ({ eye: [0, 0, 3], at: [0, 0, 0], up: [0, 1, 0] })
 const now = pose(), from = pose(), to = pose()
 let focus = -1 // the place we are at, or home
 let flight = -1, fstart = 0, flen = 1 // flying from `from` toward `focus` since fstart, for flen seconds
-const HOME = { d: 3.1, pitch: 0.38, yaw: 0.6 }
+export const HOME = { d: 5.2, pitch: 0.38, yaw: 0.6 } // where the reveal leaves the eye, and Escape takes it
 const rest = { ...HOME } // where the eye is about what it looks at
 const want = { ...HOME } // and where the pointer has asked it to be
 const n0: V = [0, 0, 0], e0: V = [0, 0, 0], N0: V = [0, 0, 0]
@@ -225,7 +225,11 @@ function pick(cx: number, cy: number) {
 }
 
 // ---- the frame -------------------------------------------------------------------------------------------------
-const L0 = unit([1, 0.3, 0.45]), L: V = [0, 0, 0], Y = [0, 1, 0]
+export const L0 = unit([1, 0.3, 0.45])
+const L: V = [0, 0, 0], Y = [0, 1, 0]
+// The sun at planet time pt: it goes round once in five minutes. The reveal and the ident run on the same clock,
+// ending at 0 where the world's begins, so nothing in the sky jumps when the world takes over.
+export const clock = (pt: number, o: V) => turn(L0, Y, -0.02 * pt, o)
 const PEEP = unit([0.5, 0.55, 0.65])
 let last = 0
 
@@ -264,7 +268,7 @@ export const planet: Scene = {
     aim(p, [0, 0, 0], [now.at[0] - E[0], now.at[1] - E[1], now.at[2] - E[2]], now.up, clamp(0.62 - 0.04 * Math.log10(0.3 / alt), 0.5, 0.75))
     cam.set(p.subarray(0, 16))
     if (dbg.has('at')) L.splice(0, 3, ...L0)
-    else turn(L0, Y, -0.02 * t, L)
+    else clock(t, L)
     p.set([-E[0], -E[1], -E[2], 1, L[0], L[1], L[2], t, 0, 1, 0, 0, 1, 0.07, 1, 1, EXPOSE, 1, 0, 0], 16)
 
     // the monuments, the places' own drawing, and the sun on them
