@@ -17,6 +17,7 @@ import { jump, splice } from './reality'
 import { clamp, smooth, type Frame, type Scene } from './scene'
 import { FISH, beat, despread, fishBeam, fisheye, hodo, iq, tube } from './seeing'
 import { PLACES } from '../world/places'
+import { sound } from '../world/sound'
 import { ctx, frame, site, type V } from '../world/ctx'
 import { clock, paint, type Pose } from '../world/planet'
 import { shot as s1 } from '../world/sites/station'
@@ -129,11 +130,13 @@ export const tour: Scene = {
       else beat(f, pt, ink)
     }
     jump(tc, f, CUTS[i] >= 0.6, 0)
+    const world = sound(0.4) // the place's own signal (world/sound.ts), quietly under the choir, at its own planet time
     place(t + AT)
     return (tt, o) => {
       const j = cut(tt), from = PIN >= 0 ? tt - (tt % CUTS[j]) : STARTS[j]
       if (splice(tt - from, o)) return
       sing(tt + AT, o, smooth(0, 0.03, tt - from), MOODS[j % MOODS.length])
+      world(GOLD[j % ORDER.length] + tt, o)
     }
   },
 }
