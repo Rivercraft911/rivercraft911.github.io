@@ -29,9 +29,13 @@ const Y = vec3f(0.2290, 0.6917, 0.0793);
   return vec4f(f32((i << 1u) & 2u) * 2.0 - 1.0, f32(i & 2u) * 2.0 - 1.0, 0.0, 1.0);
 }
 
-// The field as light: the raster's frame, linearly reconstructed at the phosphor's resolution.
+@group(0) @binding(6) var solids: texture_2d<f32>; // the mesh pass's light (mesh.ts), premultiplied, at the phosphor's size
+
+// The field as light: the raster's frame, linearly reconstructed at the phosphor's resolution, and whatever solid
+// thing stands in front of it laid over it by how much of each pixel it covers.
 @fragment fn lightFS(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-  return vec4f(textureSampleLevel(src, smp, pos.xy / r.res, 0.0).rgb * r.gain, 0.0);
+  let m = textureLoad(solids, vec2i(pos.xy), 0);
+  return vec4f((textureSampleLevel(src, smp, pos.xy / r.res, 0.0).rgb * (1.0 - m.a) + m.rgb) * r.gain, 0.0);
 }
 
 // A world's shot (raster.ts SHOT): the field's frame shrunk to 512 × 320, four taps a pixel so its detail

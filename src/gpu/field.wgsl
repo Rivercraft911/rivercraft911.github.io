@@ -26,8 +26,13 @@ fn finite(c: vec3f) -> vec3f {
 
 // Read out as text, how much of this pixel is text and how much light (raster.wgsl): a field may say.
 var<private> text = 1.0;
+// How far along the pixel's ray (camera.wgsl's, unit length) the field's light comes from, so solid things the
+// mesh pass draws (mesh.ts) pass behind what the field has in front of them. Nothing set: as far as can be.
+var<private> dist = 3.0e38;
 
-@fragment fn fs(@builtin(position) pos: vec4f) -> @location(0) vec4f {
+struct Out { @location(0) c: vec4f, @location(1) d: f32 }
+
+@fragment fn fs(@builtin(position) pos: vec4f) -> Out {
   let c = finite(field(vec2f((pos.x / u.res.x * 2.0 - 1.0) * u.aspect, 1.0 - pos.y / u.res.y * 2.0)));
-  return vec4f(c, clamp(text, 0.0, 1.0));
+  return Out(vec4f(c, clamp(text, 0.0, 1.0)), select(3.0e38, dist, dist > 0.0));
 }
