@@ -17,6 +17,7 @@ import { equation } from '../../acts/reality'
 import { TAU, clamp, hash, view } from '../../acts/scene'
 import { Path } from '../../beam/path'
 import { QPSK, rc, symbol } from '../../dsp/dvbs2'
+import { pigeon } from '../copper'
 import { ctx, cross, dot, frame, len, site, solid, unit, type V } from '../ctx'
 import { PLACES } from '../places'
 import { C, DEG, at, numbers, to, up } from './sky'
@@ -160,6 +161,7 @@ let frameNo = -1
 export function draw(k: number) {
   if (!ready) init()
   const here = ctx.focus === k
+  pigeon(here) // the transport stream on the carrier's copper and the S3's
   if (here && was !== k && !cut) clk = PAD - 2.5 // it goes as we arrive, the flight here over
   was = ctx.focus, cut = false, clk += ctx.dt
   const s = clk % CYCLE, ts = flightTime(s), flying = s > PAD && ts < T_LAND, burning = flying && ts < BURN, chute = ts > T_AP && flying

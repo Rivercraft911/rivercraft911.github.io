@@ -11,6 +11,7 @@
 import type { Fn } from '../../beam/beam'
 import { Path } from '../../beam/path'
 import { equation } from '../../acts/reality'
+import { lasers } from '../copper'
 import { ctx, cross, dot, frame, look, seen, site, unit, type V } from '../ctx'
 import { PLACES } from '../places'
 import { numbers } from './sky'
@@ -103,6 +104,7 @@ export function draw(k: number) {
   const P = PLACES[k], t = ctx.t
   site(P.lat, P.lon, n)
   if (!ready || dot(n, ctx.E) < 0.75) return
+  lasers(lv, ctx.focus === k) // the twelve enables, on both boards
   frame(n, e, N)
   for (let j = 0; j < 3; j++) g[j] = n[j] + AT[0] * e[j] + AT[1] * N[j]
   const c = dot(n, unit(g))

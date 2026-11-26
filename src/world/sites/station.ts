@@ -14,6 +14,7 @@
 import { equation } from '../../acts/reality'
 import { TAU, clamp } from '../../acts/scene'
 import { Path } from '../../beam/path'
+import { NA, coil as copper, ground } from '../copper'
 import { ctx, cross, dot, len, solid, unit, type V } from '../ctx'
 import { DEG, RE, numbers, orbit, to, up } from './sky'
 
@@ -111,6 +112,7 @@ function tile(n: V, s: number, z: number, a: V, size: number) {
   const g = Math.sign(s)
   for (let i = 0; i < 3; i++) (tc[i] = c[i] + n[i] * s + Z[i] * z), (tn[i] = n[i] * g)
   solid('coil', tc, a, tn, cross(a, tn, tz), size, 1, 0.12) // a little of its own light, so it is not lost in eclipse
+  copper(dot(mw, tn) / M_REF, AX.indexOf(n)) // its share of m, as current in its turns
 }
 
 // An arrow from the bus along v (world), l long, a dwell at its tip.
@@ -131,6 +133,7 @@ export function draw(k: number) {
   else field(orbit(A, RAAN, INC, RATE * t, c), Bw)
   for (let i = 0; i < 3; i++) (mw[i] = X[i] * m[0] + Y[i] * m[1] + Z[i] * m[2]), (ww[i] = X[i] * w[0] + Y[i] * w[1] + Z[i] * w[2])
   const mag = len(m), near = Math.hypot(c[0] - ctx.E[0], c[1] - ctx.E[1], c[2] - ctx.E[2])
+  ground(m[2] / M_REF, (m[2] / NA) * 1e3, here) // the panel on the ground carries the bus's Z current; the hat hears it
 
   // the planet's field: light runs south to north along every line, as B does outside the planet
   lines.clear()

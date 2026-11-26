@@ -18,6 +18,7 @@ import { TAU, view } from '../../acts/scene'
 import { Path } from '../../beam/path'
 import { fft } from '../../dsp/fft'
 import { CODES, L1 } from '../../dsp/gps'
+import { gnss } from '../copper'
 import { clear, ctx, frame, look, seen, site, unit, type V } from '../ctx'
 import { PLACES, RIVER } from '../places'
 import { C, DEG, RE, numbers, orbit, to, up } from './sky'
@@ -185,6 +186,7 @@ export function draw(k: number) {
   const close = Math.hypot(rx[0] - ctx.E[0], rx[1] - ctx.E[1], rx[2] - ctx.E[2]) < 0.9
   sky(t)
   if (close) search(ctx.dt)
+  gnss(xr, xi, here) // the capture, leaving the MAX2769B on its four lines
 
   // the rays, each in its own code
   rays.clear()

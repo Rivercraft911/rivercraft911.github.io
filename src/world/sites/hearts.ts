@@ -9,6 +9,7 @@
 // (the higher MAC) beats that much late; the rings are shown 25× slower than light, the beat in real time.
 import { equation } from '../../acts/reality'
 import { Path } from '../../beam/path'
+import { heart as copper } from '../copper'
 import { ctx, frame, look, seen, site, solid, type V } from '../ctx'
 import { PLACES } from '../places'
 import { C, RE, numbers, to, up } from './sky'
@@ -80,7 +81,8 @@ export function draw(k: number) {
   site(P.lat, P.lon, n)
   m[0] = -n[0], m[1] = -n[1], m[2] = -n[2]
   const ph = mod(t, T), env = heart(n, ph)
-  heart(m, mod(t - LAG, T))
+  copper(ph, T, LIFT, focus) // the data line, on the heart just stood
+  heart(m, mod(t - LAG, T)), copper(mod(t - LAG, T), T, LIFT, false)
   frame(n, e, N), (fine = focus ? 200 : 144)
   // the beacons in flight: every 450 ms from each heart, the follower's 137 ms after the leader's, out and round
   for (let from = 0; from < 2; from++) {

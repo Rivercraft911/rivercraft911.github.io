@@ -9,11 +9,14 @@ export type Board = {
   project: string
   w: number // mm, the Edge.Cuts bounding box
   h: number
+  t: number // mm thick
   layers: string[] // copper, top first
   outline: number[][] // polylines [x0, y0, x1, y1, …], arcs flattened
   tracks: number[][] // [layer, width, net, x0, y0, x1, y1, …]: runs of one net, layer and width
   nets: string[]
   vias: [x: number, y: number, drill: number, diameter: number][]
+  // every pad on a routed net; layer −1 is through them all, name is "U1.3 PA11": whose pad, and what the part calls it
+  pads: [x: number, y: number, net: number, layer: number, w: number, h: number, turn: number, name: string][]
 }
 // src: the picture. hole: the one the zoom falls through, [x, y, drill, pad] (pad = drill: unplated); close: the
 // close-ups baked around it, [x0, y0, mm, px] each, a square of the board seen closer.

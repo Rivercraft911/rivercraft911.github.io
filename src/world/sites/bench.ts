@@ -16,6 +16,7 @@ import { equation } from '../../acts/reality'
 import { TAU } from '../../acts/scene'
 import { text } from '../../beam/font'
 import { Path } from '../../beam/path'
+import { bench as copper } from '../copper'
 import { ctx, frame, look, seen, site, solid, unit, type V } from '../ctx'
 import { PLACES } from '../places'
 import { C, RE, numbers, to, up } from './sky'
@@ -78,6 +79,7 @@ function hid(ch: string): [number, number] {
 }
 const hex = (b: number) => b.toString(16).toUpperCase().padStart(2, '0')
 const REPORTS = [...MACRO].map((ch) => `${hex(hid(ch)[0])} 00 ${hex(hid(ch)[1])} 00 00 00 00 00`), IDLE = '00 00 00 00 00 00 00 00'
+const CODES = [...MACRO].map(hid)
 const SO_FAR = [...MACRO].map((_, i) => MACRO.slice(0, i + 1))
 const ir = new Path(), keys = new Path(), IR = { w: 0.1, path: ir }, KEYS = { w: 0.25, path: keys }, pc: V = [0, 0, 0], dir: V = [0, 0, 0], vals = [0, 0]
 
@@ -107,7 +109,8 @@ export function draw(k: number) {
 
   // the trigger, coming down the sky to PEEP's photodiode: where along the ray the carrier is on, now
   const ms = (((t * 1000) / SLOW) % CYCLE + CYCLE) % CYCLE
-  for (let j = 0; j < 3; j++) (pc[j] = n[j] * 1.004 + 0.1 * e[j] + 0.02 * N[j]), (dir[j] = 0.75 * n[j] + 0.25 * e[j] - 0.6 * N[j])
+  const [px, py] = P.monuments[0].at!, ph = 1.004 + P.monuments[0].lift! // PEEP, where places.ts stands it
+  for (let j = 0; j < 3; j++) (pc[j] = n[j] * ph + px * e[j] + py * N[j]), (dir[j] = 0.75 * n[j] + 0.25 * e[j] - 0.6 * N[j])
   unit(dir)
   for (let b = 0, r0 = -1; b <= 600; b++) {
     const r = b * 0.01, on = b < 600 && (lit(ms + r * MS) || lit(ms + r * MS - CYCLE))
@@ -121,6 +124,7 @@ export function draw(k: number) {
       r0 = -1
     }
   }
+  copper(ms, lit(ms), CODES, focus) // what PEEP's copper and the glasses' carry
   WHEEL.w = focus ? 0.6 : 0.3
   ctx.f.ch.push(WHEEL, IR)
   if (!focus) return
@@ -128,7 +132,7 @@ export function draw(k: number) {
   // the macro: what has been typed, and the report on the wire
   keys.clear()
   if (ms < CYCLE - 100 && look(pc)) {
-    const i = Math.floor(ms / KEY), down = i < MACRO.length && ms % KEY < 10, x = seen.x - 0.2, y = seen.y + 0.13
+    const i = Math.floor(ms / KEY), down = i < MACRO.length && ms % KEY < 10, x = seen.x - 0.2, y = seen.y + 0.3
     keys.color(0.45, 1, 0.62, 0.9)
     text(keys, SO_FAR[Math.min(i, MACRO.length - 1)], x, y, 0.045)
     keys.color(1, 1, 1, down ? 1 : 0.3)

@@ -6,12 +6,14 @@
 // outline in pixels. Around the hole the zoom falls through it also renders close-ups, <id>-<n>.webp, each a square
 // of the board seen closer, so the hole is still sharp as it fills the screen. `npm run boards -- <id…>` renders
 // only those (the geometry is cheap and always baked). Needs KiCad 10, ffmpeg and cwebp.
+// The world's monuments carry their signals on this geometry (src/world/copper.ts), so it also has the board's
+// thickness and every pad that is on a routed net; the boards after the coil are geometry alone.
 import { execFileSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 
-const GH = '/Users/river/Documents/github/'
+const GH = '/Users/river/Documents/github/', PV = '/Users/river/Documents/stanford/SSI/IREC/Pigeon_Vision/PigeonVision/hardware/'
 // In the order the film falls through them. A source is a local file, or a repo path read from its clone when
 // there is one, else fetched. `stackup` recolours the picture, by stackup layer type. `hole` is the hole the zoom
 // falls through, [x, y, drill, pad] in mm (pad = drill: unplated), and `close` the close-ups around it, each a
@@ -31,6 +33,10 @@ const BOARDS = [
   { id: 'peep', title: 'PEEP', project: 'PEEP', repo: 'Rivercraft911/PEEP', path: 'PCB/peep/peep.kicad_pcb', clone: GH + 'PEEP',
     hole: [4.63, 2.22, 0.3, 0.6], close: [3, 1.5, 0.75] }, // a via in the second contact
   { id: 'coil', title: 'Magnetorquer coil', project: 'SAMWISE', repo: 'stanford-ssi/samwise-avionics', path: 'Universal_Z_MagTorq/Coil_Panel_Z_v1/Coil_Panel_Z.kicad_pcb', clone: GH + 'samwise-avionics' },
+  // not in the zoom: geometry alone, for the world (bake-models.mjs has their solids)
+  { id: 'pigeon-carrier', title: 'Pigeon carrier', project: 'Pigeon Vision', file: PV + 'carrier/PigeonCarrier/PigeonCarrier.kicad_pcb', bare: true },
+  { id: 'yapogee-s3', title: 'Yapogee S3', project: 'Pigeon Vision', file: PV + 'yapogee-s3/kicad/YapogeeS3.kicad_pcb', bare: true },
+  { id: 'picohat', title: 'Pico debug hat', project: 'SAMWISE', file: GH + 'samwise-groundstation/SoftwareDebugPicoHat/SoftwareDebugPicoHat.kicad_pcb', bare: true },
 ]
 
 const KICAD = '/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli', FFMPEG = '/opt/homebrew/bin/ffmpeg', CWEBP = '/opt/homebrew/bin/cwebp'
@@ -69,17 +75,19 @@ function arc(a, m, b) {
   const t = ([x, y]) => (Math.atan2(y - c[1], x - c[0]) - Math.atan2(ay - c[1], ax - c[0]) + 2 * TAU) % TAU
   return around(c, a, t(m) < t(b) ? t(b) : t(b) - TAU)
 }
-// An Edge.Cuts shape as a polyline. (None of these boards draws its outline inside a footprint.)
-function edge(n) {
-  const [x0, y0] = pt(n, n[0] === 'gr_circle' ? 'center' : 'start')
-  switch (n[0]) {
-    case 'gr_line': return [x0, y0, ...pt(n, 'end')]
-    case 'gr_arc': return arc([x0, y0], pt(n, 'mid'), pt(n, 'end'))
-    case 'gr_circle': return around([x0, y0], pt(n, 'end'), TAU)
-    case 'gr_rect': { const [x1, y1] = pt(n, 'end'); return [x0, y0, x1, y0, x1, y1, x0, y1, x0, y0] }
+// An Edge.Cuts shape as a polyline; `to` places a footprint's own (the Yapogee S3 draws its outline in one).
+function edge(n, to = (p) => p) {
+  const at = (k) => to(pt(n, k)), k = n[0].slice(3), [x0, y0] = at(k === 'circle' ? 'center' : 'start')
+  switch (k) {
+    case 'line': return [x0, y0, ...at('end')]
+    case 'arc': return arc([x0, y0], at('mid'), at('end'))
+    case 'circle': return around([x0, y0], at('end'), TAU)
+    case 'rect': { const [x1, y1] = at('end'); return [x0, y0, x1, y0, x1, y1, x0, y1, x0, y0] }
   }
   throw new Error(`edge ${n[0]}`)
 }
+// KiCad's turn: a degrees, anticlockwise on a page whose y runs down
+const turn = ([x, y], a) => { const c = Math.cos((a * Math.PI) / 180), s = Math.sin((a * Math.PI) / 180); return [x * c + y * s, y * c - x * s] }
 
 const rev = (p) => { const q = []; for (let i = p.length - 2; i >= 0; i -= 2) q.push(p[i], p[i + 1]); return q }
 // Chains pieces { k, p } of the same key that meet end to end into longer polylines. At a junction only the
@@ -103,7 +111,11 @@ function chain(pieces) {
 
 function geometry({ id, title, project }, src) {
   const pcb = parse(src), on = (n, l) => kid(n, 'layer')?.[1] === l
-  const shapes = pcb.filter((n) => /^gr_/.test(n[0]) && on(n, 'Edge.Cuts')).map(edge)
+  const shapes = pcb.filter((n) => /^gr_/.test(n[0]) && on(n, 'Edge.Cuts')).map((n) => edge(n))
+  for (const f of all(pcb, 'footprint')) {
+    const [fx, fy, fa = 0] = kid(f, 'at').slice(1).map(Number)
+    shapes.push(...f.filter((n) => /^fp_(line|arc|circle|rect)$/.test(n[0]) && on(n, 'Edge.Cuts')).map((n) => edge(n, (p) => { const [x, y] = turn(p, fa); return [fx + x, fy + y] })))
+  }
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity
   for (const p of shapes) for (let i = 0; i < p.length; i += 2)
     (x0 = Math.min(x0, p[i])), (x1 = Math.max(x1, p[i])), (y0 = Math.min(y0, p[i + 1])), (y1 = Math.max(y1, p[i + 1]))
@@ -117,12 +129,22 @@ function geometry({ id, title, project }, src) {
     k: [layers.indexOf(kid(n, 'layer')[1]), r(+kid(n, 'width')[1]), net(n)],
     p: at(n[0] === 'arc' ? arc(pt(n, 'start'), pt(n, 'mid'), pt(n, 'end')) : [...pt(n, 'start'), ...pt(n, 'end')]),
   }))
+  // a pad: where it is, its net, its layer (−1: through them all), its size and turn, and whose it is ("U1.3 PA11")
+  const pads = all(pcb, 'footprint').flatMap((f) => {
+    const [fx, fy, fa = 0] = kid(f, 'at').slice(1).map(Number), ref = all(f, 'property').find((q) => q[1] === 'Reference')?.[2] ?? all(f, 'fp_text').find((q) => q[1] === 'reference')?.[2]
+    return all(f, 'pad').filter((q) => kid(q, 'net')).map((q) => {
+      const [px, py, pa = 0] = kid(q, 'at').slice(1).map(Number), [dx, dy] = turn([px, py], fa), cu = kid(q, 'layers').slice(1)
+      return [...at([fx + dx, fy + dy]), net(q), cu.includes('*.Cu') ? -1 : layers.indexOf(cu.find((l) => l.endsWith('.Cu'))), ...kid(q, 'size').slice(1, 3).map((v) => r(+v)), pa % 180, [`${ref}.${q[1]}`, kid(q, 'pinfunction')?.[1]].filter(Boolean).join(' ')]
+    })
+  })
+  const routed = new Set(pieces.map((c) => c.k[2]))
   const g = {
-    id, title, project, w: r(x1 - x0), h: r(y1 - y0), layers,
+    id, title, project, w: r(x1 - x0), h: r(y1 - y0), t: +kid(kid(pcb, 'general'), 'thickness')[1], layers,
     outline: chain(shapes.map((p) => ({ k: '', p: at(p) }))).map((c) => c.p),
     tracks: chain(pieces).map((c) => [...c.k, ...c.p]),
     nets,
     vias: all(pcb, 'via').map((n) => [...at(pt(n, 'at')), r(+kid(n, 'drill')[1]), r(+kid(n, 'size')[1])]),
+    pads: pads.filter((q) => routed.has(q[2])),
   }
   return [g, pieces.length]
 }
@@ -225,6 +247,7 @@ try {
     }
     const src = readFileSync(home, 'utf8'), [g, n] = geometry(b, src), json = JSON.stringify(g)
     writeFileSync(new URL(`${b.id}.json`, OUT), json)
+    if (b.bare) { console.log(b.id, `${g.w}x${g.h} mm`, `${g.tracks.length}/${n} tracks`, `${g.pads.length} pads`, `${json.length} B`); continue }
     const [pic, close] = !only.length || only.includes(b.id) ? picture({ ...b, w: g.w, h: g.h }, src, home, tmp) : ['picture kept', was.find((w) => w.id === b.id)?.close]
     list.push({ id: g.id, title: g.title, project: g.project, w: g.w, h: g.h, ...(b.hole && { hole: b.hole, close }) })
     console.log(b.id, `${g.w}x${g.h} mm`, `${g.tracks.length}/${n} tracks`, `${g.vias.length} vias`, `${g.layers.length} layers`, `${json.length} B;`, pic)
