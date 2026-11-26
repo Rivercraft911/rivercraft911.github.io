@@ -12,9 +12,9 @@ import { place, sing } from './choir'
 import { REVEAL, RV } from './clock'
 import { TAU, clamp, smooth, type Scene } from './scene'
 import { ctx, look, seen, trace, unit, type V } from '../world/ctx'
-import { HOME, EXPOSE, clock } from '../world/planet'
+import { HOME, EXPOSE, air, clock } from '../world/planet'
 
-const H0 = 0.02 // altitude at the start, radii: down in the eye, its dark water filling the frame
+const H0 = 0.18 // altitude at the start, radii: over the eye, its wall round the frame as the drain's rim was
 const W0 = 1.1 // the turning we arrive with, rad/s, as the whirlpool's camera had it
 const p = ctx.p
 const F: Field = { shader: PLANET, k: 1, p, res: 2 }
@@ -71,7 +71,7 @@ function planet(t: number, pt: number, f: Parameters<Scene['build']>[1]) {
   aim(p, [0, 0, 0], [-eye[0], -eye[1], -eye[2]], up, 0.62)
   clock(pt, L)
   const text = 1 - smooth(0.4, 2.6, t) // the glyphs we fell through, dissolving as the eyewall comes into view
-  p.set([-eye[0], -eye[1], -eye[2], 1, L[0], L[1], L[2], pt, 0, 1, 0, 0, 1, 0.07, 1, 1, EXPOSE * smooth(-0.2, 1.2, t), 1, 0, 0, text, 0, 0, 0], 16)
+  air(p, eye, L, pt, EXPOSE * smooth(-0.1, 0.5, t), text)
   F.cell = text > 0.01 ? 12 : undefined
   F.ink = [0.55, 0.85, 1]
   f.field = F

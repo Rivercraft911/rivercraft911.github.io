@@ -233,6 +233,14 @@ function pick(cx: number, cy: number) {
 
 // ---- the frame -------------------------------------------------------------------------------------------------
 export const L0 = unit([1, 0.3, 0.45])
+// The planet field's slots (planet.wgsl): the eye's place, the sun and the time, the spin (none: the sun goes round),
+// the storm, the exposure, and River's: the river's place and scale (the beam's own θ(s), 1:400), and where every place
+// stands, each on land, each a town at night. The core is the storm's eye, open sea. `text`: how much is read as glyphs.
+const RAD = Math.PI / 180, ON_LAND = PLACES.filter((P) => P.lat < 80), SITES = ON_LAND.flatMap((P) => [P.lat * RAD, P.lon * RAD])
+export function air(p: Float32Array, E: ArrayLike<number>, L: ArrayLike<number>, t: number, exposure: number, text = 0) {
+  p.set([-E[0], -E[1], -E[2], 1, L[0], L[1], L[2], t, 0, 1, 0, 0, 1, 0.07, 1, 1, exposure, 1, ON_LAND.length, 0, text, PLACES[0].lat * RAD, PLACES[0].lon * RAD, 1 / 400], 16)
+  p.set(SITES, 40)
+}
 const L: V = [0, 0, 0], Y = [0, 1, 0]
 // The sun at planet time pt: it goes round once in five minutes. The reveal and the ident run on the same clock,
 // ending at 0 where the world's begins, so nothing in the sky jumps when the world takes over.
@@ -267,7 +275,7 @@ export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number
   cam.set(p.subarray(0, 16))
   if (dbg.has('at')) L.splice(0, 3, ...L0)
   else clock(t, L)
-  p.set([-E[0], -E[1], -E[2], 1, L[0], L[1], L[2], t, 0, 1, 0, 0, 1, 0.07, 1, 1, EXPOSE, 1, 0, 0], 16)
+  air(p, E, L, t, EXPOSE)
 
   // the monuments, the places' own drawing, and the sun on them
   ctx.t = t, ctx.dt = dt, ctx.f = f, ctx.focus = focus
