@@ -140,3 +140,20 @@ export function draw(k: number) {
   equation(ctx.f, "f'=f-\\frac{f_s}{n}\\qquad f_s=20\\,Hz\\qquad n=5", P.ink)
   numbers("f=\\num{1}{0.00}\\,Hz\\qquad f'=\\num{0}{-0.00}\\,Hz\\qquad c\\to c/25", P.ink, vals)
 }
+
+// What it sounds like. PEEP at the bench's own slowing of time, 25×, which brings its 38 kHz carrier down to
+// 1520 Hz: the trigger is three beeps. The macro is a tune: every report's usage code a semitone over a low A,
+// sounding while its key is down. And under them, in real time as it is drawn, the wheel as a photodiode behind a
+// valve sees it: the five blades passing, let through for 10 ms in every 50, so what is heard is the strobe's own
+// beat, a 20 Hz purr swelling and dying at 5(f − 4) Hz: it slows, stops and turns over as the wheel's picture does.
+const NOTE = [...MACRO].map((ch) => 110 * 2 ** (hid(ch)[1] / 12))
+let beep = 0, key = 0, kp = 0, valve = 0, mean = 0
+export function voice(t: number, dt: number) {
+  const ms = ((((t * 1000) / SLOW) % CYCLE) + CYCLE) % CYCLE, i = Math.floor(ms / KEY), fr = t * FS
+  beep += 0.01 * (+lit(ms) - beep), key += 0.004 * (+(i < MACRO.length && ms % KEY < 10) - key)
+  if (i < MACRO.length) kp += dt * NOTE[i]
+  valve += 0.02 * (+(fr - Math.floor(fr) < CLEAR) - valve)
+  const light = valve * (0.5 + 0.5 * Math.cos(BLADES * angle(t)))
+  mean += 1e-4 * (light - mean)
+  return 0.16 * beep * Math.sin((TAU * 38000 * t) / SLOW) + 0.3 * key * (Math.sin(TAU * kp) + 0.3 * Math.sin(2 * TAU * kp)) + 0.35 * (light - mean)
+}

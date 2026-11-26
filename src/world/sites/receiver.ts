@@ -261,3 +261,21 @@ export function draw(k: number) {
     }
   }
 }
+
+// What it sounds like: every satellite in view as its carrier is once its code is wiped off, a tone, at 1320 Hz and
+// a quarter of its Doppler (two octaves down: ±4.5 kHz would not fit under it), so each falls the whole of its
+// pass, from rising to setting, as loud as 1/ρ. Its own C/A code still keys it, the phase turned over chip by chip
+// at the pace the rays run. The one being searched for stands out, as its ray does.
+const amp = new Float32Array(24), chip = new Float32Array(24), turns = new Float64Array(24)
+export function voice(t: number, dt: number) {
+  const c = ((Math.floor(RUN * t) % 1023) + 1023) % 1023
+  let out = 0
+  for (let i = 0; i < 24; i++) {
+    const a = (amp[i] += 4e-4 * ((seenUp[i] ? ((SHELL - 1) / range[i]) * (i === cur ? 1 : 0.4) : 0) - amp[i]))
+    if (a < 1e-3) continue
+    chip[i] += 4e-3 * (1 - 2 * CODES[i][c] - chip[i])
+    turns[i] += dt * (1320 + doppler[i] / 4)
+    out += a * chip[i] * Math.sin(TAU * turns[i])
+  }
+  return 0.25 * out
+}

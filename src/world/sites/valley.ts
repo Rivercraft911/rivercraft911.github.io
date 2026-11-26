@@ -85,3 +85,22 @@ export function draw(k: number) {
   equation(ctx.f, 's(t)=\\sum_k a_k\\,g(t-kT)\\qquad\\frac{58192}{22194}\\,R_s=69.8\\,Mb/s', PLACES[k].ink)
   numbers('k=\\num{0}{00000}\\qquad I=\\num{1}{-0.00}\\qquad Q=\\num{2}{-0.00}', PLACES[k].ink, vals)
 }
+
+// What it sounds like: the same s(t) on a carrier, as it leaves the antenna, Re s(t) e^{2πi f t}, the carrier
+// brought down to 480 Hz, eight cycles to a symbol. A pilot block is 0.6 s of bare tone and a header a second and a
+// half of one phase rocking; the data is that tone made to carry three bits, sixty times a second.
+const FC = 8 * RS, EVERY = 32 // the envelope is slow: it is found every 32nd sample, and runs straight between
+let vi = 0, vq = 0, di = 0, dq = 0, due = 0
+export function voice(t: number, dt: number) {
+  if (--due < 0) {
+    const x = (t + EVERY * dt + T0) * RS, k = Math.floor(x), f = x - k
+    let I = 0, Q = 0
+    for (let m = 1 - SPAN; m <= SPAN; m++) {
+      const j = sym(k + m), w = rc(f - m)
+      I += CI[j] * w, Q += CQ[j] * w
+    }
+    di = (I - vi) / EVERY, dq = (Q - vq) / EVERY, due = EVERY - 1
+  }
+  vi += di, vq += dq
+  return 0.28 * (vi * Math.cos(TAU * FC * t) - vq * Math.sin(TAU * FC * t))
+}

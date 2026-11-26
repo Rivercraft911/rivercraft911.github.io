@@ -13,6 +13,7 @@ import { Path } from '../beam/path'
 import { PLACES, RIVER } from './places'
 import { ctx, dot, frame, len, look, seen, site, stand, trace, turn, unit, type V } from './ctx'
 import { covered, mount, page, route, within } from './pages'
+import { sound } from './sound'
 
 const p = ctx.p
 const cam = new Float32Array(16)
@@ -342,5 +343,6 @@ export const planet: Scene = {
     const c = covered(), ease = 1 - Math.exp(-4 * dt)
     side[0] += (c[0] - side[0]) * ease, side[1] += (c[1] - side[1]) * ease
     paint(f, now, t, dt, focus, DEBUG ? +(dbg.get('ap') ?? 0) : focus >= 0 && flight < 0 ? 1 : 0, true)
+    return sound()
   },
 }

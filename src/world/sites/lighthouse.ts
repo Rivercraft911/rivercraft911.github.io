@@ -147,3 +147,20 @@ export function draw(k: number) {
   equation(ctx.f, 'f_{line}=\\frac{4\\cdot 27000}{60}=1800\\,Hz\\qquad f_{px}=1.83\\,MHz', P.ink)
   numbers('n=\\num{0}{000}\\qquad t\\to t/15', P.ink, vals)
 }
+
+// What it sounds like: the frame as a photodiode on the ground under it would hear it. The three lasers' levels
+// summed, line after line in the galvo's order, the beam on the ground for the middle 30 % of each facet's sweep, at
+// the 120 lines a second shown. One line is much like the next, so it is a note, a low B, whose timbre is the
+// picture's and goes down the frame and back up with the scan once a second.
+let lp = 0, dc = 0
+export function voice(t: number, dt: number) {
+  const q = RATE * t, f = Math.floor(q), h = (q - f - W0) / WIN
+  let v = 0
+  if (ready && h >= 0 && h < 1) {
+    const row = line(((f % NY) + NY) % NY) * (NX + 1) * 3, x0 = Math.floor(h * NX), x1 = Math.min(NX, x0 + Math.max(1, Math.ceil((RATE * dt * NX) / WIN)))
+    for (let k = 0; k < 3; k++) v += sum[row + 3 * x1 + k] - sum[row + 3 * x0 + k]
+    v /= 3 * (x1 - x0)
+  }
+  lp += 0.12 * (v - lp), dc += 2e-4 * (lp - dc)
+  return 1.4 * (lp - dc)
+}

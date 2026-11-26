@@ -209,3 +209,18 @@ export function draw(k: number) {
     numbers('|\\omega|=\\num{0}{0.000}\\,°/s\\qquad|B|=\\num{1}{00.0}\\,\\mu T\\qquad|m|=\\num{2}{0.00}\\,mA\\,m^2', INK, vals)
   }
 }
+
+// What it sounds like. The field, as a proton magnetometer hears it: a tone at the protons' precession, γ|B|/2π,
+// 42.58 Hz to the microtesla, 1.04 kHz over the magnetic equator and an octave higher over the poles, since a
+// dipole's field is twice as strong there: up and down twice an orbit. And the coils, three notes under it (its
+// eighth, a fifth over that, its quarter), each as loud as the moment the B-dot law asks of that coil and turning
+// over with its sign: they throb as the bus turns in the field, and are gone when it has stopped.
+const coil = [0, 0, 0]
+let fp = 0, ph = 0
+export function voice(_t: number, dt: number) {
+  fp += 1e-3 * (42.577e6 * len(Bw) - fp)
+  ph += (dt * fp) / 16, ph -= Math.floor(ph)
+  let out = 0.1 * Math.sin(TAU * 16 * ph)
+  for (let i = 0; i < 3; i++) out += 0.45 * (coil[i] += 1e-3 * (clamp(m[i] / M_REF, -1.2, 1.2) - coil[i])) * Math.sin(TAU * (2 + i) * ph)
+  return out
+}

@@ -101,3 +101,15 @@ export function draw(k: number) {
   equation(ctx.f, 'b=0.98\\,e^{-\\frac{(\\varphi-150)^2}{2(88)^2}}+0.62\\,e^{-\\frac{(\\varphi-410)^2}{2(120)^2}}', P.ink)
   numbers('b=\\num{0}{0.00}\\qquad\\varphi=\\num{1}{000}\\,ms\\qquad\\frac{\\pi R}{c}=66.8\\,ms\\qquad c\\to c/25', P.ink, vals)
 }
+
+// What it sounds like, in real time. The firmware's envelope b(φ) is the loudness of a heart's two sounds: the lub a
+// 55 Hz tone and the dub a fifth over it (a heart's second sound is the higher), each with its octave, so a small
+// speaker has it too. A beacon is heard as a detector hears any burst of radio, by its envelope: 664 µs, a tick,
+// the leader's every 450 ms and the follower's 137 ms behind it.
+const W = 2 * Math.PI
+export function voice(t: number) {
+  const ph = mod(t, T)
+  const lub = 0.98 * gauss(ph, 0.15, 0.088) * (Math.sin(W * 55 * ph) + 0.5 * Math.sin(W * 110 * ph))
+  const dub = 0.62 * gauss(ph, 0.41, 0.12) * (Math.sin(W * 82.5 * ph) + 0.5 * Math.sin(W * 165 * ph))
+  return 0.5 * (lub + dub) + 0.3 * (+(mod(t, SYNC) < AIR * 1e-6) + 0.6 * +(mod(t - 0.137, SYNC) < AIR * 1e-6))
+}
