@@ -39,6 +39,9 @@ export class Raster {
   private data: GPUTexture[] // each field's data texture, there from the start so rows land while the pipelines compile
   private ready = false
   private light!: GPURenderPipeline
+  private halfPipe!: GPURenderPipeline
+  private half?: GPUTexture // the scene at half size, for the lens
+  private halfGroup?: GPUBindGroup
   private cell!: GPURenderPipeline
   private text!: GPURenderPipeline
   private u: GPUBuffer
@@ -100,7 +103,7 @@ export class Raster {
       })
     const solids = this.mesh.compile()
     const r = d.createShaderModule({ code: rasterWGSL }), fl = d.createPipelineLayout({ bindGroupLayouts: [layout] })
-    ;[this.light, this.cell, this.text] = await Promise.all([pipe(r, 'lightFS', acc, ADD), pipe(r, 'cellFS', 'rgba32float'), pipe(r, 'textFS', acc, ADD)])
+    ;[this.light, this.cell, this.text, this.halfPipe] = await Promise.all([pipe(r, 'lightFS', acc, ADD), pipe(r, 'cellFS', 'rgba32float'), pipe(r, 'textFS', acc, ADD), pipe(r, 'halfFS', FLOAT)])
     this.fields = await Promise.all(
       FIELDS.map(async (f, i) => {
         const u = d.createBuffer({ size: 256, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
@@ -197,20 +200,25 @@ export class Raster {
     sweep(f, this.views[0], this.views[2], fw, fh, aspect)
     if (!text) {
       this.mesh.render(enc, f.solids, w, h, this.views[2])
+      if (this.half?.width !== Math.max(1, w >> 1) || this.half.height !== Math.max(1, h >> 1)) {
+        this.half?.destroy()
+        this.half = d.createTexture({ size: [Math.max(1, w >> 1), Math.max(1, h >> 1)], format: FLOAT, usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING })
+        this.solidView = null
+      }
       if (this.mesh.view !== this.solidView) {
         const sv = (this.solidView = this.mesh.view) ?? this.blank.createView()
-        this.groups[0] = d.createBindGroup({
-          layout: this.light.getBindGroupLayout(0),
-          entries: [
-            { binding: 0, resource: { buffer: this.u } },
-            { binding: 1, resource: this.smp },
-            { binding: 2, resource: this.views[0] },
-            { binding: 6, resource: sv },
-            { binding: 7, resource: this.mesh.distView ?? this.blankDist.createView() },
-            { binding: 8, resource: this.views[2] },
-          ],
-        })
+        const scene: GPUBindGroupEntry[] = [
+          { binding: 0, resource: { buffer: this.u } },
+          { binding: 1, resource: this.smp },
+          { binding: 2, resource: this.views[0] },
+          { binding: 6, resource: sv },
+          { binding: 7, resource: this.mesh.distView ?? this.blankDist.createView() },
+          { binding: 8, resource: this.views[2] },
+        ]
+        this.halfGroup = d.createBindGroup({ layout: this.halfPipe.getBindGroupLayout(0), entries: scene })
+        this.groups[0] = d.createBindGroup({ layout: this.light.getBindGroupLayout(0), entries: [...scene, { binding: 9, resource: this.half.createView() }] })
       }
+      if (uf[20] > 0) pass(this.half.createView(), this.halfPipe, this.halfGroup!) // the lens is open: its taps' scene
     }
     if (!text) return
     pass(this.views[1], this.cell, this.groups[1])

@@ -49,19 +49,25 @@ fn at(px: vec2f) -> vec4f {
 // A thin lens's circle of confusion, px: zero at the focus, the full aperture at infinity.
 fn coc(d: f32) -> f32 { return min(r.aper * abs(1.0 - r.focus / max(d, 1e-6)), 48.0); }
 
+@group(0) @binding(9) var half: texture_2d<f32>; // the same, at half size, for the lens to gather from
+
+// The scene and its distance at half size: one filtered tap of it is four of the full one, which is all a blur needs.
+@fragment fn halfFS(@builtin(position) pos: vec4f) -> @location(0) vec4f { return at(pos.xy * 2.0); }
+
 @fragment fn lightFS(@builtin(position) pos: vec4f) -> @location(0) vec4f {
   let c = at(pos.xy);
   if (r.aper <= 0.0) { return vec4f(c.rgb * r.gain, 0.0); }
   // Scatter as gather: each tap round the pixel adds its light here if its own blur disc reaches this far, spread
   // over that disc's area; a tap behind a sharp pixel may not blur over it. The pattern turns every frame, and the
-  // phosphor's persistence averages the turns into a smooth bokeh.
+  // phosphor's persistence averages the turns into a smooth bokeh. The taps are read from the half-size scene.
   let R0 = coc(c.a);
   let reach = min(48.0, r.aper * 1.2 + 1.0);
   var acc = vec4f(c.rgb, 1.0) / max(R0 * R0, 1.0);
-  for (var i = 0; i < 40; i++) {
-    let rr = sqrt((f32(i) + 0.5) / 40.0) * reach;
+  let H = vec2f(textureDimensions(half));
+  for (var i = 0; i < 32; i++) {
+    let rr = sqrt((f32(i) + 0.5) / 32.0) * reach;
     let th = f32(i) * 2.3999632 + r.spin;
-    let s = at(pos.xy + vec2f(cos(th), sin(th)) * rr);
+    let s = textureSampleLevel(half, smp, clamp((pos.xy + vec2f(cos(th), sin(th)) * rr) / r.res, 0.5 / H, 1.0 - 0.5 / H), 0.0);
     let cs = select(coc(s.a), min(coc(s.a), R0), s.a > c.a);
     let w = clamp(cs - rr + 1.0, 0.0, 1.0) / max(cs * cs, 1.0);
     acc += vec4f(s.rgb * w, w);

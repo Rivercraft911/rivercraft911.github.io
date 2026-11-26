@@ -299,6 +299,7 @@ export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number
   const fd = Math.hypot(at[0] - E[0], at[1] - E[1], at[2] - E[2])
   solids.focus = fd
   solids.aperture = lens * clamp(0.12 / fd, 0, 1) * 26
+  F.res = lens > 0 ? 1.2 : 2 // under the lens the world behind is a blur: its sky and clouds need not be swept at full size
 
   river.clear().color(0.5, 0.8, 1, 0.9)
   trace(river, RW, RW.length / 3)
