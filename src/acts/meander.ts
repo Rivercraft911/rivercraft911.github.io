@@ -19,12 +19,12 @@ const REACH = 90 // metres of river drawn, at most
 const CEIL = 0.72 // the equation's room
 const CLOSED = 2.405 // J₀'s first zero
 const STOP = HALT - HOOK // the chain has stopped
-const DRY = 3.75, FAST = 85 // the sheaf runs off downstream from here, this many metres a second
+const DRY = 3.75 // the hero comes up to the valley's brightness from here; the contours stay, and the valley takes them on
 
 // Each frame's state: how far the frame has settled from the hook's (origin ox, oy; kh units a metre) into
-// the valley's map, the chain's turn, the front the sheaf runs dry behind, and the level a ring of light
+// the valley's map, the chain's turn, and the level a ring of light
 // has climbed to, spreading up the land from the water.
-let seat = 0, ox = 0, oy = 0, kh = 0, u = 0, now = 0, dry = -1e9, set = 0, ring = -9
+let seat = 0, ox = 0, oy = 0, kh = 0, u = 0, now = 0, set = 0, ring = -9
 const q = { x: 0, y: 0, z: 0 }
 // dx metres downstream of the spring and dz across it, on the screen (−z is up on the map): on a level
 // sheet until the sheaf settles (set) onto the land, which steps down with the river.
@@ -50,7 +50,7 @@ function strand(p: Path, a: number, b: number, z0: number, fold: number, i0: num
       const zz = level && set > 0 ? mix(z, contour(side, level - 1, SPRING + x), set) : z
       put(mix(s, x, fold), mix(-AMP * S, zz, fold))
       if (q.x > view.a + 0.05) break
-      const i = i0 * (1 - smooth(CEIL - 0.12, CEIL, q.y)) * (level ? smooth(dry - 2, dry + 1, SPRING + x) * (1 + 3 * Math.exp(-(((level - ring) / 2) ** 2))) : glow(reach(SPRING + x), now))
+      const i = i0 * (1 - smooth(CEIL - 0.12, CEIL, q.y)) * (level ? 1 + 3 * Math.exp(-(((level - ring) / 2) ** 2)) : glow(reach(SPRING + x), now))
       if (!(i > 0.01) || !(q.y > -1.05) || q.x < -view.a - 0.05) pen = false
       else {
         p.intensity(i)
@@ -87,7 +87,7 @@ export const meander: Scene = {
   build(t, f) {
     const T = HOOK + t, A = view.a * 0.9, N = tune(T)
     map()
-    ;(u = turn(T)), (now = t), (hn = 0), (dry = t > DRY ? SPRING + (t - DRY) * FAST : -1e9)
+    ;(u = turn(T)), (now = t), (hn = 0)
     seat = clamp(lock([[0, 0], [0.25, 1]], t, 5, 0.8)), (ox = -A), (oy = SEAT.cy), (kh = (2 * A) / (PER * M1))
 
     // the hero's ω swells and comes home; the sheaf's widest reaches for the figure eight, then combs out
@@ -98,7 +98,7 @@ export const meander: Scene = {
     const fold = (from: number) => clamp(lock([[0, 0], [from, 1]], t, 12, 0.7), 0, 1.15)
 
     sheaf.clear()
-    for (let l = 1; l <= LEVELS && dry < SPRING + 40; l++)
+    for (let l = 1; l <= LEVELS; l++)
       for (const side of [-1, 1]) {
         const k = fold(0.14 + (0.5 * l) / LEVELS), z0 = contour(side, l - 1, SPRING)
         if (k < 0.02) continue

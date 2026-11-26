@@ -664,6 +664,24 @@ export const valley: Scene = {
       if (heroRow === i && t < 3) for (let j = 0; j < NC && heroN < HERO; j++) if (ok[j]) (hx[heroN] = sx[j]), (hy[heroN++] = sy[j])
     }
     if (land > 0.06) items_(t, Infinity, next)
+    // the contours the meander's rivers combed out onto, carried on at their own heights, so they tilt with the land
+    // as we crane up, and give way as its cross-sections rise
+    const cl = 0.2 * (1 - smooth(1, 2.6, t))
+    if (cl > 0.01)
+      for (const side of [-1, 1])
+        for (let l = 0; l < LEVELS; l++) {
+          let pen = false
+          ink.color(INK[0], INK[1], INK[2], cl)
+          for (let x = X0; x < XM + 8; x += 0.4) {
+            const z = contour(side, l, x)
+            if (z !== z || !cam.project(x, riverY(x) + (l + 0.5) * CI, z, p3)) {
+              pen = false
+              continue
+            }
+            pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
+            pen = true
+          }
+        }
     rim(Infinity, edge, brim)
     if (wall > 0) shaft(t, wall, 1 - 0.8 * smooth(12.6, 14, t))
     if (t >= 3 && t < ON + 0.3) newest(t)
