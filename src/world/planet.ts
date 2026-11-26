@@ -285,6 +285,10 @@ export const planet: Scene = {
     sh[0] = near[0] * 1.01 - E[0], sh[1] = near[1] * 1.01 - E[1], sh[2] = near[2] * 1.01 - E[2], sh[3] = 0.12
     up[0] = near[0], up[1] = near[1], up[2] = near[2]
     sun[0] = L[0], sun[1] = L[1], sun[2] = L[2], sun[3] = 22 * clamp(dot(near, L) * 4 + 0.6, 0, 1)
+    // the lens: on the place, at the camera's distance, opening like a macro lens's as the camera comes close
+    const fd = Math.hypot(now.at[0] - E[0], now.at[1] - E[1], now.at[2] - E[2])
+    solids.focus = fd
+    solids.aperture = (DEBUG ? +(dbg.get('ap') ?? 0) : focus >= 0 && flight < 0 ? 1 : 0) * clamp(0.12 / fd, 0, 1) * 26
 
     river.clear().color(0.5, 0.8, 1, 0.9)
     trace(river, RW, RW.length / 3)

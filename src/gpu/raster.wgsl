@@ -14,6 +14,9 @@ struct R {
   lift: f32,   // scene light to coverage
   dim: f32,    // how dark a glyph may get in a dark cell
   fine: f32,   // the field's pixels across a grid step of a cell
+  focus: f32,  // the lens: where it is focused, world units
+  aper: f32,   // its blur at infinity, px (0: a pinhole)
+  spin: f32,   // this frame's turn of the lens's sampling pattern
 }
 
 @group(0) @binding(0) var<uniform> r: R;
@@ -30,12 +33,40 @@ const Y = vec3f(0.2290, 0.6917, 0.0793);
 }
 
 @group(0) @binding(6) var solids: texture_2d<f32>; // the mesh pass's light (mesh.ts), premultiplied, at the phosphor's size
+@group(0) @binding(7) var near: texture_2d<f32>;   // how far each pixel's solid is
+@group(0) @binding(8) var far: texture_2d<f32>;    // how far the field's light came from (field.wgsl), at the field's size
 
-// The field as light: the raster's frame, linearly reconstructed at the phosphor's resolution, and whatever solid
-// thing stands in front of it laid over it by how much of each pixel it covers.
+// The field as light, linearly reconstructed at the phosphor's resolution, with whatever solid thing stands in front
+// of it laid over it by how much of each pixel it covers; and how far away that is.
+fn at(px: vec2f) -> vec4f {
+  let q = clamp(px, vec2f(0.5), r.res - 0.5);
+  let m = textureLoad(solids, vec2i(q), 0);
+  let D = vec2f(textureDimensions(far));
+  let d = select(textureLoad(far, vec2i(q / r.res * D), 0).r, textureLoad(near, vec2i(q), 0).r, m.a > 0.5);
+  return vec4f(textureSampleLevel(src, smp, q / r.res, 0.0).rgb * (1.0 - m.a) + m.rgb, d);
+}
+
+// A thin lens's circle of confusion, px: zero at the focus, the full aperture at infinity.
+fn coc(d: f32) -> f32 { return min(r.aper * abs(1.0 - r.focus / max(d, 1e-6)), 48.0); }
+
 @fragment fn lightFS(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-  let m = textureLoad(solids, vec2i(pos.xy), 0);
-  return vec4f((textureSampleLevel(src, smp, pos.xy / r.res, 0.0).rgb * (1.0 - m.a) + m.rgb) * r.gain, 0.0);
+  let c = at(pos.xy);
+  if (r.aper <= 0.0) { return vec4f(c.rgb * r.gain, 0.0); }
+  // Scatter as gather: each tap round the pixel adds its light here if its own blur disc reaches this far, spread
+  // over that disc's area; a tap behind a sharp pixel may not blur over it. The pattern turns every frame, and the
+  // phosphor's persistence averages the turns into a smooth bokeh.
+  let R0 = coc(c.a);
+  let reach = min(48.0, r.aper * 1.2 + 1.0);
+  var acc = vec4f(c.rgb, 1.0) / max(R0 * R0, 1.0);
+  for (var i = 0; i < 40; i++) {
+    let rr = sqrt((f32(i) + 0.5) / 40.0) * reach;
+    let th = f32(i) * 2.3999632 + r.spin;
+    let s = at(pos.xy + vec2f(cos(th), sin(th)) * rr);
+    let cs = select(coc(s.a), min(coc(s.a), R0), s.a > c.a);
+    let w = clamp(cs - rr + 1.0, 0.0, 1.0) / max(cs * cs, 1.0);
+    acc += vec4f(s.rgb * w, w);
+  }
+  return vec4f(acc.rgb / acc.a * r.gain, 0.0);
 }
 
 // A world's shot (raster.ts SHOT): the field's frame shrunk to 512 × 320, four taps a pixel so its detail

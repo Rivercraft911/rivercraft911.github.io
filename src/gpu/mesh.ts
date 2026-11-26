@@ -20,6 +20,8 @@ export type Solids = {
   up: ArrayLike<number> // which way is up, here
   fog?: ArrayLike<number> // the air's colour and thickness per unit length
   shadow?: ArrayLike<number> // the sphere (centre, radius) of what casts shadows; none, no shadows
+  focus?: number // the lens: the distance it is focused at, world units
+  aperture?: number // and its blur at infinity, px; 0 or none, a pinhole (raster.wgsl does the blur)
 }
 
 const STRIDE = 32 // position, normal (f32 × 3 each), colour and (metal, rough) as unorm8 × 4
@@ -50,7 +52,10 @@ export class Mesh {
   private color?: GPUTexture // the resolved light, read by the raster's composite
   private msaa?: GPUTexture
   private depth?: GPUTexture
-  private dist?: GPUTextureView
+  private dist?: GPUTexture // how far each pixel's solid is, resolved, for the depth of field
+  private distMS?: GPUTexture
+  distView?: GPUTextureView
+  private field?: GPUTextureView
   // Four samples where the pixels can afford them; past ~3 Mpx the screen's own density, and the jitter the
   // phosphor's persistence averages, are antialiasing enough.
   private samples = innerWidth * innerHeight * Math.min(2, devicePixelRatio) ** 2 > 3e6 ? 1 : 4
@@ -95,12 +100,16 @@ export class Mesh {
     ]
     const layout = d.createPipelineLayout({ bindGroupLayouts: [l0, this.l1] })
     const depth = (write: boolean, compare: GPUCompareFunction): GPUDepthStencilState => ({ format: 'depth32float', depthWriteEnabled: write, depthCompare: compare })
-    const color = (entryPoint: string, blend?: GPUBlendState, writeMask = GPUColorWrite.ALL) => ({ module, entryPoint, targets: [{ format: 'rgba16float' as const, blend, writeMask }] })
+    const color = (entryPoint: string, blend?: GPUBlendState, writeMask = GPUColorWrite.ALL, dist = writeMask) => ({
+      module,
+      entryPoint,
+      targets: [{ format: 'rgba16float' as const, blend, writeMask }, { format: 'r16float' as const, writeMask: dist }],
+    })
     const over: GPUBlendState = { color: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' }, alpha: { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' } }
     const multisample = { count: this.samples }
     ;[this.solid, this.clear, this.prime, this.shade] = await Promise.all([
       d.createRenderPipelineAsync({ layout, vertex: { module, entryPoint: 'vs', buffers }, fragment: color('solidFS'), depthStencil: depth(true, 'greater'), multisample }),
-      d.createRenderPipelineAsync({ layout, vertex: { module, entryPoint: 'vs', buffers }, fragment: color('clearFS', over), depthStencil: depth(false, 'greater'), multisample }),
+      d.createRenderPipelineAsync({ layout, vertex: { module, entryPoint: 'vs', buffers }, fragment: color('clearFS', over, GPUColorWrite.ALL, 0), depthStencil: depth(false, 'greater'), multisample }),
       d.createRenderPipelineAsync({ layout, vertex: { module, entryPoint: 'fullVS' }, fragment: color('primeFS', undefined, 0), depthStencil: depth(true, 'always'), multisample }),
       d.createRenderPipelineAsync({
         layout: d.createPipelineLayout({ bindGroupLayouts: [l0] }),
@@ -116,22 +125,26 @@ export class Mesh {
     if (!this.ready) return
     const d = this.device
     if (this.color?.width !== w || this.color.height !== h) {
-      this.color?.destroy(), this.msaa?.destroy(), this.depth?.destroy()
+      this.color?.destroy(), this.msaa?.destroy(), this.depth?.destroy(), this.dist?.destroy(), this.distMS?.destroy()
       const use = GPUTextureUsage.RENDER_ATTACHMENT
       this.color = d.createTexture({ size: [w, h], format: 'rgba16float', usage: use | GPUTextureUsage.TEXTURE_BINDING })
       this.msaa = this.samples > 1 ? d.createTexture({ size: [w, h], format: 'rgba16float', sampleCount: this.samples, usage: use }) : undefined
       this.depth = d.createTexture({ size: [w, h], format: 'depth32float', sampleCount: this.samples, usage: use })
+      this.dist = d.createTexture({ size: [w, h], format: 'r16float', usage: use | GPUTextureUsage.TEXTURE_BINDING })
+      this.distMS = this.samples > 1 ? d.createTexture({ size: [w, h], format: 'r16float', sampleCount: this.samples, usage: use }) : undefined
       this.view = this.color.createView()
+      this.distView = this.dist.createView()
       this.dirty = true
     }
-    if (this.dist !== dist) {
-      this.dist = dist
+    if (this.field !== dist) {
+      this.field = dist
       this.g1 = d.createBindGroup({ layout: this.l1, entries: [{ binding: 0, resource: this.shadow.createView() }, { binding: 1, resource: this.cmp }, { binding: 2, resource: dist }] })
     }
     const out: GPURenderPassColorAttachment = { view: this.msaa ? this.msaa.createView() : this.view!, resolveTarget: this.msaa ? this.view : undefined, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }
+    const far: GPURenderPassColorAttachment = { view: this.distMS ? this.distMS.createView() : this.distView!, resolveTarget: this.distMS ? this.distView : undefined, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }
     const items = s?.items ?? []
     if (!items.length) {
-      if (this.dirty) enc.beginRenderPass({ colorAttachments: [out] }).end(), (this.dirty = false)
+      if (this.dirty) enc.beginRenderPass({ colorAttachments: [out, far] }).end(), (this.dirty = false)
       return
     }
     this.dirty = true
@@ -154,7 +167,7 @@ export class Mesh {
       const p = enc.beginRenderPass({ colorAttachments: [], depthStencilAttachment: { view: this.shadow.createView(), depthClearValue: 1, depthLoadOp: 'clear', depthStoreOp: 'store' } })
       p.setPipeline(this.shade), p.setBindGroup(0, this.g0), each(p, false), p.end()
     }
-    const p = enc.beginRenderPass({ colorAttachments: [out], depthStencilAttachment: { view: this.depth!.createView(), depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'discard' } })
+    const p = enc.beginRenderPass({ colorAttachments: [out, far], depthStencilAttachment: { view: this.depth!.createView(), depthClearValue: 0, depthLoadOp: 'clear', depthStoreOp: 'discard' } })
     p.setBindGroup(0, this.g0), p.setBindGroup(1, this.g1!)
     p.setPipeline(this.prime), p.draw(3)
     p.setPipeline(this.solid), each(p, false)

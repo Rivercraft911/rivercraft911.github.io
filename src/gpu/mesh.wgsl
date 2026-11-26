@@ -133,7 +133,9 @@ fn shade(i: O) -> vec4f {
   return vec4f(col * c.sunc.w, i.col.a);
 }
 
-@fragment fn solidFS(i: O) -> @location(0) vec4f { return vec4f(shade(i).rgb, 1.0); }
+// and how far along its ray it is, for the lens's depth of field (raster.wgsl)
+struct S { @location(0) c: vec4f, @location(1) d: f32 }
+@fragment fn solidFS(i: O) -> S { return S(vec4f(shade(i).rgb, 1.0), length(i.w)); }
 @fragment fn clearFS(i: O) -> @location(0) vec4f {
   let s = shade(i);
   return vec4f(s.rgb * s.a, s.a);

@@ -45,13 +45,15 @@ export class Raster {
   private cell!: GPURenderPipeline
   private text!: GPURenderPipeline
   private u: GPUBuffer
-  private uf = new Float32Array(20)
+  private uf = new Float32Array(24)
   private glyph: GPUBuffer
   private smp: GPUSampler
   private tex?: GPUTexture // the field's frame
   private dist?: GPUTexture // and how far along each pixel's ray its light came from (field.wgsl)
   private shotDist: GPUTexture
   private blank: GPUTexture
+  private blankDist: GPUTexture
+  private turn = 0
   private solidView?: GPUTextureView | null = null // the mesh pass's light the light group was made with (null: none yet)
   readonly mesh: Mesh
   private cells?: GPUTexture
@@ -83,6 +85,7 @@ export class Raster {
     this.shotView = this.shot.createView()
     this.shotDist = d.createTexture({ size: SHOT, format: 'r32float', usage: GPUTextureUsage.RENDER_ATTACHMENT })
     this.blank = d.createTexture({ size: [1, 1], format: FLOAT, usage: GPUTextureUsage.TEXTURE_BINDING })
+    this.blankDist = d.createTexture({ size: [1, 1], format: 'r16float', usage: GPUTextureUsage.TEXTURE_BINDING })
     this.mesh = new Mesh(d)
     this.data = FIELDS.map(({ data: [w, h, b = 1, mips = 1] = [1, 1], shots }) =>
       shots
@@ -230,6 +233,7 @@ export class Raster {
     uf[8] = ink[0], uf[9] = ink[1], uf[10] = ink[2], uf[11] = gain * f.k
     uf[12] = TILE[0], uf[13] = TILE[1], uf[14] = ATLAS_COLS, uf[15] = this.chars.length
     uf[16] = f.lift ?? 2, uf[17] = 0.2, uf[18] = fine
+    uf[19] = f.solids?.focus ?? 1, uf[20] = text ? 0 : (f.solids?.aperture ?? 0), uf[21] = (this.turn = (this.turn + 2.3999632 * 0.618) % 6.2831853)
     d.queue.writeBuffer(this.u, 0, uf)
 
     sweep(f, this.views[0], this.views[2], fw, fh, aspect)
@@ -239,7 +243,14 @@ export class Raster {
         const sv = (this.solidView = this.mesh.view) ?? this.blank.createView()
         this.groups[0] = d.createBindGroup({
           layout: this.light.getBindGroupLayout(0),
-          entries: [{ binding: 0, resource: { buffer: this.u } }, { binding: 1, resource: this.smp }, { binding: 2, resource: this.views[0] }, { binding: 6, resource: sv }],
+          entries: [
+            { binding: 0, resource: { buffer: this.u } },
+            { binding: 1, resource: this.smp },
+            { binding: 2, resource: this.views[0] },
+            { binding: 6, resource: sv },
+            { binding: 7, resource: this.mesh.distView ?? this.blankDist.createView() },
+            { binding: 8, resource: this.views[2] },
+          ],
         })
       }
     }
