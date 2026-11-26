@@ -48,7 +48,7 @@ export function symbol(k: number, bits: number) {
   return s
 }
 
-// Physical layer framing (EN 302 307-1 §5.5), short FECFRAMEs with pilots. Every PLFRAME opens with a
+// Physical layer framing (EN 302 307-1 §5.5), with pilots: short FECFRAMEs unless a stream asks for normal ones. Every PLFRAME opens with a
 // 90-symbol π/2-BPSK header: the start-of-frame word and the PLS code naming the frame's modcod, which
 // may change frame to frame (ACM). Pilot blocks of 36 symbols follow every 16 slots of data.
 const SOF = 0x18d2e82
@@ -56,12 +56,12 @@ const PLS_SCRAMBLE = 0x719d83c953422dfan
 const G = [0x55555555, 0x33333333, 0x0f0f0f0f, 0x00ff00ff, 0x0000ffff, 0xffffffff] // RM(1,5) rows
 const S2 = Math.SQRT1_2
 
-// The 90 header bits for a modcod: SOF, then the 7-bit PLS (modcod, short, pilots) as a (64,7) code.
+// The 90 header bits for a modcod: SOF, then the 7-bit PLS (modcod, short or normal, pilots) as a (64,7) code.
 const headers = new Map<number, Uint8Array>()
-function header(modcod: number) {
-  let h = headers.get(modcod)
+function header(modcod: number, short = true) {
+  const pls = (modcod << 2) | (short ? 0b11 : 0b01), b = (i: number) => (pls >> (6 - i)) & 1
+  let h = headers.get(pls)
   if (h) return h
-  const pls = (modcod << 2) | 0b11, b = (i: number) => (pls >> (6 - i)) & 1
   h = new Uint8Array(90)
   for (let i = 0; i < 26; i++) h[i] = (SOF >> (25 - i)) & 1
   for (let i = 0; i < 32; i++) {
@@ -73,7 +73,7 @@ function header(modcod: number) {
       h[26 + n] = y ^ (j & b(6)) ^ Number((PLS_SCRAMBLE >> BigInt(63 - n)) & 1n)
     }
   }
-  headers.set(modcod, h)
+  headers.set(pls, h)
   return h
 }
 
@@ -85,10 +85,10 @@ export const PLH = 90, PILOT = 36, SLOTS = 16 * 90
 export class Frames {
   private starts = [0]
   private cons: Constellation[] = []
-  constructor(readonly rs: number, readonly pick: (t: number) => Constellation) {}
+  constructor(readonly rs: number, readonly pick: (t: number) => Constellation, readonly fec = 16200) {}
 
-  static len(c: Constellation) {
-    const data = 16200 / c.bits, slots = data / 90
+  static len(c: Constellation, fec = 16200) {
+    const data = fec / c.bits, slots = data / 90
     return PLH + data + PILOT * Math.floor((slots - 1) / 16)
   }
 
@@ -98,7 +98,7 @@ export class Frames {
     while (s[s.length - 1] <= k) {
       const c = this.pick(s[s.length - 1] / this.rs)
       this.cons.push(c)
-      s.push(s[s.length - 1] + Frames.len(c))
+      s.push(s[s.length - 1] + Frames.len(c, this.fec))
     }
     let lo = 0, hi = s.length - 2
     while (lo < hi) {
@@ -116,7 +116,7 @@ export class Frames {
     if (k < 0) return (o.i = o.q = 0), Kind.Data
     const f = this.frame(k), p = k - this.starts[f], c = this.cons[f]
     if (p < PLH) {
-      const a = 1 - 2 * header(c.modcod)[p]
+      const a = 1 - 2 * header(c.modcod, this.fec === 16200)[p]
       o.i = a * (p & 1 ? -S2 : S2), o.q = a * S2 // π/2-BPSK: odd symbols at 45°, even at 135°
       return Kind.Header
     }
