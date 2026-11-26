@@ -1,0 +1,272 @@
+[
+ {
+  "id": "peep",
+  "file": "peep.glb",
+  "bytes": 493912,
+  "tris": 15282,
+  "bounds": [
+   -0.00603,
+   -0.00169,
+   -0.004,
+   0.00603,
+   0.00043,
+   0.004
+  ],
+  "up": "y",
+  "materials": 12,
+  "project": "PEEP",
+  "note": "IR-triggered keystroke injector, 12.06 × 8 mm, STM32F042"
+ },
+ {
+  "id": "heart",
+  "file": "heart.glb",
+  "bytes": 3821928,
+  "tris": 107014,
+  "bounds": [
+   -0.04711,
+   -0.00404,
+   -0.04455,
+   0.04738,
+   0.00284,
+   0.04532
+  ],
+  "up": "y",
+  "materials": 12,
+  "project": "Rava Heart",
+  "note": "heart of 144 LEDs that beats in sync with its twin over ESP-NOW"
+ },
+ {
+  "id": "strobe-board",
+  "file": "strobe-board.glb",
+  "bytes": 1088328,
+  "tris": 34697,
+  "bounds": [
+   -0.02193,
+   -0.00053,
+   -0.00762,
+   0.0206,
+   0.0038,
+   0.00762
+  ],
+  "up": "y",
+  "materials": 12,
+  "project": "strobeGlasses",
+  "note": "the MK1 glasses board"
+ },
+ {
+  "id": "ephemeris",
+  "file": "ephemeris.glb",
+  "bytes": 3906636,
+  "tris": 92241,
+  "bounds": [
+   -0.0285,
+   -0.00219,
+   -0.017,
+   0.0225,
+   0.0093,
+   0.017
+  ],
+  "up": "y",
+  "materials": 11,
+  "project": "Ephemeris-1",
+  "note": "GNSS IQ breakout"
+ },
+ {
+  "id": "laserbrain",
+  "file": "laserbrain.glb",
+  "bytes": 3869636,
+  "tris": 113570,
+  "bounds": [
+   -0.05,
+   -0.00932,
+   -0.05,
+   0.05,
+   0.01254,
+   0.05
+  ],
+  "up": "y",
+  "materials": 12,
+  "project": "R-01",
+  "note": "LaserBrain, the projector controller"
+ },
+ {
+  "id": "laserdriver",
+  "file": "laserdriver.glb",
+  "bytes": 3904348,
+  "tris": 128901,
+  "bounds": [
+   -0.025,
+   -0.00396,
+   -0.025,
+   0.025,
+   0.01284,
+   0.02685
+  ],
+  "up": "y",
+  "materials": 12,
+  "project": "R-01",
+  "note": "LaserDriverRGB, 4 binary-weighted current channels per laser"
+ },
+ {
+  "id": "coil",
+  "file": "coil.glb",
+  "bytes": 570084,
+  "tris": 19236,
+  "bounds": [
+   -0.04849,
+   -0.00344,
+   -0.04866,
+   0.04848,
+   0.00083,
+   0.04866
+  ],
+  "up": "y",
+  "materials": 6,
+  "project": "SAMWISE",
+  "note": "Z magnetorquer coil panel"
+ },
+ {
+  "id": "pigeon-carrier",
+  "file": "pigeon-carrier.glb",
+  "bytes": 3972716,
+  "tris": 101264,
+  "bounds": [
+   -0.0729,
+   -0.00301,
+   -0.07167,
+   0.0729,
+   0.01682,
+   0.07167
+  ],
+  "up": "y",
+  "materials": 12,
+  "project": "Pigeon Vision",
+  "note": "CM5 carrier, 144.78 mm across"
+ },
+ {
+  "id": "yapogee-s3",
+  "file": "yapogee-s3.glb",
+  "bytes": 3685924,
+  "tris": 109465,
+  "bounds": [
+   -0.0335,
+   -0.00218,
+   -0.02251,
+   0.0275,
+   0.00592,
+   0.02249
+  ],
+  "up": "y",
+  "materials": 12,
+  "project": "Pigeon Vision",
+  "note": "Yapogee S3, the DVB-S2 transmitter daughterboard"
+ },
+ {
+  "id": "picohat",
+  "file": "picohat.glb",
+  "bytes": 3324600,
+  "tris": 114173,
+  "bounds": [
+   -0.04173,
+   -0.00551,
+   -0.02735,
+   0.04148,
+   0.01066,
+   0.02735
+  ],
+  "up": "y",
+  "materials": 12,
+  "project": "SAMWISE",
+  "note": "ground station debug hat for a Pico, S-band and UHF LoRa"
+ },
+ {
+  "id": "strobe-frame",
+  "file": "strobe-frame.glb",
+  "bytes": 631232,
+  "tris": 26406,
+  "bounds": [
+   -0.07516,
+   -0.02309,
+   -0.04255,
+   0.07516,
+   0.02309,
+   0.04255
+  ],
+  "up": "y",
+  "materials": 2,
+  "project": "strobeGlasses",
+  "note": "MK1 frame and brow cover, as assembled"
+ },
+ {
+  "id": "r01-chassis",
+  "file": "r01-chassis.glb",
+  "bytes": 1476408,
+  "tris": 50228,
+  "bounds": [
+   -0.09102,
+   -0.05859,
+   -0.09102,
+   0.09102,
+   0.05859,
+   0.09102
+  ],
+  "up": "y",
+  "materials": 3,
+  "project": "R-01",
+  "note": "base box and deck, colours after the CAD render"
+ },
+ {
+  "id": "r01-polygon",
+  "file": "r01-polygon.glb",
+  "bytes": 144588,
+  "tris": 5734,
+  "bounds": [
+   -0.02636,
+   -0.009,
+   -0.0368,
+   0.02636,
+   0.009,
+   0.0368
+  ],
+  "up": "y",
+  "materials": 2,
+  "project": "R-01",
+  "note": "polygon mirror mount and spinner"
+ },
+ {
+  "id": "r01-laser-plate",
+  "file": "r01-laser-plate.glb",
+  "bytes": 77880,
+  "tris": 2584,
+  "bounds": [
+   -0.02,
+   -0.001,
+   -0.05,
+   0.02,
+   0.001,
+   0.05
+  ],
+  "up": "y",
+  "materials": 1,
+  "project": "R-01",
+  "note": "laser mounting plate"
+ },
+ {
+  "id": "pigeon-tube",
+  "file": "pigeon-tube.glb",
+  "bytes": 214176,
+  "tris": 7104,
+  "bounds": [
+   -0.0762,
+   -0.0762,
+   -0.07613,
+   0.0762,
+   0.0762,
+   0.07613
+  ],
+  "up": "y",
+  "materials": 2,
+  "project": "Pigeon Vision",
+  "note": "camera section: 6 in tube and two camera cradles, as assembled"
+ }
+]
