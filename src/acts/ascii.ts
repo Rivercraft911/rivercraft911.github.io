@@ -4,12 +4,10 @@
 // one RTTY can send, and it does: the centre row goes out as real FSK (45.45 Bd, mark 2125 Hz, space
 // 2295 Hz, Baudot with its shifts), while the choir is held and crushed at the cell clock to five bits.
 import type { Stereo } from '../audio/audio'
-import { descent, place, sing } from './choir'
-import { ASCII as DUR, LEAD, R3 as AT, WRAP } from './clock' // AT: the choir's clock when the world below begins
-import { GROUP, GROUP_INK, hang, PER, plunge, SHRINK } from './drain'
-import { equation } from './reality'
-import { VORTEX, VORTEX_INK, live, surface, vortex } from './wrap'
-import { TAU, clamp, mix, smooth, type Scene } from './scene'
+import { place, sing } from './choir'
+import { ASCII as DUR, LEAD, WRAP } from './clock'
+import { VORTEX_INK, fly, turning, vortex } from './wrap'
+import { TAU, mix, smooth, type Scene } from './scene'
 
 // Baudot (ITA2, US figures) by code: letters, then figures. '\0' marks a code that prints nothing.
 const LTRS = '\0E\nA SIU\rDRJNFCKTZLWHYPQOBG\0MXV\0'
@@ -21,8 +19,7 @@ const BAUD = 45.45, MARK = 2125, SPACE = 2295
 const HOLD = 3600 // the cell clock: 120 cells a row, 30 rows a second
 
 const row = new Uint8Array(512) // the centre row of text, as the raster last read it out
-const P1 = [0.1, 1, 0.27], AMBER = [1, 0.42, 0.02] // linear light
-const ink = [0, 0, 0]
+const INK = VORTEX_INK.map((c) => 1.5 * c ** 2.2) // the water's own white, in linear light: the drops go on through the text in their colours
 
 // The teleprinter: one character after another from the centre row, each a start bit, five data bits
 // LSB first and 1.5 stop bits, on continuous-phase FSK. Half-bits are its clock.
@@ -70,31 +67,23 @@ function crush(T: number, o: Stereo, x: number) {
   for (let i = 0; i < 6; i++) o.s[i] += mix(tmp.s[i], (smoothed[i] += (held.s[i] - smoothed[i]) * 0.3), x)
 }
 
-// The whirlpool goes on underneath, its drain opening onto the pearls below, and we are pulled down the
-// throat into them (drain.ts): the text spreads over the water like an infection along the spiral, reads
-// the world below as it opens, and is eaten back through by it as we fall in.
-const HOLE = 0.08 // the drain's mouth
-const SPREAD = 0.9, EAT = [DUR - 1.1, DUR - 0.1] // how long the infection takes; when the world eats it back
-const text = (t: number) => smooth(0, SPREAD, t) * (1 - smooth(EAT[0], EAT[1], t)) // how much of the sound is text
+// The whirlpool goes on underneath and we go on down it (wrap.ts flies us): the text spreads over the water
+// like an infection along the spiral, the drops still streaming through it in their own colours; the drain
+// opens under it, dark, and at the last we are over it and go down.
+const SPREAD = 0.9, CLEAR = [DUR - 1.1, DUR - 0.1] // how long the infection takes; when the crush lets go
+const text = (t: number) => smooth(0, SPREAD, t) * (1 - smooth(CLEAR[0], CLEAR[1], t)) // how much of the sound is text
 export const ascii: Scene = {
   dur: DUR,
   build(t, f) {
-    const T = t + WRAP, fld = vortex(T, (f.at ?? 0) + t, f), p = fld.p
-    const s = PER * (descent(T + LEAD) - descent(AT)), k = SHRINK ** s
-    plunge(p, s, t - DUR, smooth(0, 1.6, t))
-    p[15] = HOLE * smooth(0.2, 1.4, t)
-    hang(p, surface(HOLE), k, t - DUR)
-    p[46] = 1.3 * Math.min(1, t / SPREAD), p[47] = 1.1 * clamp((t - EAT[0]) / (EAT[1] - EAT[0]))
-    const w = smooth(0, DUR, t)
-    for (let i = 0; i < 3; i++) ink[i] = 1.4 * mix(P1[i], AMBER[i], w)
+    const T = t + WRAP, dark = smooth(DUR - 0.3, DUR, t), fld = vortex(T, (f.at ?? 0) + t, f, 1, 1, 1 - dark), p = fld.p
+    fly(T)
+    p[46] = 1.3 * Math.min(1, t / SPREAD), p[47] = dark
     fld.cell = 14
-    fld.fine = t < SPREAD + 0.2 ? 2 : 1 // fine for the water's filaments while they show through; by the time the pearls do, all is text
-    fld.ink = ink
-    fld.lift = 14
+    fld.fine = t < SPREAD + 0.2 ? 2 : 1 // fine for the water's filaments while they show through
+    fld.ink = INK
+    fld.lift = 4
     fld.read = row
-    // the vortex's equation until the drain opens onto the pearls, then theirs
-    const eq = smooth(1.2, 2, t)
-    eq < 1 ? equation(f, VORTEX, VORTEX_INK, 0.9 * (1 - eq), live) : equation(f, GROUP, GROUP_INK, 0.9 * smooth(2, 2.6, t))
+    turning(f, T, 1 - dark)
     place(T + LEAD)
     return (tt, o) => {
       const x = text(tt)

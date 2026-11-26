@@ -4,6 +4,7 @@ import postWGSL from './post.wgsl?raw'
 import { FLOATS, type Beam } from '../beam/beam'
 import type { Face } from '../beam/font'
 import { GRID, Raster, TILE, type Field } from './raster'
+import { splat, type Drops } from './drops'
 
 export type Look = {
   sigma: number // spot radius as a fraction of screen height
@@ -138,7 +139,7 @@ export class Phosphor {
     this.stale = false
   }
 
-  draw(beam: Beam, aspect: number, dt: number, look: Look, field?: Field, dpr = 1) {
+  draw(beam: Beam, aspect: number, dt: number, look: Look, field?: Field, dpr = 1, drops?: Drops, tier = 0) {
     const d = this.device, { width: w, height: h } = this.acc, uf = this.uf, k = this.k
     const s = Math.hypot(look.sigma * h, PIXEL) // the spot as the pixel grid can show it
     const decay = Math.exp(-dt / look.tau)
@@ -167,6 +168,7 @@ export class Phosphor {
     p.setPipeline(this.decay)
     p.draw(3)
     this.raster.composite(p)
+    splat(d, p, drops, w, h, aspect, 1 - decay, tier) // the droplets, under the beam
     if (beam.n > 1) {
       p.setPipeline(this.seg)
       p.setBindGroup(0, this.segGroup)

@@ -20,7 +20,7 @@ export class Timeline {
 
   build(t: number, f: Frame): Voice | undefined {
     f.ch.length = 0
-    f.rate = f.look = f.field = undefined
+    f.rate = f.look = f.field = f.drops = undefined
     const i = this.index(t), s = this.scenes[i], fade = s.fade ?? 0
     const k = fade > 0 && i > 0 ? clamp((t - this.starts[i]) / fade) : 1
     const vb = this.scene(i, t, f, k)

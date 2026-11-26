@@ -10,13 +10,11 @@ import { Path, STRIDE } from '../beam/path'
 import { load, use } from '../beam/font'
 import { fft, hann } from '../dsp/fft'
 import { Field } from '../dsp/terrain'
-import { heard } from '../audio/audio'
 import { place, sing } from './choir'
 import { VALLEY as DUR, SING } from './clock' // the choirs begin to sing at SING
 import { Kind } from '../dsp/dvbs2'
 import { ON, RS, STEPS, STONES, chase, decision, esn0, offset, order, rain, sig, sigma, signal, stone, turn } from './modem'
-import { aim, equation } from './reality'
-import { A0, ARC, FALL, KEYS as POOL, M, R, TAU_RASTER, VORTEX, VORTEX_INK, live, pool, surface, turned, vortex as whirl } from './wrap'
+import { A0, GF, HF, KEYS as POOL, M, R, RIM, TAU_RASTER, V as VR, loud, say as tell, sight, surface, turned, turning, vortex as whirl } from './wrap'
 import { LOOK } from '../gpu/phosphor'
 import { Board, Say } from './say'
 import { TAU, cam, clamp, glide, hash, lock, mix, smooth, view, type Scene } from './scene'
@@ -28,7 +26,7 @@ const rnd = (n: number) => hash(n) * 0.5 + 0.5
 
 // ── the river: a meander of two scales, skewed, climbing in cascades ─────────────────────────────────
 const CASCADES = [10, 24, 38, 51] // where the river steps down
-export const LIP = 62 // where the valley ends and the river pours off the edge
+export const LIP = 62 // where the river reaches the rim of the shaft it ends in
 const SC = 15 // a pool
 const X0 = -12, X1 = 104, DX = 0.1, NX = Math.round((X1 - X0) / DX) + 1
 const RZ = new Float64Array(NX), RY = new Float64Array(NX)
@@ -48,7 +46,7 @@ let XM = 0
   }
   for (let i = 0; i < NX; i++) {
     const x = X0 + i * DX
-    RY[i] = -4 * (1 - Math.exp(-Math.max(0, x) / 30)) - CASCADES.reduce((a, c, j) => a + [0.6, 0.8, 0.7, 0.9][j] * smooth(c - 0.25, c + 0.25, x), 0) - 60 * smooth(LIP, LIP + 0.8, x)
+    RY[i] = -4 * (1 - Math.exp(-Math.max(0, x) / 30)) - CASCADES.reduce((a, c, j) => a + [0.6, 0.8, 0.7, 0.9][j] * smooth(c - 0.25, c + 0.25, x), 0)
   }
 }
 const idx = (x: number) => Math.max(0, Math.min(NX - 1, Math.round((x - X0) / DX)))
@@ -57,29 +55,41 @@ const W0 = 1.6
 const wide = (x: number) => W0 * (1 + 0.3 * Math.sin(0.21 * x + 0.4) + 0.2 * Math.sin(0.07 * x) + 1.6 * Math.exp(-(((x - SC) / 3.5) ** 2))) // narrows, pools
 
 // ── the land ────────────────────────────────────────────────────────────────────────────────────────
+// The shaft the river ends in (wrap.ts): its axis RIM downstream of the lip, its floor the pool, HF below.
+// The river runs round its rim in a moat, widest where it comes in, and goes over all the way round.
+const YL = riverY(LIP - 0.2), ZL = riverZ(LIP)
+const SX = LIP + RIM * M, SZ = ZL, RR = RIM * M, YP = YL - HF * M
+export const SHAFT = [SX, YP, SZ] // the vortex's axis stands here, straight up: where it meets the pool's still water
+const moat = (x: number, z: number) => RR + 3.4 + (1.1 * (SX - x)) / (Math.hypot(x - SX, z - SZ) || 1)
 const field = new Field(128, 2.1, 11)
 function height(x: number, z: number) {
-  const d = Math.abs(z - riverZ(x)), base = riverY(x), W = wide(x)
-  if (d < W) return base
+  const dc = Math.hypot(x - SX, z - SZ)
+  if (dc < RR) return YP
+  const m = dc - moat(x, z), W = wide(x), d = W + Math.max(0, Math.min(Math.abs(z - riverZ(x)) - W, m)) // as far from the moat as from the river
+  const base = mix(YL, riverY(x), smooth(0, 4, m))
+  if (d <= W) return base
   const wall = (6 + 3 * Math.sin(0.05 * x + 1) + 2 * Math.sin(0.13 * x)) * smooth(W, 17, d) ** 1.4
   const rough = field.at(x * 0.7, z * 0.7) * (0.3 + 2.4 * smooth(1.5, 12, d))
   return base + 0.3 * smooth(W, W + 0.7, d) + wall + rough * smooth(W, W + 2, d)
 }
 
-const NR = 170, NC = 200, ZW = 21
-const rowX = (i: number) => X0 + 1 + (i * (LIP - X0 - 1)) / (NR - 1) // the last row is the edge
-const RH = new Float32Array(NR * NC), RZp = new Float32Array(NR * NC)
-for (let i = 0; i < NR; i++)
+// NR rows to the lip, then NB more past it, wider: round the shaft and on to the far peaks. RK: what each
+// point is, land, water (1) or the shaft's void (2).
+const NR = 170, NB = 76, NT = NR + NB, NC = 200, ZW = 21
+const rowX = (i: number) => (i < NR ? X0 + 1 + (i * (LIP - X0 - 1)) / (NR - 1) : LIP + (i - NR + 1) * 0.55) // row NR − 1 is the lip
+const RH = new Float32Array(NT * NC), RZp = new Float32Array(NT * NC), RK = new Uint8Array(NT * NC)
+for (let i = 0; i < NT; i++)
   for (let j = 0; j < NC; j++) {
-    const x = rowX(i), z = riverZ(x) + (j / (NC - 1) - 0.5) * 2 * ZW
+    const x = rowX(i), z = riverZ(x) + (j / (NC - 1) - 0.5) * 2 * (i < NR ? ZW : 2.2 * ZW), dc = Math.hypot(x - SX, z - SZ)
     RZp[i * NC + j] = z, RH[i * NC + j] = height(x, z)
+    RK[i * NC + j] = dc < RR ? 2 : dc < moat(x, z) || (x <= LIP && Math.abs(z - riverZ(x)) < wide(x)) ? 1 : 0
   }
 
 // ── items: firs, stones, far peaks; all strokes in world space, ordered by x ────────────────────────
 type Item = { x: number; a: number; n: number; c: readonly number[]; t0: number; base: number; kind: number }
 const V: number[] = []
 const items: Item[] = []
-const TREE = 0, PEAK = 2, HATCH = 3, FLOW = 4
+const TREE = 0, PEAK = 2, HATCH = 3, FLOW = 4, FIR2 = 5 // FIR2: a fir past the lip, neither counted nor sung
 const item = (x: number, pts: number[], c: readonly number[], t0: number, base: number, kind: number) =>
   (items.push({ x, a: V.length / 3, n: pts.length / 3, c, t0, base, kind }), V.push(...pts))
 
@@ -181,6 +191,28 @@ function peaks(seed: number, x: number, z0: number, z1: number, base: number, H:
     if (pts.length >= 18) item(pts[0], pts.slice(), WATER, opens(pts[0]), 0, FLOW)
   }
 }
+// Round the shaft and beyond it: firs, and the moat's current, running round from where the river comes in
+// and quickening to the rim (critical there: Fr = 1), then the first of its fall. All of it rises at FAR,
+// as we leave the pool and it comes into sight: until then it costs the beam nothing.
+const FAR = 8.5
+for (let i = 0; i < 300; i++) {
+  const a = TAU * rnd(i * 3 + 7000), r = RR + 5.5 + 30 * rnd(i * 5 + 7001) ** 1.3, x = SX + r * Math.cos(a), z = SZ + r * Math.sin(a), h = height(x, z) - YL
+  if (x < 58 || x > X1 - 3 || h > 7 || h < 0.25) continue
+  fir(x, z, 0.6 + 1.3 * rnd(i * 7 + 7002), 7000 + i, FAR + 0.02 * (x - LIP))
+  items[items.length - 1].kind = items[items.length - 2].kind = FIR2
+}
+for (let k = 0; k < 640; k++) {
+  let a = Math.PI * (2 * rnd(k * 17 + 9001) - 1) * (k < 400 ? 1 : 0.22), // and more where the river comes in
+     r = RR + 0.2 + (moat(SX - Math.cos(a), SZ + Math.sin(a)) - RR - 0.4) * rnd(k * 19 + 9002) // a: round from where the river comes in
+  const pts: number[] = []
+  for (let s = 0; s < 44 && r > RR; s++) {
+    pts.push(SX - r * Math.cos(a), YL + 0.02, SZ + r * Math.sin(a))
+    const vt = 0.9 * (1 - (0.75 * Math.abs(a)) / Math.PI), vr = 0.2 + 1.6 * Math.exp(-(r - RR) / 1.3), sp = Math.hypot(vt, vr), step = 0.07 * (0.6 + sp)
+    a += (Math.sign(a) * vt * step) / (sp * r), r -= (vr * step) / sp
+  }
+  if (r <= RR) for (let s = 1; s <= 3; s++) pts.push(SX - (RR - VR * 0.12 * s) * Math.cos(a), YL - 0.5 * GF * (0.12 * s) ** 2, SZ + (RR - VR * 0.12 * s) * Math.sin(a))
+  if (pts.length >= 15) item(pts[0], pts.slice(), WATER, FAR + 0.02 * (pts[0] - LIP), 0, FLOW)
+}
 peaks(13, 104, riverZ(104) - 60, riverZ(104) + 60, riverY(LIP) - 4, 30, 4.5)
 items.sort((a, b) => a.x - b.x)
 const VX = Float32Array.from(V)
@@ -198,13 +230,13 @@ const FIRS = L('x(y) = 0.3 H (1 - y / H)^{0.9}\\, tri(\\pi n y / H),\; N = \\num
 const PEAKS = L('h(z) = 20 \\log_{10} |S(e^{i \\omega})|', INK, 6)
 const SPRAY = L('(x, y) = (x_0 + v_x \\tau,\; y_0 + v_y \\tau - 3.5 \\tau^2)', WHITE, 2)
 const EYE = L('eye = (\\num{0}{-00.0}, \\num{1}{-00.0}, \\num{2}{-00.0})', WHITE, 5.2)
-const FALLS = L('(x, z) = (x_l, z_l) + v_l \\tau,\; y = \\num{0}{-0.00} - 2.5 \\tau^2', WHITE, 10.3)
-const POOL_EQ = L('\\theta = \\theta_l + \\frac{K}{2} \\ln \\frac{1 + r_c^2 / r^2}{1 + r_c^2 / R^2},\; r = R e^{-\\num{0}{0.00} \\tau}', WATER, 14.6)
-const SPEC = L('S(f, t) = |\\sum_n x[n]\\, w[n - tH]\\, e^{-i 2\\pi f n / 1024}|,\; t = \\num{0}{00.00}', CYAN, 12.9)
+// From the lip on one equation is told at a time, each growing out of the last (wrap.ts say): the lip's
+// critical flow, the fall, the plot the falling water is, and then the vortex's own.
+const FROUDE = 'Fr^2 = \\frac{v^2}{g h}', BALLISTIC = 'y = y_l - \\frac{1}{2} g \\tau^2', STFT = 'S(f, t) = |\\sum_n x[n]\\, w[n - t H]\\, e^{-i 2 \\pi f n / N}|'
 const STONE = [1, 0.8, 0.45] as const
 const MODEM = L('E_s / N_0 = \\num{0}{-00.0}\\,dB,\; M = \\num{1}{00},\; \\Delta f = \\num{2}{-000}\\,Hz', STONE, ON)
 const RAIN = L('A = 0.0239\\, R^{1.18} L,\; R = \\num{0}{00.0}\\,mm/h', INK, 6)
-const board = new Board([RIVER, OPEN, FLOWS, LAND, WALL, WAVES, SPRAY, FIRS, MODEM, EYE, PEAKS, RAIN, FALLS, SPEC, POOL_EQ])
+const board = new Board([RIVER, OPEN, FLOWS, LAND, WALL, WAVES, SPRAY, FIRS, MODEM, EYE, PEAKS, RAIN])
 const say = new Say()
 export const RIVER_EQ = '\\theta(s) = \\omega_1 \\sin(2\\pi s / M_1) + \\omega_2 \\sin(2\\pi s / M_2 + \\phi)'
 let ceil = 1 // nothing of the land is drawn above this: the board's room
@@ -225,7 +257,7 @@ let heroN = 0, heroGain = 0.7, occlude = 1, landK = 1, lp = 0, hl = 0, hr = 0 //
 // down to the pool as its stones lock, low over it through the rain and up as the sky clears; low and
 // fast down the river to the lip; over it and round in an arc to face the falls, held there on the plot
 // they have become; then up and over as it pours down into the plunge pool below (wrap.ts).
-const MAP_FOV = 1.1, YL = riverY(LIP - 0.2), ZL = riverZ(LIP)
+const MAP_FOV = 1.1
 const on = (x: number, h: number, dz: number, tx: number, fov: number) => [x, riverY(x) + h, riverZ(x) + dz, tx, riverY(tx), riverZ(tx), fov]
 const KEYS: number[][] = [
   [0, 0, 0, 0, 0, 0, 0, 0], // the map, framed each frame to the screen
@@ -236,10 +268,16 @@ const KEYS: number[][] = [
   [8.4, ...on(SC - 4, 6, 3.5, SC + 3, 1.05)], // up over the stones as the sky clears and they multiply
   [9.3, ...on(SC + 9, 8, 3, 42, 1)],
   [10.5, ...on(43, 6.5, 0, 57, 1)],
-  [11.6, LIP - 8, YL + 5, riverZ(LIP - 8) + 2, LIP + 6, YL - 4, ZL + 2, 1],
-  [12.6, LIP + 9, YL - 2, ZL + 8, LIP + 3, YL - 10, ZL, 1.05], // out over the edge and round, to look back at the curtain from inside its bow
-  [14, LIP + 12, YL - 17, ZL + 1, LIP + 4.5, YL - 18, ZL, 1.15], // down its face with the water: the plot on every side
-  [15.8, LIP + 30, YL - 13, ZL + 1.5, LIP + 6, YL - 14.5, ZL, 1], // back far enough to hold all of it, lip to foot
+  // low and fast to the lip, the shaft opening ahead; over it with the water, looking down the fall at the
+  // pool; down inside the curtain as fast as it falls, so the plot hangs still round us; out over the pool
+  // at its foot to see it lip to foot; and up, to look down on the disc the spectrum makes (wrap.ts flies on)
+  [11.2, 55.5, YL + 2.6, riverZ(55.5), LIP + 22, YL - 9, ZL, 1.05],
+  [11.7, LIP - 0.4, YL + 1.5, ZL, LIP + 13, YL - 20, ZL, 1.1],
+  [12.35, LIP + 4.6, YL - 1.6, ZL + 0.4, SX - 2, YP, SZ, 1.2],
+  [13.2, SX - 6, YL - 9.5, SZ + 1.5, LIP + 3, YL - 12, ZL, 1.1],
+  [14.3, SX - 3, YL - 21, SZ - 1, LIP + 4, YL - 22, ZL - 2, 1.05],
+  [15.4, SX + 4, YP + 1.8, SZ + 2, SX - 13, YP + 13, SZ, 1.1],
+  [16.8, SX + 5, YP + 8, SZ - 7, SX - 5, YP + 3, SZ + 1, 1.05],
 ]
 // Straight down on the stretch the meander drew, framed as it framed it.
 function framed(k: number[]) {
@@ -360,166 +398,113 @@ function whitewater(t: number, xc: number) {
     ink.color(0.9, 0.97, 1, on * (1 - age / life) * fog(p3.z)).moveTo(p3.x, p3.y).lineTo(x1, y1)
   }
 }
-// The falls. The river leaves the lip and drops; every lane of the falling sheet is a frequency (log,
-// 80 Hz to 8 kHz) and every droplet carries the spectrum of the moment it went over: the true STFT of
-// what the speakers are playing. So the falls are a waterfall display, rows born at the lip and falling.
-const LANES = 72, ROWS = 512, NF = 1024
-const spec = new Float32Array(ROWS * LANES), stamp = new Float64Array(ROWS).fill(-1e9)
-const re = new Float64Array(NF), im = new Float64Array(NF)
-let row = 0, ref = -20 // ref: the display's reference level, dB, riding a little over the row's mean
-function listen(t: number) {
-  const r = heard.buf, m = r.length - 1
-  for (let n = 0; n < NF; n++) (re[n] = r[(heard.n - NF + n) & m] * hann(n, NF)), (im[n] = 0)
-  fft(re, im)
-  const o = (row % ROWS) * LANES
-  let sum = 0
-  for (let l = 0; l < LANES; l++) {
-    const f = 80 * 100 ** (l / (LANES - 1)), b = Math.min(NF / 2 - 1, Math.round((f * NF) / heard.sr))
-    const db = 20 * Math.log10(Math.hypot(re[b], im[b]) + 1e-6)
-    spec[o + l] = db, (sum += db)
-  }
-  // set by the mean, as an analyzer's auto level is, not the peak: one loud note must not black out the
-  // water's noise under it. Silence stays dark.
-  ref = Math.max(-40, ref + (sum / LANES + 18 - ref) * 0.1)
-  for (let l = 0; l < LANES; l++) spec[o + l] = clamp((spec[o + l] - ref + 40) / 40) ** 2
-  stamp[row % ROWS] = t
-  row++
-}
-// The row printed nearest time t (no older than the history holds), as an offset into spec.
-function rowAt(t: number) {
-  let lo = Math.max(0, row - ROWS), hi = row - 1
-  while (hi - lo > 1) {
-    const m = (lo + hi) >> 1
-    stamp[m % ROWS] < t ? (lo = m) : (hi = m)
-  }
-  return (Math.abs(stamp[lo % ROWS] - t) < Math.abs(stamp[hi % ROWS] - t) ? lo % ROWS : hi % ROWS) * LANES
-}
-const past = (t: number, lane: number) => (row ? spec[rowAt(t) + lane] : 0)
-const PAL = [[0.02, 0.08, 0.35], [0.05, 0.4, 1], [0.1, 0.95, 0.9], [1, 0.85, 0.2], [1, 1, 1]]
-// Every lane flies from its place on the lip to its place on the ring round the plunge pool's drain (wrap.ts),
-// ballistic: straight across at its own speed while it falls 2.5τ², so the curtain bows round the pool and
-// the spectrum lands on the ring in order, 80 Hz to 8 kHz, angle for log-frequency.
-const FALL_G = 5, TAU_MAX = FALL, W_LIP = wide(LIP) * 1.3
-const PX = LIP + 1.6 * TAU_MAX + M * R, PY = YL - 0.5 * FALL_G * TAU_MAX ** 2, PZ = ZL // the drain, under the pool's surface
-const BX = new Float64Array(LANES), BZ = new Float64Array(LANES), LZ = new Float64Array(LANES), AL = new Float64Array(LANES)
-for (let l = 0; l < LANES; l++) {
-  AL[l] = A0 + (l / (LANES - 1)) * ARC
-  BX[l] = PX + M * R * Math.cos(AL[l]), BZ[l] = PZ + M * R * Math.sin(AL[l]), LZ[l] = ZL + (1 - (2 * l) / (LANES - 1)) * W_LIP
-}
-const fallX = (tau: number, l: number) => LIP + ((BX[l] - LIP) * tau) / TAU_MAX + 0.05 * Math.sin(7 * tau + l)
-const fallZ = (tau: number, l: number) => LZ[l] + ((BZ[l] - LZ[l]) * tau) / TAU_MAX
-// The pool's units (x across, y downstream, z up, from the drain) and ours.
-const toPool = (x: number, y: number, z: number, o: number[]) => ((o[0] = (z - PZ) / M), (o[1] = (x - PX) / M), (o[2] = (y - PY) / M))
+// The shaft. The river goes over its rim all the way round and falls, a curtain of drops each carrying the
+// spectrum of the moment it went over (the true STFT of what the speakers are playing): the droplets are
+// drops.wgsl's, placed in the pool's own units (wrap.ts), and what the pen draws of the shaft is here. Its
+// rock, in flutes down the wall and broken strata round it; its rim, heaving with the spectrum going over
+// it now, angle for log-frequency; the moat's outer bank; and the pool at its foot, hatched along the
+// streamlines of the vortex turning there, r = Re^(−βt) wound by Φ(r).
+const toPool = (x: number, y: number, z: number, o: number[]) => ((o[0] = (z - SZ) / M), (o[1] = (x - SX) / M), (o[2] = (y - YP) / M))
 const WE = [0, 0, 0], WT = [0, 0, 0], UP = [0, 0, 1]
-const fromPool = (k: number[]) => [k[0] + DUR, PX + M * k[2], PY + M * k[3], PZ + M * k[1], PX + M * k[5], PY + M * k[6], PZ + M * k[4], k[7]]
-KEYS.push(...POOL.map(fromPool)) // down the falls into the pool: the whirlpool's own flight, so it goes on unbroken
-// The plot's colour for v, or, plot of the way back from it, water's: blue-white, foam where it is loud.
-function shade(v: number, i: number, plot = 1, foam = 0) {
-  const f = clamp(v) * (PAL.length - 1), k = Math.min(PAL.length - 2, Math.floor(f)), u = f - k, c = PAL[k], d = PAL[k + 1]
-  const w = clamp(foam), q = 1 - plot
-  ink.color(mix(mix(c[0], d[0], u), mix(WATER[0], 0.95, w), q), mix(mix(c[1], d[1], u), mix(WATER[1], 0.98, w), q), mix(mix(c[2], d[2], u), 1, q), i)
+const fromPool = (k: number[]) => [k[0] + DUR, SX + M * k[2], YP + M * k[3], SZ + M * k[1], SX + M * k[5], YP + M * k[6], SZ + M * k[4], k[7]]
+KEYS.push(...POOL.map(fromPool)) // on down into the pool: the whirlpool's own flight, so it goes on unbroken
+type Stroke = { a: number; n: number; kind: number; x: number }
+const SV: number[] = [], rock: Stroke[] = [], rims: Stroke[] = []
+const RIMK = 0, BANK = 1
+const stroke = (list: Stroke[], pts: number[], kind = 0) => (list.push({ a: SV.length / 3, n: pts.length / 3, kind, x: pts[0] }), SV.push(...pts))
+const crag = (a: number, y: number) => 0.9 * Math.abs(field.at(a * 21, y * 0.8)) + 0.35 * Math.abs(field.at(a * 77, y * 2.3)) // the wall's roughness, outward
+for (let j = 0; j < 170; j++) {
+  const a = (TAU * (j + rnd(j * 3 + 8000))) / 170, top = YL - 24 * rnd(j * 5 + 8001) ** 2, len = 4 + 22 * rnd(j * 7 + 8002), pts: number[] = []
+  for (let k = 0; k <= 10; k++) {
+    const y = Math.max(YP, top - (len * k) / 10), r = RR + crag(a, y)
+    pts.push(SX + r * Math.cos(a), y, SZ + r * Math.sin(a))
+  }
+  stroke(rock, pts)
 }
-// Streaks in the falling water: smooth noise over lane and the moment it went over, so it falls with it.
-function streak(l: number, s: number) {
-  const k = Math.floor(s), u = s - k, a = rnd(l * 131 + k * 7.3), b = rnd(l * 131 + (k + 1) * 7.3)
-  return mix(a, b, u * u * (3 - 2 * u))
+for (let l = 0; l < 16; l++)
+  for (let k = 0; k < 60; k++) {
+    if (rnd(l * 61 + k * 3 + 8100) > 0.7) continue // ledges, broken
+    const pts: number[] = []
+    for (let i = 0; i <= 4; i++) {
+      const a = (TAU * (k + i / 4)) / 60, y = YL - 1 - (27 * (l + rnd(l + 8200))) / 16 + 0.3 * field.at(a * 9, l * 3.1), r = RR + crag(a, y)
+      pts.push(SX + r * Math.cos(a), y, SZ + r * Math.sin(a))
+    }
+    stroke(rock, pts)
+  }
+for (let k = 0; k < 120; k++)
+  for (const kind of [RIMK, BANK]) {
+    const pts: number[] = []
+    for (let i = 0; i <= 3; i++) {
+      const a = (TAU * (k + i / 3)) / 120, r = kind ? moat(SX + Math.cos(a), SZ + Math.sin(a)) : RR
+      pts.push(SX + r * Math.cos(a), YL + 0.03, SZ + r * Math.sin(a))
+    }
+    stroke(rims, pts, kind)
+  }
+rims.sort((a, b) => a.x - b.x)
+const SVX = Float32Array.from(SV)
+// The lane at angle a round the shaft: 80 Hz to 8 kHz over half of it, mirrored on the other.
+const lane = (a: number) => {
+  const b = ((((a - A0) / Math.PI) % 2) + 2) % 2
+  return b > 1 ? 2 - b : b
 }
-// Where the falls are on screen.
-let near = 1 // spray too close to the lens to hold in focus, thinned out
 // Close beside the lens a point projects far off the screen, and a stroke out to it would cost the beam its
 // whole budget and the exposure its light: such points are not drawn.
 const framed_ = () => Math.abs(p3.x) < 1.3 * view.a && Math.abs(p3.y) < 1.3
-function fallAt(tau: number, l: number, lift: number) {
-  const x = fallX(tau, l), y = YL - 0.5 * FALL_G * tau * tau + 1.2 * lift, z = fallZ(tau, l)
-  if (!cam.project(x, y, z, p3)) return false
-  near = smooth(2, 9, Math.hypot(x - eye.x, y - eye.y, z - eye.z))
-  return framed_() && visible(p3.x, p3.y)
+// What is down the shaft is seen from over its rim only through its mouth.
+function through(x: number, y: number, z: number) {
+  if (eye.y <= YL) return true
+  const k = (eye.y - YL) / (eye.y - y)
+  return Math.hypot(eye.x + (x - eye.x) * k - SX, eye.z + (z - eye.z) * k - SZ) < RR
 }
-// The plot pours into the pool: a point of it m of the way from its place on the curtain (lane l, tau below
-// the lip) to its place wound round the drain (r out, turned as the water has turned there). The way runs
-// in the pool's cylinder, radius, angle and height, so the sheet winds round the drain as it comes down:
-// its rows bend into rings, its lanes fan out into angles, and the rectangle becomes the disc.
-const MORPH = [16.8, 18.8]
-function plotAt(tau: number, l: number, m: number, r: number) {
-  const x = fallX(tau, l), y = YL - 0.5 * FALL_G * tau * tau, z = fallZ(tau, l)
-  const rc = Math.hypot(x - PX, z - PZ) / M, ac = Math.atan2(z - PZ, x - PX)
-  let da = AL[l] + turned(r) - ac
-  da -= TAU * Math.round(da / TAU)
-  const a = ac + m * da, rr = mix(rc, r, m), X = PX + M * rr * Math.cos(a), Y = mix(y, PY + M * surface(r), m), Z = PZ + M * rr * Math.sin(a)
-  if (!cam.project(X, Y, Z, p3)) return false
-  near = smooth(2, 9, Math.hypot(X - eye.x, Y - eye.y, Z - eye.z))
-  return framed_() && visible(p3.x, p3.y)
-}
-function falls(t: number, show: number) {
-  const rows = smooth(12.9, 13.9, t) * (1 - smooth(18.4, 19.8, t)), plot = smooth(12.2, 13.3, t)
-  const morph = smooth(MORPH[0], MORPH[1], t)
-  // face to face with it, the lanes give way to rows: the raster of a waterfall plot. Then it pours down
-  // into the pool, the rows nearest the water first, and lies on it as the whirlpool will: the newest at
-  // the rim, each older one an e-fold of the inflow further in. Each row's moment slides back by the time
-  // the water takes to fall, so it lands showing what the pool shows there.
-  for (let j = 0; j < 130 && rows > 0; j++) {
-    const u = j / 129, tau = u * TAU_MAX, m = smooth(0, 1, 1.5 * morph - 0.5 * (1 - u)), rp = R * Math.exp(-pool.beta * tau)
-    const r = row ? rowAt(t - tau - m * FALL) : 0
+// The rim and the moat's bank, up to x, in their place in the sweep.
+let heave = 0
+function rim(upto: number, next: { i: number }, k: number) {
+  for (; next.i < rims.length && rims[next.i].x < upto; next.i++) {
+    const it = rims[next.i]
     let pen = false
-    for (let l = 0; l < LANES; l++) {
-      const v = spec[r + l]
-      if (!plotAt(tau, l, m, rp)) {
+    for (let v = 0; v < it.n; v++) {
+      const o = 3 * (it.a + v), x = SVX[o], z = SVX[o + 2], lv = it.kind ? 0 : loud(lane(Math.atan2(z - SZ, x - SX)))
+      if (!cam.project(x, SVX[o + 1] + 0.9 * heave * lv, z, p3) || !framed_() || !visible(p3.x, p3.y)) {
         pen = false
         continue
       }
-      shade(v, show * rows * near * (0.3 + 0.7 * v) * smooth(0, 0.3, tau)) // the floor is lit too, as a display's is
+      if (it.kind) ink.color(WATER[0], WATER[1], WATER[2], 0.6 * k * fog(p3.z) * landK)
+      else ink.color(1, mix(0.8, 0.97, lv), mix(0.6, 0.95, lv), k * fog(p3.z) * (0.5 + 2 * lv * lv))
       pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
       pen = true
     }
   }
-  // the lip, heaving with the spectrum going over it now
-  const lip = smooth(12.3, 14.3, t) * (1 - smooth(MORPH[0] - 0.6, MORPH[0] + 0.2, t))
-  let pen = false
-  for (let l = 0; l < LANES && lip > 0; l++) {
-    const v = past(t, l)
-    if (!fallAt(0, l, v * lip)) {
-      pen = false
-      continue
-    }
-    ink.color(1, mix(0.75, 0.95, v), mix(0.45, 0.85, v), show * lip * (0.3 + v * v))
-    pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
-    pen = true
-  }
-  // the lanes down the curtain, until face to face they give way to the rows. Seen obliquely they crowd
-  // together: keep the ink per unit of screen what it is face on. Until it turns to the plot it is water,
-  // white in streaks that fall with it, foaming where the spectrum is loud.
-  const lanes = 1 - smooth(13.2, 14.2, t)
-  for (let l = 0; l < LANES && lanes > 0; l++) {
+}
+// The rock down the wall, and the pool: hatched along its streamlines, each with a brighter stretch running in.
+function shaft(t: number, k: number, hatch: number) {
+  const grow = clamp(lock([[0, 0], [FAR + 0.4, 1]], t, 7, 0.45), 0, 1.2)
+  for (const it of rock) {
     let pen = false
-    for (let j = 0; j <= 44; j++) {
-      const tau = (j / 44) ** 1.3 * TAU_MAX
-      if (!fallAt(tau, l ? l - 1 : 1, 0)) {
+    for (let v = 0; v < it.n; v++) {
+      const o = 3 * (it.a + v), y = YL + (SVX[o + 1] - YL) * grow
+      if (!through(SVX[o], y, SVX[o + 2]) || !cam.project(SVX[o], y, SVX[o + 2], p3) || !framed_() || p3.y > ceil) {
         pen = false
         continue
       }
-      const nx = p3.x, ny = p3.y
-      if (!fallAt(tau, l, 0)) {
-        pen = false
-        continue
-      }
-      const v = past(t - tau, l), gap = clamp(Math.hypot(p3.x - nx, p3.y - ny) / 0.025, 0.08, 1)
-      const w = streak(l, 9 * (t - tau)) ** 2, look = mix(0.15 + 0.6 * w + 0.4 * v, 0.3 + 0.7 * v, plot)
-      shade(v, 0.45 * near * gap * show * lanes * look * fog(p3.z) * smooth(0, 0.5, tau), plot, w + v)
+      ink.color(INK[0], INK[1], INK[2], (it.n > 5 ? 0.05 : 0.1) * k * fog(p3.z) * grow)
       pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
       pen = true
     }
   }
-  // spray where it lands, flung back up from the foot of the curtain, until the water is the plot
-  const spray = show * lanes * (1 - plot)
-  for (let d = 0; d < 160 && spray > 0.02; d++) {
-    const l = Math.floor(rnd(d * 17) * LANES), life = 0.7 + 0.6 * rnd(d * 3), age = (t + life * rnd(d * 7)) % life
-    const x0 = fallX(TAU_MAX, l), z0 = fallZ(TAU_MAX, l), out = 1 + 3 * rnd(d * 19)
-    const vx = (x0 - LIP) / TAU_MAX + out * Math.cos(AL[l]), vz = out * Math.sin(AL[l]) + 2 * rnd(d * 11) - 1, vy = 2 + 5 * rnd(d * 5)
-    const at = (a: number) => cam.project(x0 + vx * a, PY + vy * a - 0.5 * G * a * a, z0 + vz * a, p3)
-    if (!at(age) || !visible(p3.x, p3.y)) continue
-    const x1 = p3.x, y1 = p3.y
-    if (!at(Math.max(0, age - 0.06))) continue
-    ink.color(0.9, 0.97, 1, 0.8 * spray * (1 - age / life) * (0.3 + past(t - TAU_MAX - age, l))).moveTo(p3.x, p3.y).lineTo(x1, y1)
+  for (let j = 0; j < 30 && hatch > 0.02; j++) {
+    const head = (0.3 * t + rnd(j * 3 + 8500)) % 1
+    let pen = false
+    for (let i = 0; i <= 32; i++) {
+      const u = i / 32, r = RIM * 0.98 * Math.exp(-3.4 * u), a = (TAU * j) / 30 + turned(Math.min(r, R)) + 0.25 * Math.sin(3 * u + j)
+      const x = SX + M * r * Math.cos(a), y = YP + M * surface(r) + 0.03, z = SZ + M * r * Math.sin(a)
+      if (!through(x, y, z) || !cam.project(x, y, z, p3) || !framed_() || p3.y > ceil) {
+        pen = false
+        continue
+      }
+      ink.color(WATER[0], WATER[1], WATER[2], hatch * fog(p3.z) * (0.08 + 0.7 * Math.exp(-((u - head + 1) % 1) * 7)))
+      pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
+      pen = true
+    }
   }
 }
 
@@ -631,22 +616,26 @@ export const valley: Scene = {
     crane(t)
     ink.clear(), (heroN = 0), (grown = 0)
     horizon.fill(-9)
-    const next = { i: 0 }, behind = occlude > 0.5 ? eye.x + 0.3 : -Infinity, heavy = rain(t) / 45
+    const next = { i: 0 }, edge = { i: 0 }, behind = occlude > 0.5 ? eye.x + 0.3 : -Infinity, heavy = rain(t) / 45
     let heroRow = -1, nd = 0, pooled = t < ON
     slip = chase(t)
     if (t > ON) place_(t)
-    const land = (landK = 1 - smooth(11, 12.2, t)) // the valley falls away behind us as we go over
+    const land = (landK = 1 - smooth(11.9, 12.5, t)) // under the rim the land is out of sight: only the shaft's rock is left
+    const T = t - DUR, lit = smooth(11.2, 12.3, t), wall = smooth(FAR, FAR + 1, t) * (1 - smooth(12.3, 13.3, t)) // the rock's ink, until the falls are between us and it
+    const brim = smooth(FAR, FAR + 1, t) * (1 - smooth(18.4, DUR, t))
+    heave = smooth(8, 10, t)
 
     // strokes too faint to see would still cost the beam its time: once the valley is gone, skip it
-    for (let i = 0; i < NR && land > 0.06; i++) {
-      const x = rowX(i), x0 = rowX(i - 1), rise = clamp(lock([[0, 0], [SCAN + (i / NR) * SCAN_DUR, 1]], t, 7, 0.45), 0, 1.35)
+    for (let i = 0; i < (t > FAR ? NT : NR) && land > 0.06; i++) {
+      const x = rowX(i), x0 = rowX(i - 1), rise = clamp(lock([[0, 0], [i < NR ? SCAN + (i / NR) * SCAN_DUR : FAR + (0.8 * (i - NR)) / NB, 1]], t, 7, 0.45), 0, 1.35)
       if (x < behind) continue
       items_(t, x, next)
+      rim(x, edge, brim)
       if (!pooled && x > SC - 3.2) (pooled = true), stones(t)
       for (; heavy > 0 && nd < DROPS && RX[nd] < x; nd++) drop(nd, t, heavy)
       for (const c of CASCADES) if (c >= x0 && c < x && t > opens(c)) whitewater(t, c)
       // the banks and the current, from the last row to this one
-      if (i > 0 && x0 >= behind && t > opens(x0)) {
+      if (i > 0 && i < NR && x0 >= behind && t > opens(x0)) {
         const y0 = riverY(x0), y1 = riverY(x), w0 = wide(x0) * open(x0, t), w1 = wide(x) * open(x, t)
         for (const side of [-1, 1]) seg(x0, y0, riverZ(x0) + side * w0, x, y1, riverZ(x) + side * w1, WATER, 0.9)
       }
@@ -660,8 +649,8 @@ export const valley: Scene = {
       const index = (i % 8 === 0 ? 1 : 0.6) * Math.min(1, rise * 2.5) * land
       let pen = false
       for (let j = 0; j < NC; j++) {
-        const water = Math.abs(RZp[o + j] - riverZ(x)) < wide(x)
-        if (!ok[j] || !visible(sx[j], sy[j]) || (water && i % 3)) {
+        const water = RK[o + j] === 1
+        if (!ok[j] || !visible(sx[j], sy[j]) || (water && i % 3) || RK[o + j] > 1) {
           pen = false
           continue
         }
@@ -671,29 +660,34 @@ export const valley: Scene = {
         pen = true
       }
       if (t >= SCAN && rise < 1.2) heroRow = i
-      for (let j = 1; j < NC; j++) if (ok[j] && ok[j - 1]) raise(sx[j - 1], sy[j - 1], sx[j], sy[j])
+      for (let j = 1; j < NC; j++) if (ok[j] && ok[j - 1] && RK[o + j] < 2 && RK[o + j - 1] < 2) raise(sx[j - 1], sy[j - 1], sx[j], sy[j])
       if (heroRow === i && t < 3) for (let j = 0; j < NC && heroN < HERO; j++) if (ok[j]) (hx[heroN] = sx[j]), (hy[heroN++] = sy[j])
     }
     if (land > 0.06) items_(t, Infinity, next)
+    rim(Infinity, edge, brim)
+    if (wall > 0) shaft(t, wall, 1 - 0.8 * smooth(12.6, 14, t))
     if (t >= 3 && t < ON + 0.3) newest(t)
     // nothing new growing: the speakers trace the river itself, from under us to the lip
     if (heroN < 2 && t >= SCAN && land > 0.06)
       for (let x = Math.max(X0, eye.x + 1); x < LIP && heroN < HERO; x += 0.3)
         if (cam.project(x, riverY(x), riverZ(x), p3)) (hx[heroN] = p3.x), (hy[heroN++] = p3.y)
     heroGain = t < SCAN ? 0.3 : t < 3 ? 0.7 : t < ON + 0.3 ? 1 : 0.4 // a ridge or one far fir carries less than the river does
-    // the pool's printer runs from early on, so the water has its history when it shows
-    const lit = smooth(18.2, 19.8, t)
-    if (t > 10) {
-      const fld = whirl(t - DUR, (f.at ?? 0) + t, f, lit), q = fld.p
+    // the shaft's printer runs from early on, so the water has its history when it shows; its drops fall
+    // from when we run for the lip, its water is lit as we come over, and both turn from water to the plot
+    // as we ride down with them
+    if (t > 4.5) {
+      whirl(T, (f.at ?? 0) + t, f, lit, smooth(12.7, 14, t), smooth(10.2, 11, t), mix(0.35, 1, smooth(11, 12, t))) // fewer drops while they are far off
       toPool(cur[0], cur[1], cur[2], WE), toPool(cur[3], cur[4], cur[5], WT)
-      aim(q, WE, [WT[0] - WE[0], WT[1] - WE[1], WT[2] - WE[2]], UP, cur[6])
-      f.look = lit > 0 ? { tau: mix(LOOK.tau, TAU_RASTER, lit) } : undefined
+      WT[0] -= WE[0], WT[1] -= WE[1], WT[2] -= WE[2]
+      sight(WE, WT, UP, cur[6])
+      f.look = lit > 0 ? { tau: mix(LOOK.tau, TAU_RASTER, smooth(0, 0.2, lit)) } : undefined
     }
-    if (t > 6) listen(t), falls(t, smooth(6, 8, t))
-    // over the edge: the speakers trace the lip, the spectrum going over it, until the choir takes over
+    // over the edge the speakers trace the rim, the spectrum going over it, until the choir takes over
     if (heroN < 2 && t > 6)
-      for (let l = 0; l < LANES && heroN < HERO; l++)
-        if ((fallAt(0, l, past(t, l)), p3.z)) (hx[heroN] = p3.x), (hy[heroN++] = p3.y) // heard even where the board hides it
+      for (let j = 0; j < 96 && heroN < HERO; j++) {
+        const a = (TAU * j) / 96
+        if (cam.project(SX + RR * Math.cos(a), YL + 0.9 * loud(lane(a)), SZ + RR * Math.sin(a), p3)) (hx[heroN] = p3.x), (hy[heroN++] = p3.y) // heard even where it is out of frame
+      }
     // exposure: the ink is energy per length, so as the valley fills in it would burn brighter and
     // brighter; past a reference length, stop down, as an eye or a camera would
     const stop = Math.min(1, (EXPOSE / Math.max(1, ink.len)) ** 0.7)
@@ -729,13 +723,18 @@ export const valley: Scene = {
     EYE.vals[0] = eye.x, EYE.vals[1] = eye.y, EYE.vals[2] = eye.z, EYE.hot = 0.3
     MODEM.vals[0] = esn0(t), MODEM.vals[1] = order(t), MODEM.vals[2] = offset(t), MODEM.hot = +(hero === 4)
     RAIN.vals[0] = rain(t), RAIN.hot = heavy
-    FALLS.vals[0] = YL, FALLS.hot = smooth(8.8, 10.2, t) * (1 - smooth(13.8, 15.8, t))
-    SPEC.vals[0] = t, SPEC.hot = smooth(12.9, 13.9, t) * (1 - smooth(MORPH[0], MORPH[0] + 1, t))
-    POOL_EQ.vals[0] = pool.beta, POOL_EQ.hot = smooth(MORPH[0], MORPH[0] + 1, t)
-    // the board gives way to the whirlpool's one equation as we come down into it
-    const hand = smooth(DUR - 1.2, DUR, t)
-    ceil = board.show(f, t, smooth(0.2, 0.8, t) * (1 - hand))
-    if (hand > 0) equation(f, VORTEX, VORTEX_INK, 0.9 * hand, live)
+    // running for the lip the board gives way to one equation at a time: the water goes critical at the rim
+    // (Fr = 1, where it runs as fast as its own waves), falls, is the plot, and turns
+    const hand = smooth(10.6, 11.2, t)
+    ceil = mix(board.show(f, t, smooth(0.2, 0.8, t) * (1 - hand)), 1, hand)
+    if (t > 11 && t < 12.2) {
+      const fr = mix(0.4, 1, smooth(46, LIP, eye.x)), h = (1.44 / (GF * fr * fr)) ** (1 / 3) // q = vh = 1.2 m²/s the whole way
+      tell.say(f, T, FROUDE, WATER, [['v', 1.2 / h, 2], ['h', h, 2], ['Fr', fr, 2]], smooth(11, 11.4, t))
+    } else if (t >= 12.2 && t < 13.5) {
+      const tau = Math.sqrt((2 * Math.max(0, YL - eye.y)) / GF)
+      tell.say(f, T, BALLISTIC, WHITE, [['g', GF, 1], ['\\tau', tau, 2], ['y_l - y', YL - eye.y, 1]])
+    } else if (t >= 13.5 && t < 16.2) tell.say(f, T, STFT, CYAN, [['t', (f.at ?? 0) + t, 2], ['N', 4096, 0], ['H', 100, 0]])
+    else if (t >= 16.2) turning(f, T)
 
     f.rate = mix(2.4e6, 7.2e6, smooth(1, 8, t))
     if (t > SING) place(t - SING)
