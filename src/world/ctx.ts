@@ -97,10 +97,10 @@ export function solid(id: string, c: ArrayLike<number>, ax: ArrayLike<number>, a
 }
 
 // Model `id` stood on the ground at unit n: offset (east, north) radii, turned `spin` about the vertical, its thinnest
-// axis up (KiCad lays a board's parts along its thickness's negative side, so flipped is the default), `size` radii
-// across its widest, its underside `lift` above the ground.
+// axis up (flip it for a board whose interesting side is its bottom, as PEEP's is), `size` radii across its widest, its
+// underside `lift` above the ground.
 const e0: V = [0, 0, 0], N0: V = [0, 0, 0], g: V = [0, 0, 0], col: V[] = [[0, 0, 0], [0, 0, 0], [0, 0, 0]]
-export function stand(id: string, n: ArrayLike<number>, size: number, off: readonly number[] = [0, 0], spin = 0, lift = 0, flip = true) {
+export function stand(id: string, n: ArrayLike<number>, size: number, off: readonly number[] = [0, 0], spin = 0, lift = 0, flip = false) {
   const m = ctx.models[id]
   if (!m) return false
   const ext = [m.hi[0] - m.lo[0], m.hi[1] - m.lo[1], m.hi[2] - m.lo[2]]

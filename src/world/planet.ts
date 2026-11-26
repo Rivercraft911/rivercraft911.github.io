@@ -53,7 +53,7 @@ const slerp = (a: V, b: V, s: number, o: V) => {
 }
 
 // ---- the camera: a pose, and flights between poses -------------------------------------------------------------
-type Pose = { eye: V; at: V; up: V }
+export type Pose = { eye: V; at: V; up: V }
 const pose = (): Pose => ({ eye: [0, 0, 3], at: [0, 0, 0], up: [0, 1, 0] })
 const now = pose(), from = pose(), to = pose()
 let focus = -1 // the place we are at, or home
@@ -241,6 +241,49 @@ function debugPose(t: number) {
   now.up = [0, 1, 0]
 }
 
+// One frame of the planet, seen from `pose` at planet time t, with place `focus` the one looked at (its spectacle in
+// full, its equation up) and the lens open by `lens` (0 a pinhole, 1 a macro lens's). The world draws with it, and so
+// does the intro, which flies its own camera through the same places.
+export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number, lens: number, marked = false) {
+  const { eye, at } = pose, up_ = pose.up
+  E[0] = eye[0], E[1] = eye[1], E[2] = eye[2]
+  const alt = Math.max(len(E) - 1, 1e-3)
+  aim(p, [0, 0, 0], [at[0] - E[0], at[1] - E[1], at[2] - E[2]], up_, clamp(0.62 - 0.04 * Math.log10(0.3 / alt), 0.5, 0.75))
+  cam.set(p.subarray(0, 16))
+  if (dbg.has('at')) L.splice(0, 3, ...L0)
+  else clock(t, L)
+  p.set([-E[0], -E[1], -E[2], 1, L[0], L[1], L[2], t, 0, 1, 0, 0, 1, 0.07, 1, 1, EXPOSE, 1, 0, 0], 16)
+
+  // the monuments, the places' own drawing, and the sun on them
+  ctx.t = t, ctx.dt = dt, ctx.f = f, ctx.focus = focus
+  ctx.L[0] = L[0], ctx.L[1] = L[1], ctx.L[2] = L[2]
+  ctx.items.length = 0
+  PLACES.forEach((P, k) => {
+    for (const m of P.monuments) stand(m.id, sites[k], m.size, m.at, m.turn, m.lift, m.flip)
+    P.draw?.(k)
+  })
+  if (DEBUG) stand('peep', PEEP, 0.08, undefined, 0.4, 0.002)
+  const near = focus >= 0 ? sites[focus] : DEBUG ? PEEP : sites[0]
+  const sh = solids.shadow as number[], up = solids.up as number[], sun = solids.sun as number[]
+  sh[0] = near[0] * 1.01 - E[0], sh[1] = near[1] * 1.01 - E[1], sh[2] = near[2] * 1.01 - E[2], sh[3] = 0.12
+  up[0] = near[0], up[1] = near[1], up[2] = near[2]
+  sun[0] = L[0], sun[1] = L[1], sun[2] = L[2], sun[3] = 22 * clamp(dot(near, L) * 4 + 0.6, 0, 1)
+  // the lens: on the place, at the camera's distance, opening like a macro lens's as the camera comes close
+  const fd = Math.hypot(at[0] - E[0], at[1] - E[1], at[2] - E[2])
+  solids.focus = fd
+  solids.aperture = lens * clamp(0.12 / fd, 0, 1) * 26
+
+  river.clear().color(0.5, 0.8, 1, 0.9)
+  trace(river, RW, RW.length / 3)
+  drawOrbits(t)
+  if (marked) drawMarks()
+  else marks.clear()
+  f.ch.push({ w: 0.2, path: river }, { w: 0.5, path: orbits }, { w: 0.1, path: marks })
+  f.rate = 2.4e6
+  f.field = F
+  f.look = { tau: 0.025 }
+}
+
 export const planet: Scene = {
   dur: Infinity,
   build(t, f: Frame) {
@@ -263,40 +306,6 @@ export const planet: Scene = {
     else if (flight >= 0) fly(from, to, flight, now)
     else for (const key of ['eye', 'at', 'up'] as const) for (let i = 0; i < 3; i++) now[key][i] = to[key][i]
 
-    E[0] = now.eye[0], E[1] = now.eye[1], E[2] = now.eye[2]
-    const alt = Math.max(len(E) - 1, 1e-3)
-    aim(p, [0, 0, 0], [now.at[0] - E[0], now.at[1] - E[1], now.at[2] - E[2]], now.up, clamp(0.62 - 0.04 * Math.log10(0.3 / alt), 0.5, 0.75))
-    cam.set(p.subarray(0, 16))
-    if (dbg.has('at')) L.splice(0, 3, ...L0)
-    else clock(t, L)
-    p.set([-E[0], -E[1], -E[2], 1, L[0], L[1], L[2], t, 0, 1, 0, 0, 1, 0.07, 1, 1, EXPOSE, 1, 0, 0], 16)
-
-    // the monuments, the places' own drawing, and the sun on them
-    ctx.t = t, ctx.dt = dt, ctx.f = f, ctx.focus = focus
-    ctx.L[0] = L[0], ctx.L[1] = L[1], ctx.L[2] = L[2]
-    ctx.items.length = 0
-    PLACES.forEach((P, k) => {
-      for (const m of P.monuments) stand(m.id, sites[k], m.size, m.at, m.turn, m.lift, m.flip)
-      P.draw?.(k)
-    })
-    if (DEBUG) stand('peep', PEEP, 0.08, undefined, 0.4, 0.002)
-    const near = focus >= 0 ? sites[focus] : DEBUG ? PEEP : sites[0]
-    const sh = solids.shadow as number[], up = solids.up as number[], sun = solids.sun as number[]
-    sh[0] = near[0] * 1.01 - E[0], sh[1] = near[1] * 1.01 - E[1], sh[2] = near[2] * 1.01 - E[2], sh[3] = 0.12
-    up[0] = near[0], up[1] = near[1], up[2] = near[2]
-    sun[0] = L[0], sun[1] = L[1], sun[2] = L[2], sun[3] = 22 * clamp(dot(near, L) * 4 + 0.6, 0, 1)
-    // the lens: on the place, at the camera's distance, opening like a macro lens's as the camera comes close
-    const fd = Math.hypot(now.at[0] - E[0], now.at[1] - E[1], now.at[2] - E[2])
-    solids.focus = fd
-    solids.aperture = (DEBUG ? +(dbg.get('ap') ?? 0) : focus >= 0 && flight < 0 ? 1 : 0) * clamp(0.12 / fd, 0, 1) * 26
-
-    river.clear().color(0.5, 0.8, 1, 0.9)
-    trace(river, RW, RW.length / 3)
-    drawOrbits(t)
-    drawMarks()
-    f.ch.push({ w: 0.2, path: river }, { w: 0.5, path: orbits }, { w: 0.1, path: marks })
-    f.rate = 2.4e6
-    f.field = F
-    f.look = { tau: 0.025 }
+    paint(f, now, t, dt, focus, DEBUG ? +(dbg.get('ap') ?? 0) : focus >= 0 && flight < 0 ? 1 : 0, true)
   },
 }
