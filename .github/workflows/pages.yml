@@ -29,6 +29,19 @@ jobs:
       - run: npm run build
       # deep links (/<project>) are routed by the app: serve it for every path
       - run: cp dist/index.html dist/404.html
+      # /next/: the world branch while it is being made, built under its own base
+      - id: next
+        run: git ls-remote --exit-code --heads origin world && echo ok=1 >> "$GITHUB_OUTPUT" || true
+      - if: steps.next.outputs.ok
+        uses: actions/checkout@v4
+        with:
+          ref: world
+          path: next
+      - if: steps.next.outputs.ok
+        working-directory: next
+        run: npm ci && npx tsc --noEmit && npx vite build --base=/next/ --outDir ../dist/next --emptyOutDir
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

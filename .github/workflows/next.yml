@@ -1,0 +1,18 @@
+name: next
+
+# Only main may deploy Pages, so a push to the world branch asks main's workflow to redeploy:
+# the site stays main's at the root, and /next/ shows the world branch.
+on:
+  push:
+    branches: [world]
+
+permissions:
+  actions: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh workflow run pages.yml --ref main -R "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}
