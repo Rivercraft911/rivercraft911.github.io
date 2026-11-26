@@ -7,7 +7,8 @@ import { PLANET } from '../gpu/fields'
 import type { Field } from '../gpu/raster'
 import { Path } from '../beam/path'
 import { aim } from './reality'
-import { ident } from './ident'
+import { ident, lands } from './ident'
+import { title } from '../world/pages'
 import { place, sing } from './choir'
 import { REVEAL, RV } from './clock'
 import { TAU, clamp, smooth, type Scene } from './scene'
@@ -94,6 +95,7 @@ export const reveal: Scene = {
 export const named: Scene = {
   dur: ident.dur,
   build(t, f) {
+    if (!lands.at || t < 0.05) lands.at = title() // the words' name, measured where it will appear
     const v = ident.build(t, f)
     planet(REVEAL + t, T0 + REVEAL + t, f)
     return v

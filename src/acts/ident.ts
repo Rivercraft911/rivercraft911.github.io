@@ -42,6 +42,8 @@ const harmonics = (t: number) => Math.exp(Math.log(NMAX) * clamp(lock([[0, 0], [
 
 const series = new Series(2048), c = { re: 0, im: 0 }, tip = { x: 0, y: 0, z: 0 }
 const name = new Path(), call = new Path(), both = new Path(), head = new Path(), out = new Path()
+// Where the name lands, in CSS px (its baseline's left end and its width): where the words will carry it on (world/pages).
+export const lands = { at: null as { left: number; bottom: number; width: number } | null }
 const ink = new Path(), arms = new Path()
 const eq = new Say()
 let built = 0
@@ -60,15 +62,19 @@ export const ident: Scene = {
       text(both, 'RIVER DOWDY', 0, -0.02, size, 0.5)
       both.color(0.75, 1, 0.8, 0.8)
       text(both, 'KJ5SCH', 0, -0.3, 0.075, 0.5)
-      const vert = A < 1, z = (vert ? 0.024 : 0.03) * 0.95
-      head.clear().color(1, 0.7, 0.28, 0.75)
-      text(head, 'RIVER DOWDY  KJ5SCH', vert ? -A + 0.03 : -A + 0.12, 0.93, z, 0)
+      const vert = A < 1, z = (vert ? 0.024 : 0.03) * 0.95, L = lands.at
+      head.clear().color(0.95, 0.97, 1, 0.9)
+      if (L) {
+        // onto the words' own name, as wide as they set it, so the beam hands the name to the page
+        const x = ((2 * L.left) / innerWidth - 1) * A, y = 1 - (2 * L.bottom) / innerHeight, wd = ((2 * L.width) / innerWidth) * A
+        text(head, 'RIVER DOWDY', x, y, wd / measure('RIVER DOWDY', 1), 0)
+      } else text(head, 'RIVER DOWDY  KJ5SCH', vert ? -A + 0.03 : -A + 0.12, 0.93, z, 0)
       built = A
     }
 
     const up = clamp(lock([[0, 0], [RISE, 1]], t, 3.5, 0.8), 0, 1.05)
     if (up > 0) {
-      // the name rises into the corner of the instrument that powers up around it
+      // the name settles where the words will carry it on
       f.ch.push({ w: 1, path: morph(both, head, up, out, 900) })
       return voice
     }

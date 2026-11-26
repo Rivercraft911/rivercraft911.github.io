@@ -158,6 +158,16 @@ export function mount(go: (k: number) => void, on: () => boolean) {
   })
   if (deep() >= 0) go(deep())
 }
+// Where the name stands in the words, on the screen: the ident lands the beam's name there, and the words take over.
+export function title() {
+  const h = root.querySelector('h1')!, was = root.hidden
+  root.hidden = false
+  const g = document.createRange()
+  g.selectNodeContents(h) // the letters, not the block they stand in
+  const r = g.getBoundingClientRect(), s = getComputedStyle(h), w = h.textContent!.length
+  root.hidden = was
+  return { left: r.left, bottom: r.bottom - parseFloat(s.fontSize) * 0.22, width: r.width - parseFloat(s.letterSpacing || '0') * (w > 0 ? 1 : 0) } // less the last letter's spacing
+}
 // Is this event's target in the words? Keys pressed there are the reader's (space scrolls; it doesn't pause).
 export const within = (t: EventTarget | null) => t instanceof Node && root.contains(t)
 
