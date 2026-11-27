@@ -44,7 +44,9 @@ fn at(px: vec2f) -> vec4f {
   let q = clamp(px, vec2f(0.5), r.res - 0.5);
   let m = textureLoad(solids, vec2i(q), 0);
   let D = vec2f(textureDimensions(far));
-  let d = select(textureLoad(far, vec2i(q / r.res * D), 0).r, textureLoad(near, vec2i(q), 0).r, m.a > 0.5);
+  // (a pixel's solid distance is resolved from its samples, the uncovered ones 0: divided by its coverage, it is the
+  // solid's own, not one nearer, which the lens would blur as if it stood in front)
+  let d = select(textureLoad(far, vec2i(q / r.res * D), 0).r, textureLoad(near, vec2i(q), 0).r / max(m.a, 1e-3), m.a > 0.5);
   // the ground the field drew, in the shadow and the bounced light of what stands on it
   let S = vec2f(textureDimensions(shade));
   let g = textureSampleLevel(shade, smp, clamp(q / r.res, 0.5 / S, 1.0 - 0.5 / S), 0.0);
@@ -65,17 +67,24 @@ fn coc(d: f32) -> f32 { return min(r.aper * abs(1.0 - r.focus / max(d, 1e-6)), 4
   if (r.aper <= 0.0) { return vec4f(c.rgb * r.gain, 0.0); }
   // Scatter as gather: each tap round the pixel adds its light here if its own blur disc reaches this far, spread
   // over that disc's area; a tap behind a sharp pixel may not blur over it. The pattern turns every frame, and the
-  // phosphor's persistence averages the turns into a smooth bokeh. The taps are read from the half-size scene.
+  // phosphor's persistence averages the turns into a smooth bokeh. The taps are read from the half-size scene, its
+  // light filtered but its distance the nearest of the four texels the filter took: across a silhouette a blended
+  // distance is halfway between, its blur wide, and it would lay a ghost of a sharp edge out over the blurred
+  // world behind it at every tap.
   let R0 = coc(c.a);
   let reach = min(48.0, r.aper * 1.2 + 1.0);
-  var acc = vec4f(c.rgb, 1.0) / max(R0 * R0, 1.0);
+  var acc = vec4f(c.rgb, 1.0) / max(R0 * R0, 1.0) / (1.0 + dot(c.rgb, vec3f(0.2126, 0.7152, 0.0722)) * r.gain);
   let H = vec2f(textureDimensions(half));
   for (var i = 0; i < 32; i++) {
     let rr = sqrt((f32(i) + 0.5) / 32.0) * reach;
     let th = f32(i) * 2.3999632 + r.spin;
-    let s = textureSampleLevel(half, smp, clamp((pos.xy + vec2f(cos(th), sin(th)) * rr) / r.res, 0.5 / H, 1.0 - 0.5 / H), 0.0);
+    let uv = clamp((pos.xy + vec2f(cos(th), sin(th)) * rr) / r.res, 0.5 / H, 1.0 - 0.5 / H);
+    let d4 = textureGather(3, half, smp, uv);
+    let s = vec4f(textureSampleLevel(half, smp, uv, 0.0).rgb, min(min(d4.x, d4.y), min(d4.z, d4.w)));
     let cs = select(coc(s.a), min(coc(s.a), R0), s.a > c.a);
-    let w = clamp(cs - rr + 1.0, 0.0, 1.0) / max(cs * cs, 1.0);
+    // (each tap counts less the brighter it is, Karis's way: a point of light far out of focus, an LED or a glint, would
+    // otherwise be caught by a tap here and missed by the next, and lie on the blur as a scatter of sparks)
+    let w = clamp(cs - rr + 1.0, 0.0, 1.0) / max(cs * cs, 1.0) / (1.0 + dot(s.rgb, vec3f(0.2126, 0.7152, 0.0722)) * r.gain);
     acc += vec4f(s.rgb * w, w);
   }
   return vec4f(acc.rgb / acc.a * r.gain, 0.0);

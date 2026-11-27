@@ -18,12 +18,13 @@
 // Beyond: the fixed stars, which keep their places by the sun; the galaxy; the dust of the planets' plane, lit: the
 //   zodiacal light, and the gegenschein opposite the sun.
 //
-// p[4] centre (from the eye), radius   p[5] toward the sun, t   p[6] the spin axis, the spin angle
+// p[4] centre (from the eye), radius   p[5] toward the sun, t   p[6] the place marked (which, how much), -, -
 // p[7] the storm, its eye's radius (rad), cloud cover, aurora
-// p[8] exposure, the night side's own light, how many places (up to 10), the arrival's (its tower's fade: arrive.wgsl)
-// p[9] how much is read out as text, the river's place (lat, lon; rad), its radii per unit of s (0: no river)
+// p[8] exposure, the night side's own light, how many places (up to 8), the arrival's (its tower's fade: arrive.wgsl)
+// p[9] the lens's blur at infinity (px; 0 a pinhole), the river's place (lat, lon; rad), its radii per unit of s (0: no river)
 // p[10..13] the places, two a slot (lat, lon, lat, lon; rad): each stands on land and is lit at night
-// p[13].zw the place marked (which, how much)
+// p[14] (the world's only) BLEPS's main camera's footprint: where it falls (lat, lon), its picture's up (rad east of
+//   north), and −its half-width (radii; 0 or more, none)
 //
 // data: a 256² tile of white noise (fields.ts), r the same as g but 37, 17 texels on, so one bilinear tap reads a
 // lattice of 3D value noise at two depths.
@@ -99,13 +100,8 @@ fn smax(a: vec4f, b: vec4f, k: f32) -> vec4f {
   return mix(b, a, t) + vec4f(k * t * (1.0 - t), 0.0, 0.0, 0.0);
 }
 
-// The planet's own frame: the world turned back by the spin.
-fn local(v: vec3f) -> vec3f {
-  let a = u.p[6].xyz;
-  let c = cos(u.p[6].w);
-  let s = -sin(u.p[6].w);
-  return v * c + cross(a, v) * s + a * dot(a, v) * (1.0 - c);
-}
+// The planet's own frame: it holds still, and its sun goes round it (planet.ts), so the world's is the planet's.
+fn local(v: vec3f) -> vec3f { return v; }
 fn site(ll: vec2f) -> vec3f { return vec3f(cos(ll.x) * sin(ll.y), sin(ll.x), cos(ll.x) * cos(ll.y)); }
 var<private> PL: array<vec3f, 10>; // River's places
 var<private> NP: i32;
@@ -309,10 +305,10 @@ fn gorge(q: vec2f) -> vec3f {
 }
 
 // How far round each place the land is levelled for what stands there, and how far the sky is kept clear over it (rad),
-// in the order planet.ts sends the places (places.ts's, less the core): the valley, the launch, the lighthouse, the
-// bench, the hearts, the receiver, the station. The hearts stand in the weather, their tops through the cloud.
-const FLAT = array<vec2f, 7>(vec2f(0.0, 0.2), vec2f(0.12, 0.16), vec2f(0.11, 0.16), vec2f(0.18, 0.2), vec2f(0.04, 0.0), vec2f(0.09, 0.13), vec2f(0.1, 0.14));
-fn flat(pl: vec2f) -> vec2f { return FLAT[min(u32(max(pl.y, 0.0)), 6u)]; }
+// in the order planet.ts sends the places (places.ts's, those on land): the launch, the valley, the receiver, the
+// lighthouse, the bench, the glasses, the hearts, the station. The hearts stand in the weather, their tops through the cloud.
+const FLAT = array<vec2f, 8>(vec2f(0.12, 0.16), vec2f(0.0, 0.2), vec2f(0.09, 0.13), vec2f(0.11, 0.16), vec2f(0.08, 0.13), vec2f(0.12, 0.16), vec2f(0.04, 0.0), vec2f(0.1, 0.14));
+fn flat(pl: vec2f) -> vec2f { return FLAT[min(u32(max(pl.y, 0.0)), 7u)]; }
 
 // How high land of height h stands, in radii: plains under the cloud, ranges through it. Near a place (nearest) it
 // is level as far out as it needs, the hills standing back from it, since what stands there (mesh.ts) stands at
@@ -761,6 +757,13 @@ fn ground(p: vec3f, rd: vec3f, L: vec3f, t: f32, near: f32) -> vec3f {
     alb = mix(alb, vec3f(0.6), min(2.95e-6 * pow(U, 3.52), 0.4));
     let Fv = 0.02 + 0.98 * pow(1.0 - cv, 5.0);
     col = alb * (sun * max(mu, 0.0) + sky) / PI + sun * glint + Fv * sky / PI;
+    // at the pole, in the storm's eye, the bore down to the core (sites/core.ts): the light of the hunt inside coming
+    // up it, amber, brightest at its depth, and lying on the water round its mouth
+    let bore = acos(clamp(m.y, -1.0, 1.0)) / 0.045;
+    if (bore < 3.0) {
+      let deep = sat(1.0 - bore * bore);
+      col = mix(col, vec3f(1.0, 0.62, 0.2) * (1.5 + 6.0 * deep * deep), smoothstep(1.03, 0.97, bore)) + vec3f(1.0, 0.55, 0.15) * 0.8 * exp(-max(bore - 1.0, 0.0) * 3.0) * step(1.0, bore);
+    }
   } else {
     let slope = ZS * length(gt);
     let y2 = m.y * m.y;
@@ -784,15 +787,31 @@ fn ground(p: vec3f, rd: vec3f, L: vec3f, t: f32, near: f32) -> vec3f {
       var pop = 0.6 * smoothstep(0.3, 0.5, noise(m * 17.0 + 80.0) * noise(m * 41.0)) * smoothstep(0.25, 0.05, c.x); // towns, in the lowlands
       for (var k = 0; k < NP; k++) { pop += exp((dot(m, PL[k]) - 1.0) / 0.003); }
       let roads = pow(1.0 - abs(2.0 * noise(m * 110.0) - 1.0), 8.0);
-      col += night * pop * pop * (0.4 * roads + 4.0 * pow(noise(m * 420.0), 5.0)) * vec3f(1.0, 0.6, 0.27) * 9.0;
+      // (through an open lens each light is a wide faint disc: they are given as their mean, so its taps find no sparks)
+      let sharp = 1.0 / (1.0 + u.p[9].x * u.p[9].x / 4.0);
+      col += night * pop * pop * mix(0.25, 0.4 * roads + 4.0 * pow(noise(m * 420.0), 5.0), sharp) * vec3f(1.0, 0.6, 0.27) * 9.0;
     }
   }
   // the place the reader points at (in the index, or on the planet), marked on the ground: a soft ring of light round
   // what stands there, just outside its level ground
-  let mk = u.p[13].zw;
-  if (mk.y > 0.003 && mk.x >= 0.0) {
+  let mk = u.p[6].xy;
+  if (mk.y > 0.003) {
     let d = acos(clamp(dot(m, PL[i32(mk.x)]), -1.0, 1.0)) - flat(vec2f(0.0, mk.x)).x - 0.02;
     col += mk.y * vec3f(1.0, 0.86, 0.66) * (2.0 * exp(-d * d / 2e-5) + 0.12 * exp(-max(-d, 0.0) / 0.03) * step(d, 0.0));
+  }
+  // what BLEPS's main camera sees: its square on the ground, a little brighter, its edge a fine line of cool light
+  let sq = u.p[14];
+  if (sq.w < 0.0) {
+    let c = site(sq.xy);
+    let e = normalize(vec3f(c.z, 0.0, -c.x));
+    let n = cross(c, e);
+    let up = n * cos(sq.z) + e * sin(sq.z);
+    let xy = vec2f(dot(m, cross(up, c)), dot(m, up)) / -sq.w;
+    let edge = max(abs(xy.x), abs(xy.y));
+    if (dot(m, c) > 0.9 && edge < 1.1) {
+      let line = exp(-pow((edge - 1.0) * -sq.w / 3e-4, 2.0));
+      col = col * (1.0 + 0.3 * step(edge, 1.0) + 1.2 * line) + vec3f(0.4, 0.6, 0.8) * 0.15 * line;
+    }
   }
   return col;
 }
@@ -889,7 +908,9 @@ fn beyond(rd: vec3f, L: vec3f) -> vec3f {
     let v = normalize(vec3f(1.0, f.xy)) - normalize(vec3f(1.0, sp));
     let many = pow(1.0 + dot(sp, sp), -1.5) * (0.25 + 0.75 * exp(-gb * gb / 0.05)) * (1.0 - 0.8 * cosmosDust(d)); // the cell's share of sky; the plane; the dust
     if (is.x < many) {
-      let flux = select(1.0, 0.09, j == 1) * 0.04 / (is.y + 0.04);
+      // (a star through an open lens is a disc of its light, too faint to see: it is not left a point for the lens's
+      // taps to catch and scatter as sparks)
+      let flux = select(1.0, 0.09, j == 1) * 0.04 / (is.y + 0.04) / (1.0 + u.p[9].x * u.p[9].x / 4.0);
       c += mix(vec3f(1.0, 0.7, 0.45), vec3f(0.7, 0.82, 1.0), smoothstep(0.1, 0.8, is.z + 0.3 * at.z)) * flux * exp(-dot(v, v) / (0.9 * w * w)) * 3.8e-4 / w;
     }
   }
@@ -923,7 +944,7 @@ fn places() {
 }
 
 fn planet(q: vec2f) -> vec3f {
-  text = sat(u.p[9].x);
+  text = 0.0;
   let R = u.p[4].w;
   let ro = local(-u.p[4].xyz / R);
   let rd = local(ray(q));

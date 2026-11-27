@@ -1,0 +1,103 @@
+// What River has not drawn in CAD yet, made here out of boxes and cylinders, in millimetres: BLEPS's 1U and its wheel,
+// the strobe glasses' two LCD valves (clear and dark) and the wheel they strobe. Each is written as a GLB in memory, so
+// mesh.ts and the tracer take it exactly as they take River's own (a blob: URL through the same worker).
+type Mat = { col: number[]; metal: number; rough: number } // linear albedo (and alpha), as glTF's
+type Part = { mat: Mat; P: number[]; N: number[]; I: number[] }
+const parts = new Map<string, Part[]>()
+let into: Part[] = []
+const part = (mat: Mat) => {
+  let p = into.find((q) => q.mat === mat)
+  if (!p) into.push((p = { mat, P: [], N: [], I: [] }))
+  return p
+}
+type V3 = [number, number, number]
+// a quad, corners a, b, c, d in turn, facing n
+function quad(m: Mat, a: V3, b: V3, c: V3, d: V3, n: V3) {
+  const p = part(m), o = p.P.length / 3
+  p.P.push(...a, ...b, ...c, ...d), p.N.push(...n, ...n, ...n, ...n), p.I.push(o, o + 1, o + 2, o, o + 2, o + 3)
+}
+// a box from lo to hi
+export function box(m: Mat, lo: V3, hi: V3) {
+  const [x0, y0, z0] = lo, [x1, y1, z1] = hi
+  quad(m, [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1], [1, 0, 0])
+  quad(m, [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [x0, y0, z0], [-1, 0, 0])
+  quad(m, [x0, y1, z0], [x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [0, 1, 0])
+  quad(m, [x0, y0, z1], [x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [0, -1, 0])
+  quad(m, [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1])
+  quad(m, [x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [0, 0, -1])
+}
+// a prism of polygon q (x, y; convex, in turn) from z0 to z1
+export function prism(m: Mat, q: [number, number][], z0: number, z1: number) {
+  const p = part(m), o = p.P.length / 3, n = q.length
+  for (const z of [z0, z1]) for (const [x, y] of q) p.P.push(x, y, z), p.N.push(0, 0, z === z0 ? -1 : 1)
+  for (let i = 1; i + 1 < n; i++) p.I.push(o, o + i, o + i + 1, o + n, o + n + i, o + n + i + 1)
+  for (let i = 0; i < n; i++) {
+    const [ax, ay] = q[i], [bx, by] = q[(i + 1) % n], l = Math.hypot(by - ay, ax - bx)
+    quad(m, [ax, ay, z0], [bx, by, z0], [bx, by, z1], [ax, ay, z1], [(by - ay) / l, (ax - bx) / l, 0])
+  }
+}
+// a frustum round axis a (unit, one of ±x, ±y, ±z) from c: radius r0 at c, r1 at c + len a; capped at the far end,
+// and at the near too if `base`; n sides
+export function tube(m: Mat, c: V3, a: V3, r0: number, r1: number, len: number, n = 32, base = false) {
+  const u: V3 = a[0] ? [0, 1, 0] : [1, 0, 0], v: V3 = [a[1] * u[2] - a[2] * u[1], a[2] * u[0] - a[0] * u[2], a[0] * u[1] - a[1] * u[0]]
+  const at = (r: number, s: number, th: number): V3 => [0, 1, 2].map((i) => c[i] + a[i] * s + r * (Math.cos(th) * u[i] + Math.sin(th) * v[i])) as V3
+  const k = (r0 - r1) / len, p = part(m)
+  for (let j = 0; j < n; j++) {
+    const t0 = (j / n) * 2 * Math.PI, t1 = ((j + 1) / n) * 2 * Math.PI, o = p.P.length / 3
+    for (const th of [t0, t1]) {
+      const nn = [0, 1, 2].map((i) => Math.cos(th) * u[i] + Math.sin(th) * v[i] + k * a[i]), l = Math.hypot(...nn)
+      p.P.push(...at(r0, 0, th), ...at(r1, len, th)), p.N.push(...nn.map((x) => x / l), ...nn.map((x) => x / l))
+    }
+    p.I.push(o, o + 2, o + 3, o, o + 3, o + 1)
+    // the caps, as fans
+    const e = at(0, len, 0), q = p.P.length / 3
+    p.P.push(...e, ...at(r1, len, t0), ...at(r1, len, t1)), p.N.push(...a, ...a, ...a), p.I.push(q, q + 1, q + 2)
+    if (base) {
+      const b = at(0, 0, 0), w = p.P.length / 3, na = a.map((x) => -x)
+      p.P.push(...b, ...at(r0, 0, t1), ...at(r0, 0, t0)), p.N.push(...na, ...na, ...na), p.I.push(w, w + 1, w + 2)
+    }
+  }
+}
+// a dome over c along axis a, radius r: a fisheye's front element
+export function dome(m: Mat, c: V3, a: V3, r: number, n = 24) {
+  for (let j = 0; j < n / 2; j++) {
+    const s0 = (j / (n / 2)) * (Math.PI / 2), s1 = ((j + 1) / (n / 2)) * (Math.PI / 2)
+    tube(m, [0, 1, 2].map((i) => c[i] + a[i] * r * Math.sin(s0)) as V3, a, r * Math.cos(s0), r * Math.cos(s1), r * (Math.sin(s1) - Math.sin(s0)), n)
+  }
+}
+
+// What is being made goes into `parts` under `id`.
+export function make(id: string, build: () => void) {
+  into = []
+  build()
+  parts.set(id, into)
+}
+
+// Every model made, as [id, blob: URL of its GLB].
+export function made(): [string, string][] {
+  return [...parts].map(([id, ps]) => {
+    const bin: number[] = [], views: object[] = [], accs: object[] = []
+    const add = (data: number[], idx: boolean) => {
+      const at = bin.length * 4
+      bin.push(...data)
+      views.push({ buffer: 0, byteOffset: at, byteLength: data.length * 4 })
+      accs.push(idx ? { bufferView: views.length - 1, componentType: 5125, count: data.length, type: 'SCALAR' } : { bufferView: views.length - 1, componentType: 5126, count: data.length / 3, type: 'VEC3' })
+      return accs.length - 1
+    }
+    const prims = ps.map((p, i) => ({ attributes: { POSITION: add(p.P, false), NORMAL: add(p.N, false) }, indices: add(p.I, true), material: i }))
+    const f = new Float32Array(bin.length), u = new Uint32Array(f.buffer)
+    let o = 0
+    for (const p of ps) for (const arr of [p.P, p.N, p.I]) for (const x of arr) arr === p.I ? (u[o++] = x) : (f[o++] = x)
+    const json = JSON.stringify({
+      asset: { version: '2.0' }, scene: 0, scenes: [{ nodes: [0] }], nodes: [{ mesh: 0 }], meshes: [{ primitives: prims }],
+      materials: ps.map((p) => ({ pbrMetallicRoughness: { baseColorFactor: p.mat.col, metallicFactor: p.mat.metal, roughnessFactor: p.mat.rough } })),
+      accessors: accs, bufferViews: views, buffers: [{ byteLength: f.byteLength }],
+    })
+    const js = new TextEncoder().encode(json + ' '.repeat((4 - (json.length % 4)) % 4)), size = 12 + 8 + js.length + 8 + f.byteLength
+    const head = new DataView(new ArrayBuffer(20))
+    head.setUint32(0, 0x46546c67, true), head.setUint32(4, 2, true), head.setUint32(8, size, true), head.setUint32(12, js.length, true), head.setUint32(16, 0x4e4f534a, true)
+    const mid = new DataView(new ArrayBuffer(8))
+    mid.setUint32(0, f.byteLength, true), mid.setUint32(4, 0x004e4942, true)
+    return [id, URL.createObjectURL(new Blob([head, js, mid, f], { type: 'model/gltf-binary' }))]
+  })
+}

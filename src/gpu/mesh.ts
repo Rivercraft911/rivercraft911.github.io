@@ -32,12 +32,6 @@ const STRIDE = 32 // position, normal (f32 × 3 each), colour and (metal, rough,
 const INST = 20 // floats an instance: three rows of its transform, (k, glow, traced, -), its lamps' light
 const SHADOW = 2048
 const MAX = 256 // models placed in a frame
-const HALTON = Array.from({ length: 16 }, (_, i) => [halton(i + 1, 2) - 0.5, halton(i + 1, 3) - 0.5])
-function halton(i: number, b: number) {
-  let f = 1, r = 0
-  for (; i > 0; i = Math.floor(i / b)) (f /= b), (r += f * (i % b))
-  return r
-}
 
 export class Mesh {
   private solid!: GPURenderPipeline
@@ -66,10 +60,11 @@ export class Mesh {
   private distMS?: GPUTexture
   distView?: GPUTextureView
   private field?: GPUTextureView
-  // Four samples where the pixels can afford them; past ~3 Mpx the screen's own density, and the jitter the
-  // phosphor's persistence averages, are antialiasing enough.
-  private samples = innerWidth * innerHeight * Math.min(2, devicePixelRatio) ** 2 > 3e6 ? 1 : 4
-  private n = 0
+  // Four samples a pixel, up to a Retina laptop's whole screen (an M4 Pro draws them in its tiles at no cost worth
+  // measuring); past that the screen's own density will do. Never a jitter for the phosphor to average: its
+  // persistence in the world is two frames, so a jittered edge flickers, and an edge of a lamp or a glint, which
+  // burns past white, sparkles.
+  private samples = innerWidth * innerHeight * Math.min(2, devicePixelRatio) ** 2 > 8e6 ? 1 : 4
   private dirty = true
   view?: GPUTextureView
   ground?: GPUTextureView // the traced ground's light against its light in the open, for the raster's composite; none, untraced
@@ -163,8 +158,9 @@ export class Mesh {
       layout: this.l1,
       entries: [this.shadow.createView(), this.cmp, dist, traced ? T.lit! : this.blank[0], traced ? T.geo! : this.blank[1]].map((resource, binding) => ({ binding, resource })),
     }))
-    const out: GPURenderPassColorAttachment = { view: this.msaa ? this.msaa.createView() : this.view!, resolveTarget: this.msaa ? this.view : undefined, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }
-    const far: GPURenderPassColorAttachment = { view: this.distMS ? this.distMS.createView() : this.distView!, resolveTarget: this.distMS ? this.distView : undefined, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] }
+    // (the samples are only resolved, never kept: in the tiles they stay)
+    const out: GPURenderPassColorAttachment = { view: this.msaa ? this.msaa.createView() : this.view!, resolveTarget: this.msaa ? this.view : undefined, loadOp: 'clear', storeOp: this.msaa ? 'discard' : 'store', clearValue: [0, 0, 0, 0] }
+    const far: GPURenderPassColorAttachment = { view: this.distMS ? this.distMS.createView() : this.distView!, resolveTarget: this.distMS ? this.distView : undefined, loadOp: 'clear', storeOp: this.distMS ? 'discard' : 'store', clearValue: [0, 0, 0, 0] }
     if (!items.length) {
       if (this.dirty) enc.beginRenderPass({ colorAttachments: [out, far] }).end(), (this.dirty = false)
       return
@@ -211,8 +207,8 @@ export class Mesh {
   }
 
   private write(s: Solids, w: number, h: number, traced: boolean) {
-    const u = this.uf, c = s.cam, j = HALTON[this.n++ % 16], sk = s.sky, f = s.fog ?? [0, 0, 0, 0]
-    u.set([c[4], c[5], c[6], c[3], c[8], c[9], c[10], w / h, c[12], c[13], c[14], s.near, (2 * j[0]) / w, (2 * j[1]) / h, w, h])
+    const u = this.uf, c = s.cam, sk = s.sky, f = s.fog ?? [0, 0, 0, 0]
+    u.set([c[4], c[5], c[6], c[3], c[8], c[9], c[10], w / h, c[12], c[13], c[14], s.near, 0, 0, w, h])
     u.set([s.sun[0], s.sun[1], s.sun[2], s.sun[3], s.sunc[0], s.sunc[1], s.sunc[2], s.sunc[3]], 16)
     u.set([sk[0], sk[1], sk[2], 0, sk[3], sk[4], sk[5], 0, sk[6], sk[7], sk[8], 0, s.up[0], s.up[1], s.up[2], 0, f[0], f[1], f[2], f[3]], 24)
     u.fill(0, 44)

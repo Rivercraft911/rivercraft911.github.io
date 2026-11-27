@@ -10,7 +10,9 @@ import { model, type Solids } from '../gpu/mesh'
 import { aim } from '../acts/reality'
 import { clamp, view, type Scene, type Frame } from '../acts/scene'
 import { PLACES } from './places'
-import { ctx, dot, frame, len, look, seen, site, stand, turn, unit, type V } from './ctx'
+import { ctx, cross, dot, frame, len, look, seen, site, stand, turn, unit, type V } from './ctx'
+import { made } from './make'
+import { HALF, sight } from './sites/bleps'
 import { covered, hovered, mount, page, route, within } from './pages'
 import { sound } from './sound'
 
@@ -44,6 +46,7 @@ export function attach(d: GPUDevice) {
       for (const m of list) model(d, base + m.file + (LAMPS[m.id] ? `#lamp=${LAMPS[m.id]}` : '')).then((g) => (models[m.id] = g))
     })
     .catch(() => {})
+  for (const [id, url] of made()) model(d, url).then((g) => (models[id] = g)) // and what is not in CAD yet (make.ts)
 }
 
 const slerp = (a: V, b: V, s: number, o: V) => {
@@ -75,9 +78,15 @@ function restAt(k: number, o: Pose) {
     return o
   }
   const P = PLACES[k]
-  // a place that moves (a satellite, a rocket) is looked at where it is now
-  const r = P.where ? len(P.where(n0, lastBuild)) : (site(P.lat, P.lon, n0), 1.01)
-  unit(n0), frame(n0, e0, N0)
+  // a place that moves (a satellite, a rocket) is looked at where it is now; one in orbit, from the orbit's own frame
+  // (its normal for east, so the camera never swings round over a pole)
+  const r = P.where ? len(P.where(n0, lastBuild)) : (site(P.lat, P.lon, n0), 1.01 + (P.rise ?? 0))
+  unit(n0)
+  if (P.orbit) {
+    const h = dot(P.orbit, n0)
+    for (let i = 0; i < 3; i++) e0[i] = P.orbit[i] - n0[i] * h
+    unit(e0), cross(n0, e0, N0)
+  } else frame(n0, e0, N0)
   for (let i = 0; i < 3; i++) {
     o.at[i] = n0[i] * r
     o.up[i] = n0[i]
@@ -117,14 +126,60 @@ export function go(k: number, t: number, quiet = false) {
   restAt(k, to)
   const arc = Math.acos(clamp(dot(unit([...from.eye]), unit([...to.eye])), -1, 1))
   flight = 0, fstart = t, flen = 1.4 + 1.1 * arc + 0.5 * Math.abs(Math.log(len(from.eye) / len(to.eye)))
+  sky[0] = day, sky[1] = tilt
+  light(k, t + flen)
   page(k, flen) // its page comes in as the camera arrives
   if (!quiet) route(k) // a visitor's flight is their history; the world showing itself is not
+}
+
+// ---- the light: the day and the year, turned so a place is reached in good light ----------------------------------
+// The sun goes round once in five minutes, the planet's day. Flying to a place turns that day on (or back) and its year
+// (the sun's declination, within ±24°) with the flight, so the place is reached with the sun 24° up and three quarters
+// behind the camera, the hardware lit and the land round it long-shadowed: the light moves as the camera does, and it
+// is only ever the sun. A place in orbit is given a dawn–dusk sun instead, along its orbit's normal on the camera's side
+// and 68° off its plane, so it is in sunlight all the way round, over the terminator, the ground under it at 15°. At a place the day goes on at a
+// quarter of its pace; going home, the year comes back to the arrival's and the day runs on.
+const DAY = 0.02, D0 = Math.asin(-0.2702), H0 = Math.atan2(0.9585, 0.091), OB = (24 * Math.PI) / 180
+let day = 0, tilt = 0
+const sky = [0, 0, 0, 0] // the flight's day and year, from and to
+const Ld: V = [0, 0, 0]
+// The sun at planet time pt, its day `d` seconds on and its declination `a` over the arrival's.
+function sunAt(pt: number, d: number, a: number, o: V) {
+  const de = D0 + a, h = H0 - DAY * (pt + d)
+  o[0] = Math.cos(de) * Math.sin(h), o[1] = Math.sin(de), o[2] = Math.cos(de) * Math.cos(h)
+  return o
+}
+// The day and year for reaching place k at time ta (restAt has just left its frame in n0, e0, N0): of every hour and
+// every declination the year allows, the one nearest what is wanted there, and nearest the day as it is.
+const S: V = [0, 0, 0]
+function light(k: number, ta: number) {
+  sky[2] = day, sky[3] = 0
+  if (k < 0) return
+  const P = PLACES[k], yaw = P.view[2], P0 = (2 * Math.PI) / DAY, w = (Math.sin(yaw) < 0 ? -1 : 1) * Math.sin(1.19), v = Math.cos(1.19) * Math.SQRT1_2
+  for (let i = 0; i < 3; i++) Ld[i] = v * (n0[i] - N0[i]) + w * e0[i] // (in orbit: along its normal, and ahead)
+  let best = -Infinity
+  for (let j = 0; j <= 12; j++)
+    for (let i = 0; i < 72; i++) {
+      const a = -OB + (OB * j) / 6, h = (i * Math.PI) / 36
+      sunAt(0, (H0 - h) / DAY, a - D0, S)
+      let score: number
+      if (P.orbit) score = 4 * dot(S, Ld)
+      else {
+        // 24° up, and 40° round from behind the camera either way
+        const el = Math.asin(clamp(dot(S, n0), -1, 1)), off = Math.abs(Math.atan2(Math.sin(Math.atan2(dot(S, e0), dot(S, N0)) - yaw), Math.cos(Math.atan2(dot(S, e0), dot(S, N0)) - yaw)))
+        score = -(((el - 0.42) / 0.2) ** 2) - (((off - 0.7) / 0.7) ** 2)
+      }
+      let d = (H0 - h) / DAY - ta
+      d -= P0 * Math.round((d - day) / P0)
+      score -= (0.6 * Math.abs(d - day)) / P0 + (0.3 * Math.abs(a - D0 - tilt)) / OB
+      if (score > best) (best = score), (sky[2] = d), (sky[3] = a - D0)
+    }
 }
 
 // Left alone, the world shows itself: half a minute untouched at home and it starts touring River's places, a dozen
 // seconds at each, its pages opening as it arrives. Any sign of someone there (a pointer, a wheel, a key) and it
 // stands down where it is, and they carry on from there.
-const ATTRACT = ['valley', 'launch', 'lighthouse', 'bench', 'hearts', 'receiver', 'station', 'core'].map((id) => PLACES.findIndex((P) => P.id === id))
+const ATTRACT = ['launch', 'bleps', 'valley', 'glasses', 'lighthouse', 'receiver', 'hearts', 'station', 'bench', 'core'].map((id) => PLACES.findIndex((P) => P.id === id))
 const AFTER = 25, DWELL = 12
 let touring = false, showing = -1
 for (const ev of ['pointermove', 'pointerdown', 'wheel', 'keydown'])
@@ -166,7 +221,7 @@ addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && focus >= 0) go(-1, lastBuild)
   else if (e.key === 'ArrowRight') go(((focus + 2) % n) - 1, lastBuild)
   else if (e.key === 'ArrowLeft') go(((focus + n) % n) - 1, lastBuild)
-  else if (/^[1-9]$/.test(e.key) && +e.key <= PLACES.length) go(+e.key - 1, lastBuild) // the index's numbers
+  else if (/^[0-9]$/.test(e.key) && (+e.key || 10) <= PLACES.length) go((+e.key || 10) - 1, lastBuild) // the index's numbers (0 the tenth)
   else return
   e.stopImmediatePropagation()
 }, true)
@@ -186,7 +241,10 @@ function pick(cx: number, cy: number) {
   const x = ((2 * cx) / innerWidth - 1) * view.a, y = 1 - (2 * cy) / innerHeight
   let best = -1, bd = 0.08
   sites.forEach((s, k) => {
-    q3[0] = s[0] * 1.012, q3[1] = s[1] * 1.012, q3[2] = s[2] * 1.012
+    const P = PLACES[k]
+    if (P.where) P.where(q3, lastBuild)
+    else if (P.lat < 80) (q3[0] = s[0] * 1.012), (q3[1] = s[1] * 1.012), (q3[2] = s[2] * 1.012)
+    else return
     if (!look(q3)) return
     const d = Math.hypot(seen.x - x, seen.y - y)
     if (d < bd) (bd = d), (best = k)
@@ -198,18 +256,21 @@ function pick(cx: number, cy: number) {
 // The sun at the world's clock's zero: at the hearts it is just up, in the east-southeast, and from home the planet is
 // three parts lit, its morning terminator on the left.
 export const L0 = unit([0.9585, -0.2702, 0.091])
-// The planet field's slots (planet.wgsl): the eye's place, the sun and the time, the spin (none: the sun goes round),
+// The planet field's slots (planet.wgsl): the eye's place, the sun and the time, the place marked (none here),
 // the storm, the exposure, and River's: the river's place and scale (the beam's own θ(s), 1:400), and where every place
-// stands, each on land, each a town at night. The core is the storm's eye, open sea. `text`: how much is read as glyphs.
+// stands, each on land, each a town at night (eight of them: p[10] to p[13]). The core is the storm's eye, open sea;
+// BLEPS is in the sky. `blur`: the lens's, at infinity (px).
 const RAD = Math.PI / 180, ON_LAND = PLACES.filter((P) => P.lat < 80), SITES = ON_LAND.flatMap((P) => [P.lat * RAD, P.lon * RAD])
-export function air(p: Float32Array, E: ArrayLike<number>, L: ArrayLike<number>, t: number, exposure: number, text = 0) {
-  p.set([-E[0], -E[1], -E[2], 1, L[0], L[1], L[2], t, 0, 1, 0, 0, 1, 0.07, 1, 1, exposure, 1, ON_LAND.length, 0, text, PLACES[0].lat * RAD, PLACES[0].lon * RAD, 1 / 400], 16)
+const RIVER = PLACES.find((P) => P.id === 'valley')!
+export function air(p: Float32Array, E: ArrayLike<number>, L: ArrayLike<number>, t: number, exposure: number, blur = 0) {
+  p.set([-E[0], -E[1], -E[2], 1, L[0], L[1], L[2], t, 0, 0, 0, 0, 1, 0.07, 1, 1, exposure, 1, ON_LAND.length, 0, blur, RIVER.lat * RAD, RIVER.lon * RAD, 1 / 400], 16)
   p.set(SITES, 40)
 }
-const L: V = [0, 0, 0], Y = [0, 1, 0]
+const L: V = [0, 0, 0]
 // The sun at planet time pt: it goes round once in five minutes. The arrival runs on the same clock, ending at 0
-// where the world's begins, so nothing in the sky jumps when the world takes over.
-export const clock = (pt: number, o: V) => turn(L0, Y, -0.02 * pt, o)
+// where the world's begins, so nothing in the sky jumps when the world takes over (and the world turns it on from there).
+export const clock = (pt: number, o: V) => sunAt(pt, 0, 0, o)
+void turn
 const PEEP = unit([0.5, 0.55, 0.65])
 let last = 0
 
@@ -253,14 +314,21 @@ export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number
   }
   cam.set(p.subarray(0, 16))
   if (dbg.has('at')) L.splice(0, 3, ...L0)
+  else if (marked) sunAt(t, day, tilt, L) // the world's day and year
   else clock(t, L)
   air(p, E, L, t, EXPOSE)
-  // which place the pointer, or the index, is on: it is marked on the ground (planet.wgsl)
+  // which place the pointer, or the index, is on: it is marked on the ground (planet.wgsl), by its slot among those
+  // on land, and how much
   const k = marked ? (hover >= 0 ? hover : hovered()) : -1
-  if (k >= 0 && k !== focus && PLACES[k].lat < 80) mark[0] = k
-  mark[1] += ((k >= 0 && k === mark[0] && k !== focus ? 1 : 0) - mark[1]) * (1 - Math.exp(-8 * dt))
-  p[54] = mark[0], p[55] = mark[1]
+  if (k >= 0 && k !== focus && PLACES[k].lat < 80) mark[0] = ON_LAND.indexOf(PLACES[k])
+  mark[1] += ((k >= 0 && ON_LAND.indexOf(PLACES[k]) === mark[0] && k !== focus ? 1 : 0) - mark[1]) * (1 - Math.exp(-8 * dt))
+  p[24] = mark[0], p[25] = mark[1]
 
+  // the lens: on the place, at the camera's distance, opening like a macro lens's as the camera comes close
+  const fd = Math.hypot(at[0] - E[0], at[1] - E[1], at[2] - E[2])
+  solids.focus = ctx.fd = fd
+  solids.aperture = ctx.blur = p[36] = lens * clamp(0.12 / fd, 0, 1) * 26 // (and the stars know it: planet.wgsl)
+  ctx.ppr = 0.5 * p[3] * innerHeight * devicePixelRatio
   // River's hardware, and the sun on it
   ctx.t = t, ctx.dt = dt, ctx.f = f, ctx.focus = focus
   ctx.L[0] = L[0], ctx.L[1] = L[1], ctx.L[2] = L[2]
@@ -271,7 +339,9 @@ export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number
     P.draw?.(k)
   })
   if (DEBUG) stand('peep', PEEP, 0.08, undefined, 0.4, 0.002)
-  const near = focus >= 0 ? sites[focus] : DEBUG ? PEEP : sites[0]
+  // BLEPS's main camera's footprint on the ground (the arrival keeps its own numbers here)
+  if (marked) p.set([Math.asin(sight[1]), Math.atan2(sight[0], sight[2]), sight[4], -sight[3] * HALF], 56)
+  const near = focus >= 0 ? sites[focus] : DEBUG ? PEEP : sites[PLACES.indexOf(RIVER)]
   const sh = solids.shadow as number[], up = solids.up as number[], sun = solids.sun as number[]
   const mv = focus >= 0 ? PLACES[focus].where?.(q3, t) : undefined, hr = mv ? len(mv) / 1.01 : 1 // shadows follow a place that moves
   if (mv) unit(mv)
@@ -280,13 +350,9 @@ export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number
   up[0] = near_[0], up[1] = near_[1], up[2] = near_[2]
   sun[0] = L[0], sun[1] = L[1], sun[2] = L[2], sun[3] = 22 * clamp(dot(near_, L) * 6 + 0.5, 0, 1)
   tint(near_, L, solids.sunc as number[])
-  // the lens: on the place, at the camera's distance, opening like a macro lens's as the camera comes close
-  const fd = Math.hypot(at[0] - E[0], at[1] - E[1], at[2] - E[2])
-  solids.focus = fd
-  solids.aperture = lens * clamp(0.12 / fd, 0, 1) * 26
   F.res = lens > 0 ? 1.2 : 2 // under the lens the world behind is a blur: its sky and clouds need not be swept at full size
 }
-const mark = [-1, 0] // the place marked, and how much
+const mark = [0, 0] // the place marked, and how much
 
 export const planet: Scene = {
   dur: Infinity,
@@ -312,12 +378,17 @@ export const planet: Scene = {
     rest.d += (want.d - rest.d) * fol, rest.pitch += (want.pitch - rest.pitch) * fol, rest.yaw += (want.yaw - rest.yaw) * fol
     restAt(focus, to)
     if (flight >= 0 && (flight = (t - fstart) / flen) >= 1) flight = -1
+    if (flight >= 0) {
+      if (PLACES[focus]?.orbit) light(focus, fstart + flen) // what moves is lit for where it will be
+      const k = ease(flight)
+      day = sky[0] + (sky[2] - sky[0]) * k, tilt = sky[1] + (sky[3] - sky[1]) * k
+    } else if (focus >= 0) day -= 0.75 * dt // at a place the day goes on at a quarter of its pace
     if (DEBUG) debugPose(t)
     else if (flight >= 0) fly(from, to, flight, now)
     else for (const key of ['eye', 'at', 'up'] as const) for (let i = 0; i < 3; i++) now[key][i] = to[key][i]
 
-    const c = covered(), ease = 1 - Math.exp(-4 * dt)
-    side[0] += (c[0] - side[0]) * ease, side[1] += (c[1] - side[1]) * ease
+    const c = covered(), fe = 1 - Math.exp(-4 * dt)
+    side[0] += (c[0] - side[0]) * fe, side[1] += (c[1] - side[1]) * fe
     paint(f, now, t, dt, focus, DEBUG ? +(dbg.get('ap') ?? 0) : focus >= 0 && flight < 0 ? 1 : 0, true)
     return sound()
   },

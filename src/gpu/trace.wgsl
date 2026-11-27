@@ -226,9 +226,11 @@ fn sky(d: vec3f) -> vec3f {
 fn open() -> vec3f { return mix(u.hor.rgb, u.sky.rgb, 0.8); }
 fn sunlight() -> vec3f { return u.sunc.rgb * u.sun.w; }
 
-// Cook–Torrance, as mesh.wgsl has it: what of the light from l a surface sends toward v, per unit irradiance.
+// Cook–Torrance, as mesh.wgsl has it: what of the light from l a surface sends toward v, per unit irradiance. No
+// sharper than the sun's disc: a lobe narrower than the disc it is sampled over is a firefly when one point of the
+// disc happens to line up with it.
 fn brdf(s: Surf, v: vec3f, l: vec3f) -> vec3f {
-  let a = s.rough * s.rough;
+  let a = max(s.rough * s.rough, 0.01);
   let H = normalize(l + v);
   let nl = max(dot(s.n, l), 0.0);
   let nv = max(dot(s.n, v), 1e-4);
@@ -475,9 +477,28 @@ const Y = vec3f(0.2290, 0.6917, 0.0793);
   let key = floor(g.z);
   let kind = key - 4.0 * floor(key / 4.0);
   if (kind == NONE) { textureStore(dst, px, vec4f(0.0)); return; }
-  let c = textureLoad(src, px, 0);
+  var c = textureLoad(src, px, 0);
   let rough = 2.0 * (g.z - key);
   let st = i32(dn.x);
+  // A firefly: a texel far brighter than every texel of its own surface round it, where a path happened on a lamp or
+  // the sun's glint in something. It is brought down to its brightest neighbour before it is spread: it is noise,
+  // which no edge-stopping would ever smooth away, since it looks like an edge. (Only what is shown: its history
+  // keeps every sample.) A mirror's sharp image is no firefly, and is left.
+  if (st == 1 && kind != METAL) {
+    var hi = 0.0;
+    var near = 0;
+    for (var k = 0; k < 9; k++) {
+      let q = px + vec2i(k % 3, k / 3) - 1;
+      if (k == 4 || any(q < vec2i(0)) || any(vec2f(q) >= u.size.xy)) { continue; }
+      let gq = textureLoad(gin, q, 0);
+      if (floor(gq.z) != key || gq.w == 0.0) { continue; }
+      hi = max(hi, dot(textureLoad(src, q, 0).rgb, Y));
+      near++;
+    }
+    let cap = 1.5 * hi + 0.01;
+    let l = dot(c.rgb, Y);
+    if (near >= 3 && l > cap) { c = vec4f(c.rgb * cap / l, c.a); }
+  }
   // a sharp mirror's image is not noise; nor, at the widest step, is a mean of many samples
   if ((kind == METAL && f32(st) > 1.0 + 12.0 * rough) || (st == 8 && g.w >= 10.0)) { textureStore(dst, px, c); return; }
   let n = unpack(g.x);

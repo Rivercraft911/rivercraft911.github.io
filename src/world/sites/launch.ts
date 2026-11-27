@@ -4,7 +4,8 @@
 // atmosphere, integrated once: the motor's thrust is solved so the apogee is the target, 10 000 ft. A drogue at
 // apogee, the main at 300 m. The climb plays in real time; the descent, two and a half minutes of it, in fourteen
 // seconds. Heights are 1:6100 of a radius a metre (apogee half a radius up) and the rocket, like every landmark here,
-// far larger than that. What flies is its camera section, River's own CAD, pointing the way it goes.
+// far larger than that. What flies is its camera section, River's own CAD, its two fisheyes looking out either side,
+// grown to the size of the boards on the pad, pointing the way it goes; the camera rides with it.
 // The downlink. DVB-S2, QPSK at 8 Msym/s on 1.28 GHz, from the camera section to an antenna by the pad; its range rate
 // along that line is the Doppler the sound hears.
 import { TAU, clamp } from '../../acts/scene'
@@ -62,9 +63,10 @@ const FLOW = 5 // symbols a second, slowed to be heard
 
 // ---- the place -----------------------------------------------------------------------------------------------
 const SC = 0.5 / APOGEE // radii a metre, for heights and ranges
-const LEN = 0.05, LROCK = 3, RB = (LEN * DIA) / 2 / LROCK // the airframe: its length in radii and (assumed) metres; its radius
+const LEN = 0.05, SEC = 0.032 // the airframe's length, and the camera section's width, in radii
 const SECTION = 0.3 // the camera section's place, from the nose, as a share of the airframe
 const pn: V = [0, 0, 0], pe: V = [0, 0, 0], pN: V = [0, 0, 0], foot: V = [0, 0, 0], ant: V = [0, 0, 0]
+const nw: V = [0, 0, 0], deck: V = [0, 0, 0]
 const R: V = [0, 0, 0], a: V = [0, 0, 1], u: V = [0, 0, 0], w: V = [0, 0, 0], d: V = [0, 0, 0], q: V = [0, 0, 0], sec: V = [0, 0, 0]
 let ready = false, clk = 0, was = -2, roll = 0
 
@@ -84,7 +86,7 @@ const world = (x: number, z: number, o: V) => {
 // Where the rocket is: what a camera that rides with it looks at.
 export function where(o: V) {
   if (!ready) init(), world(0, 0, R)
-  for (let i = 0; i < 3; i++) o[i] = R[i] + a[i] * LEN * 0.5
+  for (let i = 0; i < 3; i++) o[i] = R[i] + a[i] * LEN * (1 - SECTION)
   return o
 }
 
@@ -109,9 +111,15 @@ export function draw(k: number) {
   for (let i = 0; i < 3; i++) u[i] = Math.cos(roll) * pN[i] + Math.sin(roll) * q[i]
   cross(a, u, w)
 
-  // River's camera section in its place in the airframe, aglow while the motor burns
-  for (let i = 0; i < 3; i++) sec[i] = R[i] + a[i] * LEN * (1 - SECTION)
-  solid('pigeon-tube', sec, u, w, a, 2 * RB, 1, burning ? 0.3 : 0)
+  // River's camera section in its place in the airframe, aglow while the motor burns, and on top of it, flying, the
+  // round CM5 carrier as its bulkhead and Yapogee S3 (the hacked ESP32-S3 that sends the video down) decked over it
+  for (let i = 0; i < 3; i++) (sec[i] = R[i] + a[i] * LEN * (1 - SECTION)), (nw[i] = -w[i])
+  solid('pigeon-tube', sec, u, w, a, SEC, 1, burning ? 0.3 : 0)
+  const mm = SEC / 152.4
+  for (let i = 0; i < 3; i++) deck[i] = sec[i] + a[i] * (SEC / 2 + 7 * mm)
+  solid('pigeon-carrier', deck, u, a, nw, 144.78 * mm)
+  for (let i = 0; i < 3; i++) deck[i] = sec[i] + a[i] * (SEC / 2 + 30 * mm)
+  solid('yapogee-s3', deck, u, a, nw, 61 * mm)
 
   // the way down to the antenna, for the downlink's Doppler
   for (let i = 0; i < 3; i++) d[i] = ant[i] - sec[i]

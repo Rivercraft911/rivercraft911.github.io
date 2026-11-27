@@ -3,7 +3,8 @@
 // The field. A centred dipole, B = −B₀ (R/r)³ (3(M̂·r̂)r̂ − M̂), B₀ = 31.2 μT on the ground at the magnetic equator,
 // its axis M̂ ten degrees off the planet's.
 // The orbit. Sun-synchronous, 97.6° at 1.086 radii (planet.ts's ring). A real one at that height goes round in
-// 2π√(a³/μ) = 95.5 min; this one in 10.5 s, so the film runs LAPSE ≈ 547× and every rate in it is LAPSE× its own.
+// 2π√(a³/μ) = 95.5 min; this one in 10.5 s, so the film runs 547× and every rate in it is that many times its own;
+// as we come to it, the time-lapse eases down to 20×, so its tumble is seen, and its calming.
 // The bus. A rigid 2U (0.1 × 0.1 × 0.227 m at the standard's 2.66 kg, uniform), Euler's equations, a quaternion. It
 // leaves its deployer tumbling at 0.9°/s. Its magnetometer sees the field turn in the body's frame, and the coils
 // answer with the B-dot law, m = −k dB/dt, so the torque τ = m × B always takes spin out. What is left when it has
@@ -14,7 +15,7 @@ import { ctx, cross, dot, len, solid, unit, type V } from '../ctx'
 import { DEG, RE, orbit } from './sky'
 
 const A = 1.086, RAAN = 0.4, INC = 97.6 * DEG, RATE = 0.6 // the orbit, as planet.ts draws it
-const LAPSE = RATE / Math.sqrt(3.986004418e14 / (A * RE) ** 3) // real seconds a scene second
+const N0 = Math.sqrt(3.986004418e14 / (A * RE) ** 3), HERE = 20 * N0 // rad a real second; and here, 20× life
 const B0 = 3.12e-5 // T
 const M: V = unit([Math.sin(10 * DEG) * 0.6, Math.cos(10 * DEG), Math.sin(10 * DEG) * 0.8]) // magnetic north
 const IX = (2.66 * (0.1 ** 2 + 0.227 ** 2)) / 12, IZ = (2.66 * 2 * 0.1 ** 2) / 12 // kg m², across and along
@@ -63,8 +64,10 @@ function step(u: number, h: number) {
   axes()
 }
 
-// Where the bus is at planet time t: what a camera that rides with it looks at.
-export const where = (o: V, t = ctx.t) => orbit(A, RAAN, INC, RATE * t, o)
+// Where the bus is now: what a camera that rides with it looks at. Its orbit's normal: the camera rides in its frame.
+let u = 0, rate = RATE
+export const where = (o: V) => orbit(A, RAAN, INC, u, o)
+export const NORMAL = cross(orbit(1, RAAN, INC, 0, [0, 0, 0]), orbit(1, RAAN, INC, Math.PI / 2, [0, 0, 0]))
 
 // A coil panel on the bus: its copper facing out along ±n, s from the centre (and z along the bus), its x along a.
 const tc: V = [0, 0, 0], tn: V = [0, 0, 0], tz: V = [0, 0, 0]
@@ -76,13 +79,15 @@ function tile(n: V, s: number, z: number, a: V, size: number) {
 
 let was = -2, last = -1
 export function draw(k: number) {
-  const t = ctx.t, dt = ctx.dt, here = ctx.focus === k
+  const dt = ctx.dt, here = ctx.focus === k, u0 = u
+  rate *= Math.exp(clamp(Math.log((here ? HERE : RATE) / rate), -1, 1) * (1 - Math.exp(-2.5 * dt)))
+  u += rate * dt
   // a deployment as we arrive, and one every four orbits
-  if ((here && was !== k) || Math.floor((RATE * t) / (4 * TAU)) !== last) kick()
-  was = ctx.focus, last = Math.floor((RATE * t) / (4 * TAU))
-  const n = Math.max(1, Math.ceil((dt * LAPSE) / 1.5))
-  if (dt > 0) for (let i = 1; i <= n; i++) step(RATE * (t - dt + (dt * i) / n), (dt * LAPSE) / n)
-  else field(orbit(A, RAAN, INC, RATE * t, c), Bw)
+  if ((here && was !== k) || Math.floor(u / (4 * TAU)) !== last) kick()
+  was = ctx.focus, last = Math.floor(u / (4 * TAU))
+  const lapse = (dt * rate) / N0, n = Math.max(1, Math.ceil(lapse / 1.5)) // real seconds this frame, in steps of 1.5
+  if (dt > 0) for (let i = 1; i <= n; i++) step(u0 + ((u - u0) * i) / n, lapse / n)
+  else field(orbit(A, RAAN, INC, u, c), Bw)
   // the bus: River's coil panel on every face it has one for
   tile(Z, H, 0, X, U)
   tile(Z, -H, 0, X, U)

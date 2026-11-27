@@ -6,7 +6,7 @@ struct Cam {
   right: vec4f, // .w = 1/tan(fov/2), the field camera's (camera.wgsl)
   up: vec4f,    // .w = aspect
   fwd: vec4f,   // .w = near
-  jit: vec4f,   // .xy this frame's subpixel offset in clip units; .zw the phosphor's size, px
+  jit: vec4f,   // .zw the phosphor's size, px
   sun: vec4f,   // toward the sun; .w its irradiance
   sunc: vec4f,  // its colour; .w exposure
   sky: vec4f,   // the sky overhead
@@ -44,11 +44,9 @@ struct O {
 
 fn place(m: Inst, p: vec3f) -> vec3f { return vec3f(dot(m.r0, vec4f(p, 1.0)), dot(m.r1, vec4f(p, 1.0)), dot(m.r2, vec4f(p, 1.0))); }
 
-// The pinhole: screen x across ±aspect, y across ±1, as the fields' rays leave it; the jitter lets the phosphor's
-// own persistence average a few frames' offsets into antialiasing for nothing.
+// The pinhole: screen x across ±aspect, y across ±1, as the fields' rays leave it.
 fn project(w: vec3f) -> vec4f {
-  let z = dot(w, c.fwd.xyz);
-  return vec4f(dot(w, c.right.xyz) * c.right.w / c.up.w + c.jit.x * z, dot(w, c.up.xyz) * c.right.w + c.jit.y * z, c.fwd.w, z);
+  return vec4f(dot(w, c.right.xyz) * c.right.w / c.up.w, dot(w, c.up.xyz) * c.right.w, c.fwd.w, dot(w, c.fwd.xyz));
 }
 
 @vertex fn vs(v: V, @builtin(instance_index) i: u32) -> O {
@@ -147,18 +145,28 @@ fn light(pos: vec2f, w: vec3f, N: vec3f, metal: f32, fade: f32) -> Lit {
   return Lit(l.rgb / max(l.a, 1e-6), v.x / max(v.y, 1e-6), sure.x, sure.y);
 }
 
+// v made unit, or left alone if it has no length to make one of (a NaN here would stay in the phosphor for good)
+fn unit(v: vec3f) -> vec3f { return v * inverseSqrt(max(dot(v, v), 1e-30)); }
+
 // Cook–Torrance: GGX's microfacets, Smith's shadowing, Schlick's Fresnel; Lambert under it for what is not metal.
+// No lobe is sharper than what one pixel can show: the normals a pixel spans widen it (Tokuyoshi and Kaplanyan's
+// filtering, α² + 2σ², σ² from how the normal turns from one pixel to the next), so a curved solder fillet or a pin's
+// end is a sheen and not a point that comes and goes. Nor is any sharper than the sun's disc it mirrors (0.02 rad, the
+// tracer's, trace.ts): a mirror's image of the sun is that big, never a single burning texel.
 fn shade(i: O) -> vec4f {
-  let V = normalize(-i.w);
-  var N = normalize(i.n);
+  let n0 = unit(i.n);
+  let dn = vec2f(dot(dpdx(n0), dpdx(n0)), dot(dpdy(n0), dpdy(n0)));
+  let V = unit(-i.w);
+  var N = n0;
   if (dot(N, V) < 0.0) { N = -N; } // CAD is not always wound one way: both faces are surfaces
   let base = i.col.rgb * i.col.rgb; // stored as its square root, so eight bits are spent where the eye looks
   let metal = i.pbr.x;
   let rough = max(i.pbr.y, 0.045);
-  let a = rough * rough;
+  let a0 = max(rough * rough, 0.01); // GGX's α, never under half the sun's width
+  let a = sqrt(min(a0 * a0 + min(0.5 * (dn.x + dn.y), 0.18), 1.0));
   let F0 = mix(vec3f(0.04), base, metal);
   let L = c.sun.xyz;
-  let H = normalize(L + V);
+  let H = unit(L + V);
   let nl = max(dot(N, L), 0.0);
   let nv = max(dot(N, V), 1e-4);
   let nh = max(dot(N, H), 0.0);

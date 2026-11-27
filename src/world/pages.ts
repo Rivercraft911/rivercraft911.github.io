@@ -1,10 +1,12 @@
 // The world's words: real DOM over River's planet, for whoever came to read. A place's page (each of its projects:
 // what it is, the proof, how it works, links, pictures) comes in as the camera arrives, at the right, or over the
-// bottom on a phone. The index of places, each with its one best proof, stays in the corner, so the 30-second
-// version is always one glance away. /<slug> under the base lands on the place that holds it.
+// bottom on a phone. The index of places, each with its one best proof, what River is doing now first, stays in the
+// corner, so the 30-second version is always one glance away; with a page open it folds to a dial of numbers, the
+// place tuned to lit, and every page's bar steps to the places either side (or ← and →, or a number key).
+// /<slug> under the base lands on the place that holds it.
 import './pages.css'
 import { PLACES } from './places'
-import { BEST, CONTACT, WORKS, type Work } from './content'
+import { BEST, CONTACT, NOW, ORDER, WORKS, type Work } from './content'
 import type { Media } from '../band/projects'
 
 const BASE = import.meta.env.BASE_URL // '/', or '/next/' while the world is being made
@@ -36,17 +38,19 @@ export function route(k: number) {
 const reach = el('p', { class: 'reach' })
 for (const [t, u] of [['github', CONTACT.github], ['email', CONTACT.email && `mailto:${CONTACT.email}`], ['linkedin', CONTACT.linkedin], ['résumé', CONTACT.resume]])
   if (u) reach.append(el('a', out(u), t))
+const named = (k: number) => works(k)[0]?.title ?? PLACES[k].id
+const NOWS = new Set(ORDER.filter((e) => e.now).map((e) => e.slug))
 const entries = PLACES.map((P, k) =>
-  el('a', { href: BASE + P.slugs[0], 'data-k': String(k), style: `--c: ${ink(k)}` },
+  el('a', { href: BASE + P.slugs[0], 'data-k': String(k), style: `--c: ${ink(k)}`, ...(P.slugs.some((s) => NOWS.has(s)) ? { 'data-now': '' } : {}) },
     el('span', { class: 'n', 'aria-hidden': 'true' }, String(k + 1)),
-    el('b', {}, works(k)[0]?.title ?? P.id),
+    el('b', {}, named(k)),
     el('span', {}, tie(BEST[P.id] ?? works(k)[0]?.remarkable ?? '')),
   ),
 )
 const index = el(
   'nav',
   { class: 'index', 'aria-label': 'River Dowdy’s work' },
-  el('header', {}, el('h1', {}, CONTACT.name), el('p', {}, CONTACT.what), reach),
+  el('header', {}, el('h1', {}, CONTACT.name), el('p', {}, CONTACT.what), el('p', { class: 'now' }, tie(NOW)), reach),
   el('ol', {}, ...entries.map((a, i) => el('li', { style: `--i: ${i + 1}` }, a))),
 )
 
@@ -70,12 +74,14 @@ function article(w: Work) {
 }
 const sheets = PLACES.map((_, k) => {
   const n = (k + 1) % PLACES.length
-  return el('div', { hidden: '' }, ...works(k).map(article), el('p', { class: 'next' }, el('a', { href: BASE + PLACES[n].slugs[0], 'data-k': String(n) }, `next · ${works(n)[0]?.title ?? PLACES[n].id} →`)))
+  return el('div', { hidden: '' }, ...works(k).map(article), el('p', { class: 'next' }, el('a', { href: BASE + PLACES[n].slugs[0], 'data-k': String(n) }, `next · ${named(n)} →`)))
 })
-const where = el('span', { 'aria-hidden': 'true' })
-const close = el('button', { type: 'button', title: 'Esc' }, '← all work')
+const where = el('span', { class: 'where', 'aria-hidden': 'true' })
+const step = (key: string) => el('a', { class: 'step', href: BASE, 'data-k': '0', 'aria-keyshortcuts': key }, '')
+const prev = step('ArrowLeft'), next = step('ArrowRight')
+const close = el('button', { type: 'button', title: 'Esc', 'aria-keyshortcuts': 'Escape' }, 'all work')
 const scroll = el('div', { class: 'scroll' }, ...sheets)
-const leaf = el('section', { class: 'page' }, el('p', { class: 'bar' }, where, close), scroll)
+const leaf = el('section', { class: 'page' }, el('p', { class: 'bar' }, prev, where, next, close), scroll)
 const root = el('div', { id: 'w', hidden: '' }, index, leaf)
 
 // Pictures load as they near the reader, and arrive the way R-01 paints: odd lines down, then the even ones.
@@ -124,7 +130,13 @@ export function page(k: number, after = 0) {
     const P = PLACES[k], ws = works(k)
     leaf.style.setProperty('--c', ink(k))
     leaf.setAttribute('aria-label', ws.map((w) => w.title).join(', '))
-    where.textContent = `${String(k + 1).padStart(2, '0')} / ${String(PLACES.length).padStart(2, '0')} · ${deg(P.lat, 'N', 'S')} ${deg(P.lon, 'E', 'W')}`
+    where.textContent = `${String(k + 1).padStart(2, '0')} / ${String(PLACES.length).padStart(2, '0')} · ${P.orbit ? '550 km up' : `${deg(P.lat, 'N', 'S')} ${deg(P.lon, 'E', 'W')}`}`
+    // the places either side, a step away
+    for (const [a, j] of [[prev, (k + PLACES.length - 1) % PLACES.length], [next, (k + 1) % PLACES.length]] as const) {
+      a.dataset.k = String(j), a.href = BASE + PLACES[j].slugs[0], a.style.setProperty('--c', ink(j))
+      a.textContent = a === prev ? `‹ ${named(j)}` : `${named(j)} ›`
+      a.setAttribute('aria-label', `${a === prev ? 'previous' : 'next'}: ${named(j)}`)
+    }
     document.title = `${ws.map((w) => w.title).join(' · ')} · ${CONTACT.name}`
     root.classList.add('open')
     leaf.inert = false
@@ -136,13 +148,14 @@ export function page(k: number, after = 0) {
 }
 
 // How much of the screen the words cover, across from the right and up from the bottom, so the camera can frame its
-// subject in what is left: [right, bottom], fractions of the width and height. Measured when it changes.
+// subject in what is left: [right, bottom], fractions of the width and height (right < 0: the index on the left, at
+// home). Measured when it changes.
 const cover = [0, 0]
 export const covered = () => cover
 const phone = matchMedia('(max-aspect-ratio: 17 / 20)')
 function measure() {
   const open = root.classList.contains('open') && !root.hidden
-  cover[0] = open && !phone.matches ? leaf.offsetWidth / innerWidth : 0
+  cover[0] = phone.matches ? 0 : open ? leaf.offsetWidth / innerWidth : -0.22 * Math.min(1, index.offsetWidth / innerWidth / 0.3) // (home: the planet stands right of the index)
   cover[1] = root.hidden || !phone.matches ? 0 : (open ? leaf.offsetHeight : index.offsetHeight) / innerHeight
 }
 new ResizeObserver(measure).observe(root)

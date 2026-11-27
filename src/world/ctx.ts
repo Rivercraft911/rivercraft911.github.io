@@ -46,6 +46,9 @@ export const ctx = {
   E: [0, 0, 3] as V, // the eye, in the planet's frame
   L: [0, 0, 1] as V, // toward the sun
   focus: -1, // the place the camera is at (PLACES index), or −1 above the planet
+  blur: 0, // the lens: its blur at infinity (px), the distance it is focused at, and px a radian
+  fd: 1,
+  ppr: 1,
   models: {} as Record<string, Model>,
   items: [] as Placed[], // this frame's solids
 }
@@ -68,6 +71,12 @@ const pool: Placed[] = [], LAMP = 60 // a lamp's light at full brightness, again
 export function solid(id: string, c: ArrayLike<number>, ax: ArrayLike<number>, ay: ArrayLike<number>, az: ArrayLike<number>, size: number, k = 1, glow = 0, lamp?: ArrayLike<number>, lit = 0) {
   const m = ctx.models[id]
   if (!m) return false
+  // A small thing far out of the lens's focus is a faint disc of its light, too faint to see: it is not drawn, so the
+  // lens's taps cannot catch it and scatter it as sparks.
+  if (ctx.blur > 0) {
+    const D = Math.hypot(c[0] - ctx.E[0], c[1] - ctx.E[1], c[2] - ctx.E[2])
+    if ((size / D) * ctx.ppr < 0.3 * ctx.blur * Math.abs(1 - ctx.fd / D)) return false
+  }
   const i = ctx.items.length, it = pool[i] ?? (pool[i] = { model: m, m: new Array(12), lamp: [0, 0, 0] })
   const s = size / Math.max(m.hi[0] - m.lo[0], m.hi[1] - m.lo[1], m.hi[2] - m.lo[2])
   const mc = [(m.hi[0] + m.lo[0]) / 2, (m.hi[1] + m.lo[1]) / 2, (m.hi[2] + m.lo[2]) / 2], r = it.m as number[]

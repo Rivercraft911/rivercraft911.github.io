@@ -27,7 +27,9 @@ import { clear, ctx, len, site, type V } from './ctx'
 import { PLACES } from './places'
 import { C, RE } from './sites/sky'
 import { voice as bench } from './sites/bench'
+import { voice as bleps } from './sites/bleps'
 import { voice as core } from './sites/core'
+import { voice as glasses } from './sites/glasses'
 import { voice as hearts } from './sites/hearts'
 import { voice as launch } from './sites/launch'
 import { voice as lighthouse } from './sites/lighthouse'
@@ -40,11 +42,12 @@ type Speak = (t: number, dt: number) => number
 
 const CS = 12 // radii a second
 const SLOTS = 3, FADE = 1 / (0.08 * 48000), EASE = 1 / (0.04 * 48000), GLIDE = 1 / (0.4 * 48000), SEND = 0.35
-const SPEAK: Record<string, Speak> = { valley, launch, lighthouse, bench, hearts, receiver, station }
+const SPEAK: Record<string, Speak> = { valley, launch, lighthouse, bench, glasses, hearts, receiver, station, bleps }
 // Each place's pitch, Hz: esp-dvbs2's carrier as its voice brings it down; Pigeon Vision's receiver's BFO; R-01's
 // lines a second; PEEP's 38 kHz slowed 25×; the hearts' lub; Ephemeris-1's despread carriers; SAMWISE's field as a
-// proton precesses in it (it moves, so it is asked); and the sieve's A. Home is A.
-const KEYS: Record<string, number | (() => number)> = { valley: 480, launch: 1760, lighthouse: 120, bench: 1520, hearts: 55, receiver: 1320, station: tonic, core: 55 }
+// proton precesses in it (it moves, so it is asked); the strobe glasses' valves' 100 Hz drive; BLEPS's 433 MHz beacon;
+// and the sieve's A. Home is A.
+const KEYS: Record<string, number | (() => number)> = { valley: 480, launch: 1760, lighthouse: 120, bench: 1520, glasses: 100, hearts: 55, receiver: 1320, station: tonic, bleps: 433, core: 55 }
 const HOME = 55
 type Source = { k: number; speak: Speak; flip: number; reach: number; w: V; g: number; d: number; d2: number; gT: number; dT: number; tau: number; rank: number }
 const source = (k: number, speak: Speak, flip = 1): Source => ({ k, speak, flip, reach: 1.2 * PLACES[k].view[0], w: [0, 0, 1], g: 0, d: 0, d2: 0, gT: 0, dT: 0, tau: NaN, rank: 0 })
