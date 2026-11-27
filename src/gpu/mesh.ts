@@ -10,7 +10,8 @@ export type Model = { vb: GPUBuffer; solid: number; clear: number; lo: number[];
 
 // One model in the scene: m is three rows of its transform, model → world, the world being the eye's: the eye at the
 // origin, so the scene keeps its own positions in doubles and subtracts the eye before it hands them over.
-export type Placed = { model: Model; m: ArrayLike<number>; k?: number; glow?: number }
+// k: how bright its light is; glow: its own light, as a share of its colour; lamp: the light of its lamps (bvh.worker.ts), rgb.
+export type Placed = { model: Model; m: ArrayLike<number>; k?: number; glow?: number; lamp?: ArrayLike<number> }
 
 export type Solids = {
   cam: Float32Array // reality.aim's p: 1/tan(fov/2) in p[3], right, up, forward; the eye's place is ignored (it is the origin)
@@ -27,7 +28,8 @@ export type Solids = {
   aperture?: number // and its blur at infinity, px; 0 or none, a pinhole (raster.wgsl does the blur)
 }
 
-const STRIDE = 32 // position, normal (f32 × 3 each), colour and (metal, rough) as unorm8 × 4
+const STRIDE = 32 // position, normal (f32 × 3 each), colour and (metal, rough, lamp) as unorm8 × 4
+const INST = 20 // floats an instance: three rows of its transform, (k, glow, traced, -), its lamps' light
 const SHADOW = 2048
 const MAX = 256 // models placed in a frame
 const HALTON = Array.from({ length: 16 }, (_, i) => [halton(i + 1, 2) - 0.5, halton(i + 1, 3) - 0.5])
@@ -46,7 +48,7 @@ export class Mesh {
   private u: GPUBuffer
   private uf = new Float32Array(16 * 4)
   private inst: GPUBuffer
-  private ii = new Float32Array(MAX * 16)
+  private ii = new Float32Array(MAX * INST)
   private shadow: GPUTexture
   private cmp: GPUSampler
   private g0!: GPUBindGroup
@@ -171,11 +173,12 @@ export class Mesh {
     this.write(s!, w, h, traced)
     const n = Math.min(MAX, items.length), c = s!.cam, sh = s!.shadow, L = s!.sun, tx = w / h / c[3], ty = 1 / c[3]
     for (let i = 0; i < n; i++) {
-      const M = items[i].model, m = items[i].m, o = i * 16
+      const M = items[i].model, m = items[i].m, o = i * INST, lamp = items[i].lamp
       for (let j = 0; j < 12; j++) this.ii[o + j] = m[j]
       this.ii[o + 12] = items[i].k ?? 1
       this.ii[o + 13] = items[i].glow ?? 0
       this.ii[o + 14] = traced ? T.fades[i] : 0
+      for (let j = 0; j < 3; j++) this.ii[o + 16 + j] = lamp ? lamp[j] : 0
       // Only what the camera can see is drawn, and only what stands in the sun's map is drawn into it: the sphere
       // round the model against the view's four sides, and against the column of sunlight through what casts.
       const cx = (M.lo[0] + M.hi[0]) / 2, cy = (M.lo[1] + M.hi[1]) / 2, cz = (M.lo[2] + M.hi[2]) / 2
@@ -188,7 +191,7 @@ export class Mesh {
         this.casts[i] = +(Math.abs(along) < R && dx * dx + dy * dy + dz * dz - along * along < R * R)
       }
     }
-    d.queue.writeBuffer(this.inst, 0, this.ii, 0, n * 16)
+    d.queue.writeBuffer(this.inst, 0, this.ii, 0, n * INST)
     const each = (p: GPURenderPassEncoder, clear: boolean, which: Uint8Array) => {
       for (let i = 0; i < n; i++) {
         const m = items[i].model, c = clear ? m.clear : m.solid

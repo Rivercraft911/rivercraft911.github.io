@@ -1,19 +1,18 @@
 // River's planet: the world the intro lands on, and the portfolio. A small world in units of its radius: its air,
-// storm and aurora a field (planet.wgsl), River's hardware standing on it as monuments (mesh.ts), the beam drawing
-// over it what is a signal (orbits, the river). The planet holds still and its sun goes round it, so the camera lives
-// in the planet's own frame; everything is sent relative to the eye, which keeps its place in doubles.
+// storm and aurora a field (planet.wgsl), River's hardware standing on it as monuments (mesh.ts), lit by its sun and,
+// where it has lamps, by its own light. The planet holds still and its sun goes round it, so the camera lives in the
+// planet's own frame; everything is sent relative to the eye, which keeps its place in doubles.
 //
 // Drag turns the view, the wheel is altitude, a click flies to the place under it, Escape climbs back out.
 import { PLANET } from '../gpu/fields'
 import type { Field } from '../gpu/raster'
 import { model, type Solids } from '../gpu/mesh'
 import { aim } from '../acts/reality'
-import { clamp, view, TAU, type Scene, type Frame } from '../acts/scene'
-import { Path } from '../beam/path'
-import { PLACES, RIVER } from './places'
-import { ctx, dot, frame, len, look, seen, site, stand, trace, turn, unit, type V } from './ctx'
-import { covered, mount, page, route, within } from './pages'
-import { GAP, sound, stroke } from './sound'
+import { clamp, view, type Scene, type Frame } from '../acts/scene'
+import { PLACES } from './places'
+import { ctx, dot, frame, len, look, seen, site, stand, turn, unit, type V } from './ctx'
+import { covered, hovered, mount, page, route, within } from './pages'
+import { sound } from './sound'
 
 const p = ctx.p
 const cam = new Float32Array(16)
@@ -35,13 +34,14 @@ const DEBUG = ['d', 'pitch', 'yaw', 'at'].some((k) => dbg.has(k))
 
 // ---- models: River's hardware, as baked (scripts/bake-models.mjs) --------------------------------------------
 const models = ctx.models
+const LAMPS: Record<string, string> = { heart: 'mat_2' } // which of a model's materials are its LEDs (bvh.worker.ts)
 export function attach(d: GPUDevice) {
   mount((k) => go(k, lastBuild), () => active) // the words: the index, a deep link's place, the history
   const base = `${import.meta.env.BASE_URL}media/models/`
   fetch(`${base}list.json`)
     .then((r) => (r.ok ? r.json() : []))
     .then((list: { id: string; file: string }[]) => {
-      for (const m of list) model(d, base + m.file).then((g) => (models[m.id] = g))
+      for (const m of list) model(d, base + m.file + (LAMPS[m.id] ? `#lamp=${LAMPS[m.id]}` : '')).then((g) => (models[m.id] = g))
     })
     .catch(() => {})
 }
@@ -59,8 +59,8 @@ export type Pose = { eye: V; at: V; up: V }
 const pose = (): Pose => ({ eye: [0, 0, 3], at: [0, 0, 0], up: [0, 1, 0] })
 const now = pose(), from = pose(), to = pose()
 let focus = -1 // the place we are at, or home
-let flight = -1, fstart = 0, flen = 1, farther = 0 // flying from `from` toward `focus` since fstart, for flen seconds, over an arc of `farther` rad
-export const HOME = { d: 5.2, pitch: 0.38, yaw: 0.6 } // where the reveal leaves the eye, and Escape takes it
+let flight = -1, fstart = 0, flen = 1 // flying from `from` toward `focus` since fstart, for flen seconds
+export const HOME = { d: 5.2, pitch: 0.38, yaw: 0.6 } // where the arrival leaves the eye, and Escape takes it
 const rest = { ...HOME } // where the eye is about what it looks at
 const want = { ...HOME } // and where the pointer has asked it to be
 const n0: V = [0, 0, 0], e0: V = [0, 0, 0], N0: V = [0, 0, 0]
@@ -116,7 +116,6 @@ export function go(k: number, t: number, quiet = false) {
   want.d = rest.d = d, want.pitch = rest.pitch = pitch, want.yaw = rest.yaw = yaw
   restAt(k, to)
   const arc = Math.acos(clamp(dot(unit([...from.eye]), unit([...to.eye])), -1, 1))
-  farther = arc
   flight = 0, fstart = t, flen = 1.4 + 1.1 * arc + 0.5 * Math.abs(Math.log(len(from.eye) / len(to.eye)))
   page(k, flen) // its page comes in as the camera arrives
   if (!quiet) route(k) // a visitor's flight is their history; the world showing itself is not
@@ -181,54 +180,7 @@ requestAnimationFrame(watch)
 // ---- monuments: River's hardware, stood where its place is ---------------------------------------------------
 const sites = PLACES.map((P) => site(P.lat, P.lon))
 
-// ---- the beam's share: the river, the orbits, the places --------------------------------------------------------
-const river = new Path(), orbits = new Path(), marks = new Path(), bolts = new Path()
-const E = ctx.E, q3: V = [0, 0, 0]
-// The river, where the valley is: the intro's own meander, laid on the ground.
-const RW = (() => {
-  const s = sites[0], o = new Float64Array((RIVER.length / 2) * 3)
-  frame(s, e0, N0)
-  for (let i = 0; i < RIVER.length / 2; i++) {
-    const x = RIVER[2 * i], y = RIVER[2 * i + 1], g = [0, 1, 2].map((j) => s[j] + e0[j] * x + N0[j] * y)
-    unit(g)
-    for (let j = 0; j < 3; j++) o[3 * i + j] = g[j] * 1.0015
-  }
-  return o
-})()
-const RING = new Float64Array(97 * 3)
-const ring = (r: number, raan: number, inc: number, u: number, o: V) => {
-  const x = Math.cos(u), y = Math.sin(u)
-  o[0] = r * (x * Math.cos(raan) - y * Math.cos(inc) * Math.sin(raan))
-  o[1] = r * y * Math.sin(inc)
-  o[2] = r * (x * Math.sin(raan) + y * Math.cos(inc) * Math.cos(raan))
-  return o
-}
-// GPS: Walker 24/6/1 at 55° and 4.17 radii (26 560 km over Earth's 6371); SAMWISE: sun-synchronous, 97.6° at 1.086
-function drawOrbits(t: number) {
-  orbits.clear()
-  const shell = (r: number, raan: number, inc: number, c: readonly number[]) => {
-    for (let i = 0; i <= 96; i++) RING.set(ring(r, raan, inc, (i / 96) * TAU, q3), 3 * i)
-    orbits.color(c[0], c[1], c[2], c[3])
-    trace(orbits, RING, 97)
-  }
-  for (let pl = 0; pl < 6; pl++) {
-    const raan = (pl * TAU) / 6, inc = (55 * Math.PI) / 180
-    shell(4.17, raan, inc, [0.35, 0.55, 1, 0.16])
-    for (let sv = 0; sv < 4; sv++) if (look(ring(4.17, raan, inc, (sv * TAU) / 4 + (pl * TAU) / 24 + 0.05 * t, q3))) orbits.color(0.75, 0.9, 1, 1).dot(seen.x, seen.y, 0.01)
-  }
-  shell(1.086, 0.4, (97.6 * Math.PI) / 180, [0.75, 0.6, 1, 0.45])
-  if (look(ring(1.086, 0.4, (97.6 * Math.PI) / 180, 0.6 * t, q3))) orbits.color(0.9, 0.8, 1, 1).dot(seen.x, seen.y, 0.012)
-}
-function drawMarks() {
-  marks.clear()
-  PLACES.forEach((P, k) => {
-    const s = sites[k]
-    q3[0] = s[0] * 1.012, q3[1] = s[1] * 1.012, q3[2] = s[2] * 1.012
-    if (!look(q3)) return
-    const c = P.ink
-    marks.color(c[0], c[1], c[2], k === focus ? 0.2 : k === hover ? 1 : 0.55).circle(seen.x, seen.y, k === hover ? 0.02 : 0.013, 24)
-  })
-}
+const q3: V = [0, 0, 0]
 // the place nearest the pointer on screen, if near enough
 function pick(cx: number, cy: number) {
   const x = ((2 * cx) / innerWidth - 1) * view.a, y = 1 - (2 * cy) / innerHeight
@@ -243,7 +195,9 @@ function pick(cx: number, cy: number) {
 }
 
 // ---- the frame -------------------------------------------------------------------------------------------------
-export const L0 = unit([1, 0.3, 0.45])
+// The sun at the world's clock's zero: at the hearts it is just up, in the east-southeast, and from home the planet is
+// three parts lit, its morning terminator on the left.
+export const L0 = unit([0.9585, -0.2702, 0.091])
 // The planet field's slots (planet.wgsl): the eye's place, the sun and the time, the spin (none: the sun goes round),
 // the storm, the exposure, and River's: the river's place and scale (the beam's own θ(s), 1:400), and where every place
 // stands, each on land, each a town at night. The core is the storm's eye, open sea. `text`: how much is read as glyphs.
@@ -253,8 +207,8 @@ export function air(p: Float32Array, E: ArrayLike<number>, L: ArrayLike<number>,
   p.set(SITES, 40)
 }
 const L: V = [0, 0, 0], Y = [0, 1, 0]
-// The sun at planet time pt: it goes round once in five minutes. The reveal and the ident run on the same clock,
-// ending at 0 where the world's begins, so nothing in the sky jumps when the world takes over.
+// The sun at planet time pt: it goes round once in five minutes. The arrival runs on the same clock, ending at 0
+// where the world's begins, so nothing in the sky jumps when the world takes over.
 export const clock = (pt: number, o: V) => turn(L0, Y, -0.02 * pt, o)
 const PEEP = unit([0.5, 0.55, 0.65])
 let last = 0
@@ -267,14 +221,28 @@ function debugPose(t: number) {
   now.up = [0, 1, 0]
 }
 
-// One frame of the planet, seen from `pose` at planet time t, with place `focus` the one looked at (its spectacle in
-// full, its equation up) and the lens open by `lens` (0 a pinhole, 1 a macro lens's). The world draws with it, and so
-// does the intro, which flies its own camera through the same places.
-const fw: V = [0, 0, 0], side = [0, 0], INK = [0.55, 0.85, 1]
-export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number, lens: number, marked = false, text = 0) {
+// The sun's colour where it reaches unit n, through the air (planet.wgsl's sunward: Rayleigh and Mie over Chapman's
+// column), so the hardware is lit gold at the terminator as the land round it is.
+const BR = [5.8, 13.5, 33.1], BM = 21, HR = 0.008, HM = 0.0012, WHITE = [1, 0.96, 0.9]
+function chapman(mu: number, H: number) {
+  const x = 1.004 / H, c = Math.sqrt(0.5 * Math.PI * x), up = (c / ((c - 1) * Math.abs(mu) + 1)) * Math.exp(-0.004 / H)
+  if (mu >= 0) return up
+  const x0 = x * Math.sqrt(Math.max(1 - mu * mu, 0))
+  return 2 * Math.sqrt(0.5 * Math.PI * x0) * Math.exp(Math.min(1 / H - x0, 40)) - up
+}
+function tint(n: ArrayLike<number>, L: ArrayLike<number>, o: number[]) {
+  const mu = dot(n, L), r = chapman(mu, HR) * HR, m = 1.1 * BM * HM * chapman(mu, HM)
+  for (let i = 0; i < 3; i++) o[i] = WHITE[i] * Math.exp(-(BR[i] * r + m))
+}
+
+// One frame of the planet, seen from `pose` at planet time t, with place `focus` the one looked at (its shadows and
+// its sun) and the lens open by `lens` (0 a pinhole, 1 a macro lens's). The world draws with it, and so does the
+// arrival, which flies its own camera through the same air, as wide as `fov` (radians) if it says.
+const fw: V = [0, 0, 0], side = [0, 0], E = ctx.E
+export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number, lens: number, marked = false, wide = 0) {
   const { eye, at } = pose, up_ = pose.up
   E[0] = eye[0], E[1] = eye[1], E[2] = eye[2]
-  const alt = Math.max(len(E) - 1, 1e-3), fov = clamp(0.62 - 0.04 * Math.log10(0.3 / alt), 0.5, 0.75)
+  const alt = Math.max(len(E) - 1, 1e-3), fov = wide || clamp(0.62 - 0.04 * Math.log10(0.3 / alt), 0.5, 0.75)
   fw[0] = at[0] - E[0], fw[1] = at[1] - E[1], fw[2] = at[2] - E[2]
   aim(p, [0, 0, 0], fw, up_, fov)
   if (marked && (side[0] || side[1])) {
@@ -286,25 +254,21 @@ export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number
   cam.set(p.subarray(0, 16))
   if (dbg.has('at')) L.splice(0, 3, ...L0)
   else clock(t, L)
-  air(p, E, L, t, EXPOSE, text)
-  F.cell = text > 0.02 ? 12 : undefined
-  F.ink = INK
+  air(p, E, L, t, EXPOSE)
+  // which place the pointer, or the index, is on: it is marked on the ground (planet.wgsl)
+  const k = marked ? (hover >= 0 ? hover : hovered()) : -1
+  if (k >= 0 && k !== focus && PLACES[k].lat < 80) mark[0] = k
+  mark[1] += ((k >= 0 && k === mark[0] && k !== focus ? 1 : 0) - mark[1]) * (1 - Math.exp(-8 * dt))
+  p[54] = mark[0], p[55] = mark[1]
 
-  // the monuments, the places' own drawing, and the sun on them
+  // River's hardware, and the sun on it
   ctx.t = t, ctx.dt = dt, ctx.f = f, ctx.focus = focus
   ctx.L[0] = L[0], ctx.L[1] = L[1], ctx.L[2] = L[2]
   ctx.items.length = 0
   f.rate = 2.4e6, f.field = F, f.look = { tau: 0.025 } // a place may take the field over (the core, from inside)
   PLACES.forEach((P, k) => {
     for (const m of P.monuments) stand(m.id, sites[k], m.size, m.at, m.turn, m.lift, m.flip)
-    const from = f.ch.length
     P.draw?.(k)
-    // every place keeps running, but only the one looked at is drawn at full strength: the rest recede
-    const dim = k === focus ? 1 : focus < 0 ? 0.5 : 0.3
-    for (let i = from; i < f.ch.length && dim < 1; i++) {
-      const v = (f.ch[i] as { path?: Path }).path?.v
-      if (v) for (let j = 2; j < v.length; j += 8) v[j] *= dim
-    }
   })
   if (DEBUG) stand('peep', PEEP, 0.08, undefined, 0.4, 0.002)
   const near = focus >= 0 ? sites[focus] : DEBUG ? PEEP : sites[0]
@@ -314,29 +278,15 @@ export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number
   const near_ = mv ?? near
   sh[0] = near_[0] * 1.01 * hr - E[0], sh[1] = near_[1] * 1.01 * hr - E[1], sh[2] = near_[2] * 1.01 * hr - E[2], sh[3] = 0.12
   up[0] = near_[0], up[1] = near_[1], up[2] = near_[2]
-  sun[0] = L[0], sun[1] = L[1], sun[2] = L[2], sun[3] = 22 * clamp(dot(near_, L) * 4 + 0.6, 0, 1)
+  sun[0] = L[0], sun[1] = L[1], sun[2] = L[2], sun[3] = 22 * clamp(dot(near_, L) * 6 + 0.5, 0, 1)
+  tint(near_, L, solids.sunc as number[])
   // the lens: on the place, at the camera's distance, opening like a macro lens's as the camera comes close
   const fd = Math.hypot(at[0] - E[0], at[1] - E[1], at[2] - E[2])
   solids.focus = fd
   solids.aperture = lens * clamp(0.12 / fd, 0, 1) * 26
   F.res = lens > 0 ? 1.2 : 2 // under the lens the world behind is a blur: its sky and clouds need not be swept at full size
-
-  river.clear().color(0.5, 0.8, 1, 0.9)
-  trace(river, RW, RW.length / 3)
-  drawOrbits(t)
-  if (marked) drawMarks()
-  else marks.clear()
-  // lightning in the storm's arms: the strokes the speakers hear as sferics (sound.ts), seen as the cloud lit from
-  // inside by a return stroke and its restrikes, ~45 ms apart, fading in a third of a second
-  bolts.clear()
-  for (let j = Math.floor(t / GAP) + 1, n = 0; n < 3; n++, j--) {
-    const S = stroke(j), age = t - S.t, k = age < 0 ? 0 : Math.max(0, Math.cos((age * TAU) / 0.045)) ** 3 * Math.exp(-age / 0.1)
-    if (k < 0.04) continue
-    q3[0] = S.s[0] * 1.006, q3[1] = S.s[1] * 1.006, q3[2] = S.s[2] * 1.006
-    if (look(q3)) bolts.color(0.8, 0.88, 1, 2.4 * k).dot(seen.x, seen.y, 0.003 + 0.012 * k)
-  }
-  if (f.field === F) f.ch.push({ w: 0.2, path: river }, { w: 0.5, path: orbits }, { w: 0.1, path: marks }, { w: 0.04, path: bolts })
 }
+const mark = [-1, 0] // the place marked, and how much
 
 export const planet: Scene = {
   dur: Infinity,
@@ -368,9 +318,7 @@ export const planet: Scene = {
 
     const c = covered(), ease = 1 - Math.exp(-4 * dt)
     side[0] += (c[0] - side[0]) * ease, side[1] += (c[1] - side[1]) * ease
-    // a long flight goes through the glyphs the film came down through: the world read out as text, most at mid-arc
-    const glyphs = flight >= 0 ? clamp((farther - 0.5) / 0.7) * Math.sin(Math.PI * flight) ** 2 * 0.85 : 0
-    paint(f, now, t, dt, focus, DEBUG ? +(dbg.get('ap') ?? 0) : focus >= 0 && flight < 0 ? 1 : 0, true, glyphs)
+    paint(f, now, t, dt, focus, DEBUG ? +(dbg.get('ap') ?? 0) : focus >= 0 && flight < 0 ? 1 : 0, true)
     return sound()
   },
 }

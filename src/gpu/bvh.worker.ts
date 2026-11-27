@@ -7,12 +7,13 @@
 // candidates are 12 bins along each axis of the centroids' box. A node holds both its children's boxes, so a visit is
 // one read: per child, lo, ref, hi, n; n > 0 a leaf of n triangles from ref, else ref is the child node.
 
-const STRIDE = 32 // position, normal (f32 × 3 each), colour and (metal, rough) as unorm8 × 4
+const STRIDE = 32 // position, normal (f32 × 3 each), colour and (metal, rough, lamp) as unorm8 × 4
 const BINS = 12, LEAF = 4
 
-type Prim = { M: number[]; P: Float32Array; N?: Float32Array; I: Uint32Array; col: number[]; metal: number; rough: number }
+type Prim = { M: number[]; P: Float32Array; N?: Float32Array; I: Uint32Array; col: number[]; metal: number; rough: number; lamp: boolean }
 
-function read(buf: ArrayBuffer) {
+// `lamps`: the materials, by name, that are a light (an LED's lens): the scene says how bright each frame.
+function read(buf: ArrayBuffer, lamps: string[]) {
   const v = new DataView(buf), jl = v.getUint32(12, true)
   const j = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jl)))
   const bin = 28 + jl
@@ -36,7 +37,7 @@ function read(buf: ArrayBuffer) {
       const I = p.indices != null ? (acc(p.indices) as Uint32Array) : Uint32Array.from({ length: P.length / 3 }, (_, i) => i)
       // glTF's defaults: a factor left off is 1, and the bake (bake-models.py) leaves metal off exactly its metals:
       // gold, tin, pins. A material with no factors at all is a plastic.
-      prims.push({ M, P, N: p.attributes.NORMAL != null ? (acc(p.attributes.NORMAL) as Float32Array) : undefined, I, col: pb?.baseColorFactor ?? [0.8, 0.8, 0.8, 1], metal: pb ? (pb.metallicFactor ?? 1) : 0, rough: pb ? (pb.roughnessFactor ?? 1) : 0.5 })
+      prims.push({ M, P, N: p.attributes.NORMAL != null ? (acc(p.attributes.NORMAL) as Float32Array) : undefined, I, col: pb?.baseColorFactor ?? [0.8, 0.8, 0.8, 1], metal: pb ? (pb.metallicFactor ?? 1) : 0, rough: pb ? (pb.roughnessFactor ?? 1) : 0.5, lamp: lamps.includes(j.materials?.[p.material]?.name) })
     }
     for (const c of n.children ?? []) walk(c, M)
   }
@@ -71,7 +72,7 @@ function read(buf: ArrayBuffer) {
           f[o + 3] = mx / l, f[o + 4] = my / l, f[o + 5] = mz / l
           const u = at * STRIDE + 24
           b[u] = gamma[0], b[u + 1] = gamma[1], b[u + 2] = gamma[2], b[u + 3] = Math.round(255 * p.col[3])
-          b[u + 4] = Math.round(255 * p.metal), b[u + 5] = Math.round(255 * p.rough)
+          b[u + 4] = Math.round(255 * p.metal), b[u + 5] = Math.round(255 * p.rough), b[u + 6] = p.lamp ? 255 : 0
         }
       }
     }
@@ -108,7 +109,7 @@ function oct(x: number, y: number, z: number) {
 }
 
 // The hierarchy over the vertex buffer's n triangles: its nodes (64 bytes each), the triangles in the leaves' order
-// (48 bytes: a corner, two edges, the corners' normals), and their materials (colour, then metal, rough, translucent).
+// (48 bytes: a corner, two edges, the corners' normals), and their materials (colour, then metal, rough, translucent, lamp).
 function build(vb: ArrayBuffer, n: number, solid: number) {
   const f = new Float32Array(vb), bytes = new Uint8Array(vb)
   const box = new Float32Array(n * 6), mid = new Float32Array(n * 3), idx = new Uint32Array(n)
@@ -214,7 +215,7 @@ function build(vb: ArrayBuffer, n: number, solid: number) {
     for (let q = 0; q < 3; q++) tu[o + q * 4 + 3] = oct(f[v + q * 8 + 3], f[v + q * 8 + 4], f[v + q * 8 + 5])
     const c = t * 96 + 24
     mats[i * 2] = (bytes[c] | (bytes[c + 1] << 8) | (bytes[c + 2] << 16) | (bytes[c + 3] << 24)) >>> 0
-    mats[i * 2 + 1] = bytes[c + 4] | (bytes[c + 5] << 8) | (t >= solid ? 1 << 16 : 0)
+    mats[i * 2 + 1] = (bytes[c + 4] | (bytes[c + 5] << 8) | (t >= solid ? 1 << 16 : 0) | (bytes[c + 6] << 24)) >>> 0
   }
   return { nodes: nodes.slice(0, used * 64), tris, mats: mats.buffer }
 }
@@ -222,7 +223,8 @@ function build(vb: ArrayBuffer, n: number, solid: number) {
 onmessage = async (e: MessageEvent<{ id: number; url: string }>) => {
   const { id, url } = e.data
   try {
-    const m = read(await (await fetch(url)).arrayBuffer()), n = (m.solid + m.clear) / 3
+    const lamps = new URL(url).hash.match(/lamp=([^&]*)/)?.[1].split(',') ?? [] // model.glb#lamp=<material>,…
+    const m = read(await (await fetch(url)).arrayBuffer(), lamps), n = (m.solid + m.clear) / 3
     const h = build(m.vb, n, m.solid / 3)
     postMessage({ id, ...m, ...h }, { transfer: [m.vb, h.nodes, h.tris, h.mats] })
   } catch (err) {

@@ -47,7 +47,7 @@ const index = el(
   'nav',
   { class: 'index', 'aria-label': 'River Dowdy’s work' },
   el('header', {}, el('h1', {}, CONTACT.name), el('p', {}, CONTACT.what), reach),
-  el('ol', {}, ...entries.map((a) => el('li', {}, a))),
+  el('ol', {}, ...entries.map((a, i) => el('li', { style: `--i: ${i + 1}` }, a))),
 )
 
 // ---- a page: the place's projects, one after another ---------------------------------------------------------------
@@ -168,6 +168,14 @@ export function title() {
   root.hidden = was
   return { left: r.left, bottom: r.bottom - parseFloat(s.fontSize) * 0.22, width: r.width - parseFloat(s.letterSpacing || '0') * (w > 0 ? 1 : 0) } // less the last letter's spacing
 }
+// Which place the reader is pointing at in the index (or has focused there), so the world can mark it on the ground.
+let over = -1
+for (const a of entries) {
+  const k = +a.dataset.k!, off = () => over === k && (over = -1)
+  a.addEventListener('pointerenter', () => (over = k)), a.addEventListener('focus', () => (over = k))
+  a.addEventListener('pointerleave', off), a.addEventListener('blur', off)
+}
+export const hovered = () => over
 // Is this event's target in the words? Keys pressed there are the reader's (space scrolls; it doesn't pause).
 export const within = (t: EventTarget | null) => t instanceof Node && root.contains(t)
 

@@ -32,7 +32,7 @@ export function keep(d: GPUDevice, nodes: ArrayBuffer, tris: ArrayBuffer, mats: 
 }
 
 const MAX = 16 // instances traced
-const INST = 48 // floats an instance
+const INST = 52 // floats an instance
 const DEPTH = 24 // samples a texel's mean remembers (trace.wgsl), one every fourth frame
 const ANGLE = 0.03 // an instance counts once its radius is this many radians across, from the eye,
 const REACH = 2 // and if it is no more than this many times as far as the nearest that does
@@ -232,6 +232,7 @@ export class Trace {
         b[o + 36 + j] = mn, b[o + 40 + j] = mx
       }
       b[o + 39] = T.node, b[o + 43] = T.tri, b[o + 44] = it.k ?? 1, b[o + 45] = it.glow ?? 0, b[o + 46] = i + 1
+      for (let j = 0; j < 3; j++) b[o + 48 + j] = it.lamp ? it.lamp[j] : 0
       rx += (b[o + 36] + b[o + 40]) / 2 / n, ry += (b[o + 37] + b[o + 41]) / 2 / n, rz += (b[o + 38] + b[o + 42]) / 2 / n
     }
     for (let q = 0; q < n; q++) {

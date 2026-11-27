@@ -22,7 +22,8 @@
 // p[7] the storm, its eye's radius (rad), cloud cover, aurora
 // p[8] exposure, the night side's own light, how many places (up to 10), -
 // p[9] how much is read out as text, the river's place (lat, lon; rad), its radii per unit of s (0: no river)
-// p[10..14] the places, two a slot (lat, lon, lat, lon; rad): each stands on land and is lit at night
+// p[10..13] the places, two a slot (lat, lon, lat, lon; rad): each stands on land and is lit at night
+// p[13].zw the place marked (which, how much)
 //
 // data: a 256² tile of white noise (fields.ts), r the same as g but 37, 17 texels on, so one bilinear tap reads a
 // lattice of 3D value noise at two depths.
@@ -166,7 +167,7 @@ fn air(ro: vec3f, rd: vec3f, a: f32, b: f32, L: vec3f, cut: f32, thr: f32, n: i3
   let g = 0.76;
   let pm = 3.0 / (8.0 * PI) * (1.0 - g * g) * (1.0 + mu * mu) / ((2.0 + g * g) * pow(1.0 + g * g - 2.0 * g * mu, 1.5));
   let tm = clamp(-dot(ro, rd), a, b);
-  let f = (tm - a) / (b - a);
+  let f = clamp((tm - a) / max(b - a, 1e-9), 1e-4, 1.0 - 1e-4); // (where the ray is lowest, as a share of the way: never quite an end, or a step divides by zero)
   var od = vec2f(0.0);
   var A = Air(vec3f(0.0), vec3f(1.0), vec3f(1.0));
   var seen = 1.0;
@@ -309,10 +310,19 @@ fn gorge(q: vec2f) -> vec3f {
   return vec3f(0.001 + 0.085 * (floor(y) + 0.15 * f + 0.85 * st * st * (3.0 - 2.0 * st)), 0.085 * dT * step(0.0, xx) * dx);
 }
 
+// How far round each place the land is levelled for what stands there, and how far the sky is kept clear over it (rad),
+// in the order planet.ts sends the places (places.ts's, less the core): the valley, the launch, the lighthouse, the
+// bench, the hearts, the receiver, the station. The hearts stand in the weather, their tops through the cloud.
+const FLAT = array<vec2f, 7>(vec2f(0.0, 0.2), vec2f(0.12, 0.16), vec2f(0.11, 0.16), vec2f(0.18, 0.2), vec2f(0.04, 0.0), vec2f(0.09, 0.13), vec2f(0.1, 0.14));
+fn flat(pl: vec2f) -> vec2f { return FLAT[min(u32(max(pl.y, 0.0)), 6u)]; }
+
 // How high land of height h stands, in radii: plains under the cloud, ranges through it. Near a place (nearest) it
-// is level, a fifth of a radian out, the hills standing back from it, since what stands there (mesh.ts) stands at
-// r = 1; all but the river's own, where nothing stands but the beam.
-fn level(pl: vec2f) -> f32 { return select(smoothstep(0.024, 0.06, pl.x), 1.0, i32(pl.y) == RV); }
+// is level as far out as it needs, the hills standing back from it, since what stands there (mesh.ts) stands at
+// r = 1; all but the river's own, which is its canyon. (pl.x is 1 − cos of the angle, near enough half its square.)
+fn level(pl: vec2f) -> f32 {
+  let r = flat(pl).x;
+  return select(smoothstep(0.5 * r * r, 0.5 * (1.5 * r + 0.04) * (1.5 * r + 0.04), pl.x), 1.0, i32(pl.y) == RV);
+}
 fn stand(h: f32, pl: vec2f) -> f32 {
   let up = max(h, 0.0);
   return min(level(pl) * ZD * up * (0.4 + 1.5 * up), ZT);
@@ -386,6 +396,7 @@ fn crust(m: vec3f, fp: f32) -> vec4f {
   return h;
 }
 
+var<private> crust0: f32; // the crust's own height where lay() last looked: under 0, the sea
 // The same, bare: how high the ground stands at m and nothing else (rise.x, no gradient, nothing for the painter), for
 // the march and the shadows, which ask many times a pixel. Line for line crust(): change them together. The slope the
 // ridges are worn by is kept in each octave's own frame, so no Jacobian is carried; `cut`: the canyon as well, which
@@ -432,6 +443,7 @@ fn lay(m: vec3f, fp: f32, cut: bool) -> f32 {
   }
   h += (0.09 + 0.36 * mtn) * smoothstep(-0.15, 0.0, h) * det;
   if (canyon && cut) { h = -smax(vec4f(-h, 0.0, 0.0, 0.0), vec4f(-gorge(rq / rk + vec2f(45.55, 0.0)).x, 0.0, 0.0, 0.0), 0.008).x; }
+  crust0 = h;
   return stand(h, pl);
 }
 // ---- the sky's water ---------------------------------------------------------------------------------------------
@@ -451,15 +463,16 @@ fn weather(n: vec3f) -> f32 {
   q = q * 2.3 + vec3f(0.0, 0.0, 0.004 * u.p[5].w);
   return (0.6 * noise(q) + 0.3 * noise(q * 2.3 + 5.0) - 0.45) * 4.0 + 0.4 + 0.6 * low + 0.4 * (1.0 - 18.0 * y2 + 48.0 * y2 * y2 - 32.0 * y2 * y2 * y2) + 2.0 * (u.p[7].z - 1.0);
 }
-// Over each of River's places the sky is kept clear, so what stands there is seen: a fifth of a radian out, less or
+// Over each of River's places the sky is kept clear, so what stands there is seen: as far out as FLAT says, less or
 // more by the bearing, then the weather coming back. How much of it there is over unit n, whose nearest place is pl.
 fn cleared(n: vec3f, pl: vec2f) -> f32 {
-  if (pl.x > 0.045) { return 1.0; }
+  let c = 0.5 * flat(pl).y * flat(pl).y;
+  if (pl.x > 2.0 * c || pl.y < 0.0) { return 1.0; }
   let P = PL[i32(pl.y)];
   let e = normalize(vec3f(P.z, 0.0, -P.x));
   let uv = vec2f(dot(n, e), dot(n, cross(P, e)));
   let r2 = dot(uv, uv);
-  return smoothstep(0.016, 0.045, pl.x * (1.0 + 0.45 * uv.x * (uv.x * uv.x - 3.0 * uv.y * uv.y) / (r2 * sqrt(r2) + 1e-6)));
+  return smoothstep(0.25 * c, c, pl.x * (1.0 + 0.45 * uv.x * (uv.x * uv.x - 3.0 * uv.y * uv.y) / (r2 * sqrt(r2) + 1e-6)));
 }
 // The deck over unit n: the altitudes of its base and its top (no cloud where the top is not above the base), in
 // detail down to fp. Fair weather is cells of convection, as many as the weather allows. Round the pole the deck is the
@@ -730,6 +743,13 @@ fn ground(p: vec3f, rd: vec3f, L: vec3f, t: f32, near: f32) -> vec3f {
       col += night * pop * pop * (0.4 * roads + 4.0 * pow(noise(m * 420.0), 5.0)) * vec3f(1.0, 0.6, 0.27) * 9.0;
     }
   }
+  // the place the reader points at (in the index, or on the planet), marked on the ground: a soft ring of light round
+  // what stands there, just outside its level ground
+  let mk = u.p[13].zw;
+  if (mk.y > 0.003 && mk.x >= 0.0) {
+    let d = acos(clamp(dot(m, PL[i32(mk.x)]), -1.0, 1.0)) - flat(vec2f(0.0, mk.x)).x - 0.02;
+    col += mk.y * vec3f(1.0, 0.86, 0.66) * (2.0 * exp(-d * d / 2e-5) + 0.12 * exp(-max(-d, 0.0) / 0.03) * step(d, 0.0));
+  }
   return col;
 }
 
@@ -836,33 +856,42 @@ fn beyond(rd: vec3f, L: vec3f) -> vec3f {
   return (c + cosmos(d)) / 0.11; // and the fractal cosmos beyond (cosmos.wgsl), at the exposure the world is seen at (planet.ts EXPOSE)
 }
 
-fn field(q: vec2f) -> vec3f {
+// What is beyond the planet and its air, along rd: the sun's disc, limb-darkened, over the sky behind it (beyond), as
+// much of that sky as is `seen`. Everything past the air comes from here and nowhere else.
+fn backdrop(rd: vec3f, L: vec3f, seen: f32) -> vec3f {
+  let sd = 1.0 - (1.0 - dot(rd, L)) / 1.08e-5;
+  return beyond(rd, L) * seen + select(vec3f(0.0), SUN / 6.8e-5 * (0.4 + 0.6 * sqrt(max(sd, 0.0))), sd > 0.0);
+}
+
+// River's places, from the scene's slots: where each is, and which is the river's.
+fn places() {
+  NP = i32(u.p[8].z);
+  RV = -1;
+  for (var k = 0; k < NP; k++) {
+    let v = u.p[10 + k / 2];
+    let ll = select(v.xy, v.zw, k % 2 == 1);
+    PL[k] = site(ll);
+    if (u.p[9].w > 0.0 && all(abs(ll - u.p[9].yz) < vec2f(1e-4))) { RV = k; }
+  }
+  if (RV < 0) { RS = site(u.p[9].yz); } else { RS = PL[RV]; }
+  RE = normalize(vec3f(RS.z, 0.0, -RS.x));
+  RN = cross(RS, RE);
+}
+
+fn planet(q: vec2f) -> vec3f {
   text = sat(u.p[9].x);
   let R = u.p[4].w;
   let ro = local(-u.p[4].xyz / R);
   let rd = local(ray(q));
   let L = local(u.p[5].xyz);
-  NP = i32(u.p[8].z);
-  RV = -1;
+  places();
   let top = ball(ro, rd, TOP);
   let g = ball(ro, rd, 1.0);
   var hit = g.x > 0.0;
   var tg = g.x;
   var sh = ball(ro, rd, 1.0 + CB + HW + 0.002); // the deck's shell, at its tallest
   let look = normalize(ro + rd * select(max(sh.x, 0.0), g.x, hit)); // where this pixel looks, and the place nearest that
-  var pl = vec2f(-1.0);
-  for (var k = 0; k < NP; k++) {
-    let v = u.p[10 + k / 2];
-    let ll = select(v.xy, v.zw, k % 2 == 1);
-    PL[k] = site(ll);
-    if (u.p[9].w > 0.0 && all(abs(ll - u.p[9].yz) < vec2f(1e-4))) { RV = k; }
-    if (dot(look, PL[k]) > pl.x) { pl = vec2f(dot(look, PL[k]), f32(k)); }
-  }
-  if (RV < 0) { RS = site(u.p[9].yz); } else { RS = PL[RV]; }
-  RE = normalize(vec3f(RS.z, 0.0, -RS.x));
-  RN = cross(RS, RE);
-  // the sun's disc, limb-darkened; and what is beyond
-  let sd = 1.0 - (1.0 - dot(rd, L)) / 1.08e-5;
+  let pl = nearest(look);
   var col = vec3f(0.0);
   if (top.y > 0.0) {
     let a = max(top.x, 0.0);
@@ -874,7 +903,7 @@ fn field(q: vec2f) -> vec3f {
     if (calm) { sh = ball(ro, rd, 1.0 + CB + HC + 0.0005); }
     if (sh.y > 0.0) {
       wx = weather(normalize(ro + rd * max(sh.x, 0.0)));
-      clear = cleared(look, vec2f(1.0 - pl.x, pl.y));
+      clear = cleared(look, pl);
       if (clear > 0.0 && (wx * clear > 0.1 || !calm)) { sky = clouds(ro, rd, max(sh.x, 0.0), min(sh.y, sky.t), L); } // a clear sky needs no search
     }
     // the land, stood up, as far as it can be seen: to the sea, or to the cloud that hides it
@@ -893,7 +922,7 @@ fn field(q: vec2f) -> vec3f {
       dist = tg * R;
       if (sky.through > 0.03) { col = ground(ro + rd * tg, rd, L, tg, stood(tg)); }
     } else {
-      col = beyond(rd, L) + select(vec3f(0.0), SUN / 6.8e-5 * (0.4 + 0.6 * sqrt(max(sd, 0.0))), sd > 0.0);
+      col = backdrop(rd, L, 1.0);
     }
     if (sky.through < 0.5) { dist = sky.t * R; }
     // from low down, the deck's shadow in the air: each pixel samples it at its own depths (interleaved gradient noise)
@@ -906,7 +935,7 @@ fn field(q: vec2f) -> vec3f {
     col = A.light + A.front * sky.light + sky.through * A.through * col;
     if (min(dot(ro + rd * a, L), dot(ro + rd * b, L)) < 0.2) { col += aurora(ro, rd, b, L); } // a night thing, above the weather
   } else {
-    col = beyond(rd, L) + select(vec3f(0.0), SUN / 6.8e-5 * (0.4 + 0.6 * sqrt(max(sd, 0.0))), sd > 0.0);
+    col = backdrop(rd, L, 1.0);
   }
   return min(col * u.p[8].x, vec3f(4e3));
 }

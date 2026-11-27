@@ -1,8 +1,8 @@
 // What every place on the planet draws with (planet.ts fills it each frame, a place's own module uses it): the eye
-// and its camera, the sun, the beam's projection with the planet in the way, and River's hardware, stood or flown.
+// and its camera, the sun, where a point lands on the screen with the planet in the way, and River's hardware, stood
+// or flown.
 // Units are planet radii; world space is the planet's own frame, the eye somewhere in it.
 import { project, seen } from '../acts/reality'
-import type { Path } from '../beam/path'
 import type { Frame } from '../acts/scene'
 import type { Model, Placed } from '../gpu/mesh'
 
@@ -50,7 +50,6 @@ export const ctx = {
   items: [] as Placed[], // this frame's solids
 }
 
-const q3: V = [0, 0, 0]
 // Can the eye see world point w past the planet?
 export function clear(w: ArrayLike<number>) {
   const E = ctx.E, dx = w[0] - E[0], dy = w[1] - E[1], dz = w[2] - E[2], L = Math.hypot(dx, dy, dz)
@@ -62,28 +61,14 @@ export function clear(w: ArrayLike<number>) {
 // Where world point w lands on the screen (in `seen`), if the eye can see it.
 export const look = (w: ArrayLike<number>) => clear(w) && project(ctx.p, w[0] - ctx.E[0], w[1] - ctx.E[1], w[2] - ctx.E[2])
 export { seen }
-// A world-space polyline (flat xyz, n points) through the camera, broken where the planet hides it.
-export function trace(path: Path, w: ArrayLike<number>, n: number) {
-  let pen = false
-  for (let i = 0; i < n; i++) {
-    q3[0] = w[3 * i], q3[1] = w[3 * i + 1], q3[2] = w[3 * i + 2]
-    if (!look(q3)) {
-      pen = false
-      continue
-    }
-    if (pen) path.lineTo(seen.x, seen.y)
-    else path.moveTo(seen.x, seen.y)
-    pen = true
-  }
-}
-
 // Model `id` (if it has loaded) at world point c, its own x, y, z axes laid along the unit vectors ax, ay, az,
-// `size` radii across its widest, centred: one more solid this frame. Returns whether it was there to draw.
-const pool: Placed[] = []
-export function solid(id: string, c: ArrayLike<number>, ax: ArrayLike<number>, ay: ArrayLike<number>, az: ArrayLike<number>, size: number, k = 1, glow = 0) {
+// `size` radii across its widest, centred: one more solid this frame, its lamps (if it has any) lit `lit` of colour
+// `lamp`. Returns whether it was there to draw.
+const pool: Placed[] = [], LAMP = 60 // a lamp's light at full brightness, against the sun's 22
+export function solid(id: string, c: ArrayLike<number>, ax: ArrayLike<number>, ay: ArrayLike<number>, az: ArrayLike<number>, size: number, k = 1, glow = 0, lamp?: ArrayLike<number>, lit = 0) {
   const m = ctx.models[id]
   if (!m) return false
-  const i = ctx.items.length, it = pool[i] ?? (pool[i] = { model: m, m: new Array(12) })
+  const i = ctx.items.length, it = pool[i] ?? (pool[i] = { model: m, m: new Array(12), lamp: [0, 0, 0] })
   const s = size / Math.max(m.hi[0] - m.lo[0], m.hi[1] - m.lo[1], m.hi[2] - m.lo[2])
   const mc = [(m.hi[0] + m.lo[0]) / 2, (m.hi[1] + m.lo[1]) / 2, (m.hi[2] + m.lo[2]) / 2], r = it.m as number[]
   for (let q = 0; q < 3; q++) {
@@ -92,6 +77,7 @@ export function solid(id: string, c: ArrayLike<number>, ax: ArrayLike<number>, a
     r[q * 4 + 3] = c[q] - ctx.E[q] - (R0 * mc[0] + R1 * mc[1] + R2 * mc[2])
   }
   it.model = m, it.k = k, it.glow = glow
+  for (let q = 0; q < 3; q++) (it.lamp as number[])[q] = lamp ? lamp[q] * lit * LAMP : 0
   ctx.items.push(it)
   return true
 }

@@ -8,14 +8,12 @@ import { specimen } from './acts/specimen'
 import { hook } from './acts/hook'
 import { meander } from './acts/meander'
 import { valley } from './acts/valley'
-import { ident } from './acts/ident'
 import { wrap } from './acts/wrap'
 import { ascii, CHARS } from './acts/ascii'
-import { tour } from './acts/tour'
-import { reveal, named } from './acts/reveal'
+import { arrive } from './acts/arrive'
 import { load } from './beam/font'
 import { edit } from './acts/edit'
-import { ASCII, REVEAL, TOUR, VALLEY, WRAP } from './acts/clock'
+import { ARRIVE, ASCII, VALLEY, WRAP } from './acts/clock'
 import { r01 } from './world/r01'
 import { attach, planet } from './world/planet'
 import { deep } from './world/pages'
@@ -24,11 +22,11 @@ const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
 const beam = new Beam()
 const audio = new Audio()
-// The transmission: the scope's opening, the valley and its falls, the whirlpool and its text, the tour through River's
-// places, the climb out of the storm, the name, and the planet, which is the portfolio. ?fall plays it from the lip of
-// the falls on (the pool needs their history); ?tour from the tour; ?reveal from the climb; ?ident the name. A deep
-// link to a place (/<project>) skips it all and lands there.
-const FILM = [hook, meander, valley, wrap, ascii, tour, reveal, named, planet]
+// The transmission: the scope's opening, the valley and its falls, the whirlpool and its text, the arrival out of the
+// drain's dark into the planet's own air, and the planet, which is the portfolio. ?fall plays it from the lip of the
+// falls on (the pool needs their history); ?arrive from the arrival. A deep link to a place (/<project>) skips it all
+// and lands there.
+const FILM = [hook, meander, valley, wrap, ascii, arrive, planet]
 // ?short: the transmission in about half the time, each scene cut to its best stretch and played a little faster
 const SHORT = [
   edit(hook, [[0.45, 3.6, 1.6]]),
@@ -36,9 +34,7 @@ const SHORT = [
   edit(valley, [[0, 7, 2], [7, VALLEY, 1.3]]), // the valley quickly, the falls nearly as they are
   edit(wrap, [[0, WRAP, 1.3]]),
   edit(ascii, [[0, ASCII, 1.6]]),
-  edit(tour, [[0, TOUR, 1.2]]),
-  edit(reveal, [[0, REVEAL, 1.3]]),
-  edit(named, [[0, ident.dur, 1.6]]),
+  edit(arrive, [[0, ARRIVE, 1.2]]),
   planet,
 ]
 const from = (s: typeof hook) => FILM.slice(FILM.indexOf(s))
@@ -50,15 +46,11 @@ const scenes = q.has('specimen')
       ? [planet]
       : q.has('fall')
         ? from(valley)
-        : q.has('tour')
-          ? from(tour)
-          : q.has('reveal')
-            ? from(reveal)
-            : q.has('ident')
-              ? from(named)
-              : q.has('short')
-                ? SHORT
-                : FILM
+        : q.has('arrive')
+          ? from(arrive)
+          : q.has('short')
+            ? SHORT
+            : FILM
 const timeline = new Timeline(scenes)
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }

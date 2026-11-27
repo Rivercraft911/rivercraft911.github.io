@@ -21,7 +21,7 @@ struct Cam {
   tr: vec4f,    // the traced light (trace.ts): its size, px; .z how much of it to take (0: there is none)
 }
 
-struct Inst { r0: vec4f, r1: vec4f, r2: vec4f, k: vec4f } // model → world rows; k: brightness, glow, how much of its light is traced, -
+struct Inst { r0: vec4f, r1: vec4f, r2: vec4f, k: vec4f, lamp: vec4f } // model → world rows; k: brightness, glow, how much of its light is traced, -; its lamps' light
 
 @group(0) @binding(0) var<uniform> c: Cam;
 @group(0) @binding(1) var<storage, read> inst: array<Inst>;
@@ -39,6 +39,7 @@ struct O {
   @location(2) col: vec4f,
   @location(3) pbr: vec4f,
   @location(4) @interpolate(flat) k: vec4f,
+  @location(5) @interpolate(flat) lamp: vec4f,
 }
 
 fn place(m: Inst, p: vec3f) -> vec3f { return vec3f(dot(m.r0, vec4f(p, 1.0)), dot(m.r1, vec4f(p, 1.0)), dot(m.r2, vec4f(p, 1.0))); }
@@ -54,7 +55,7 @@ fn project(w: vec3f) -> vec4f {
   let m = inst[i];
   let w = place(m, v.p);
   let n = vec3f(dot(m.r0.xyz, v.n), dot(m.r1.xyz, v.n), dot(m.r2.xyz, v.n));
-  return O(project(w), w, n, v.col, v.pbr, m.k);
+  return O(project(w), w, n, v.col, v.pbr, m.k, m.lamp);
 }
 
 @vertex fn shadowVS(v: V, @builtin(instance_index) i: u32) -> @builtin(position) vec4f {
@@ -186,7 +187,7 @@ fn shade(i: O) -> vec4f {
     glint *= mix(1.0, clamp(dot(t.l, vec3f(1.0)) / max(dot(open, vec3f(1.0)), 1e-6), 0.0, 1.0), t.cl);
   }
   let sky = base * (1.0 - metal) * all + glint * Fa;
-  var col = (sun + sky) * i.k.x + base * i.k.y;
+  var col = (sun + sky) * i.k.x + base * i.k.y + i.lamp.rgb * i.pbr.z; // and what is a lamp, lit
   let T = exp(-c.fog.w * length(i.w)); // the air between
   col = col * T + c.fog.rgb * (1.0 - T);
   return vec4f(col * c.sunc.w, i.col.a);

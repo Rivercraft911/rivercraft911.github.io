@@ -34,12 +34,13 @@ struct Inst {
   lo: vec4f,                       // its box in the world; .w where its nodes start
   hi: vec4f,                       // .w where its triangles start
   k: vec4f,                        // brightness, glow, which of the scene's things it is (from 1)
+  lamp: vec4f,                     // its lamps' light (bvh.worker.ts)
 }
 
 @group(0) @binding(0) var<uniform> u: U;
 @group(1) @binding(0) var<storage, read> nodes: array<Node>;
 @group(1) @binding(1) var<storage, read> tris: array<Tri>;
-@group(1) @binding(2) var<storage, read> mats: array<vec2u>; // colour (rgb its square root, a); metal, rough, translucent
+@group(1) @binding(2) var<storage, read> mats: array<vec2u>; // colour (rgb its square root, a); metal, rough, translucent, lamp
 @group(1) @binding(3) var<storage, read> inst: array<Inst>;
 @group(1) @binding(4) var field: texture_2d<f32>;  // what the field shows this frame: the ground's colour
 @group(1) @binding(5) var pacc: texture_2d<f32>;   // the history: light, the sun's share
@@ -200,7 +201,7 @@ fn ball(o: vec3f, d: vec3f) -> f32 {
 }
 
 // ---- what a ray lands on ------------------------------------------------------------------------------------
-struct Surf { x: vec3f, n: vec3f, ng: vec3f, base: vec3f, metal: f32, rough: f32, k: f32, glow: f32 }
+struct Surf { x: vec3f, n: vec3f, ng: vec3f, base: vec3f, metal: f32, rough: f32, k: f32, glow: vec3f }
 
 fn surf(h: Hit, o: vec3f, d: vec3f) -> Surf {
   let m = inst[h.i];
@@ -211,7 +212,8 @@ fn surf(h: Hit, o: vec3f, d: vec3f) -> Surf {
   var n = normalize(turn(m, unoct(T.n0) * (1.0 - h.uv.x - h.uv.y) + unoct(T.n1) * h.uv.x + unoct(T.n2) * h.uv.y));
   if (dot(n, ng) < 0.0) { n = -n; }
   let c = unpack4x8unorm(mt.x);
-  return Surf(o + d * h.t, n, ng, c.rgb * c.rgb, f32(mt.y & 0xffu) / 255.0, max(f32((mt.y >> 8u) & 0xffu) / 255.0, 0.045), m.k.x, m.k.y);
+  let glow = c.rgb * c.rgb * m.k.y + m.lamp.rgb * f32(mt.y >> 24u) / 255.0; // its own light, and a lamp's
+  return Surf(o + d * h.t, n, ng, c.rgb * c.rgb, f32(mt.y & 0xffu) / 255.0, max(f32((mt.y >> 8u) & 0xffu) / 255.0, 0.045), m.k.x, glow);
 }
 // Off the surface, so a ray leaving does not meet it again: by a few of the floats' own steps at that distance.
 fn lift(s: Surf) -> vec3f { return s.x + s.ng * (3e-5 * max(length(s.x), 0.01)); }
@@ -272,7 +274,7 @@ fn radiance(o0: vec3f, d0: vec3f) -> vec3f {
     }
     let s = surf(h, o, d);
     let x = lift(s);
-    var e = s.base * s.glow;
+    var e = s.glow;
     let l = toSun();
     if (u.sun.w > 0.0 && dot(s.n, l) > 0.0 && dot(s.ng, l) > 0.0 && !dark(x, l)) { e += brdf(s, -d, l) * sunlight() * dot(s.n, l) * s.k; }
     L += thr * e;

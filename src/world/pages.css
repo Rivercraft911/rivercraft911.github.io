@@ -22,6 +22,14 @@
 #w :focus-visible { outline: 1px solid var(--c, #fff); outline-offset: 3px; }
 #w h2:focus { outline: none; }
 
+/* The name comes up out of the planet's light as the world takes over from the film: the name first, opening out to
+   its spacing, then the rest of the index, line by line. */
+@keyframes name { from { opacity: 0; letter-spacing: 0.05em; filter: blur(6px); } }
+@keyframes line { from { opacity: 0; transform: translateY(6px); } }
+#w .index h1 { animation: name 2.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+#w .index header p, #w .index li { animation: line 1.2s ease-out both; animation-delay: calc(1.2s + var(--i, 0) * 0.09s); }
+@media (prefers-reduced-motion: reduce) { #w .index * { animation: none !important; } }
+
 /* ---- the index: bottom left, the whole portfolio in eight lines ---- */
 #w .index {
   position: absolute;
