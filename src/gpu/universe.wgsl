@@ -5,12 +5,13 @@
 struct Bake { size: f32, layer: f32, kind: f32, ss: f32 }
 struct Marvel { x: vec4f, y: vec4f, z: vec4f }
 @group(0) @binding(0) var<uniform> B: Bake;
-@group(0) @binding(1) var<uniform> MARVEL: array<Marvel, 8>;
+@group(0) @binding(1) var<uniform> MARVEL: array<Marvel, 16>;
 @group(0) @binding(2) var smp: sampler;
 @group(0) @binding(3) var finer: texture_2d<f32>;
 
 const COSMOS = 0.3; // the scale it is stored at (fields/cosmos.wgsl)
 const TAU = 6.2831853;
+const PI = 3.14159265;
 
 @vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
   return vec4f(f32((i << 1u) & 2u) * 2.0 - 1.0, f32(i & 2u) * 2.0 - 1.0, 0.0, 1.0);
@@ -99,9 +100,22 @@ fn galaxy(rd: vec3f) -> vec4f {
 }
 
 // The sky's light, and how much of whatever lies beyond the galaxy its dust hides.
+// Between the marvels, so space is nowhere flat: nebulosity far beyond our galaxy, clouds of glowing gas stirred by
+// their own turbulence (domain-warped noise), coloured by what glows in them (oxygen's teal, hydrogen's red, sulphur's
+// amber), and threads of dust across them, finer the farther in, hiding the stars behind. Faint: the sky's, not the eye's.
+fn nebulosity(rd: vec3f) -> vec4f {
+  let w = rd + 0.4 * (vec3f(fbm(rd * 2.0 + 1.0, 3), fbm(rd * 2.0 + 5.0, 3), fbm(rd * 2.0 + 9.0, 3)) - 0.5);
+  let n = fbm(w * 3.0, 6);
+  let gas = smoothstep(0.4, 0.8, n);
+  let hue = fbm(w * 1.3 + 13.0, 3);
+  let col = mix(mix(vec3f(0.15, 0.75, 0.8), vec3f(1.0, 0.2, 0.35), smoothstep(0.35, 0.6, hue)), vec3f(1.0, 0.6, 0.2), smoothstep(0.62, 0.75, hue));
+  let thread = pow(1.0 - abs(2.0 * fbm(w * 7.0 + 3.0, 4) - 1.0), 10.0) * smoothstep(0.4, 0.6, fbm(w * 1.7 + 21.0, 3));
+  return vec4f(col * gas * gas * (1.0 - 0.8 * thread) * 0.016 + vec3f(0.3, 0.35, 0.6) * n * n * 0.0015, 0.85 * thread);
+}
 fn sky(rd: vec3f) -> vec4f {
   let g = galaxy(rd);
-  return vec4f(g.rgb * 0.014, 1.0 - g.a);
+  let n = nebulosity(rd);
+  return vec4f(g.rgb * 0.014 + n.rgb * g.a, 1.0 - g.a * (1.0 - n.a));
 }
 
 // ---- the marvels ---------------------------------------------------------------------------------------------------
@@ -362,11 +376,252 @@ fn kleinianNebula(v: vec3f) -> vec4f {
   return vec4f(L * 0.12, 0.0);
 }
 
+// ---- the strange ones ----------------------------------------------------------------------------------------------
+// Smaller and weirder, round the whole sky (cosmos.ts STRANGE), each its own patch of it, uv in [−1, 1]², and like the
+// rest only light and dust: nothing in this sky is solid. pu: a texel's width in uv.
+var<private> pu: f32;
+// the patch's own uv for ray v of marvel k
+fn onPatch(v: vec3f, k: i32) -> vec2f { return v.xy / (v.z * MARVEL[k].x.w); }
+// no patch of sky has a frame: each thins out raggedly toward its rim
+fn ragged(q: vec2f, r: f32, s: f32) -> f32 { return smoothstep(r, 0.5 * r, length(q) + 0.3 * (fbm(vec3f(q * 2.5, s), 4) - 0.5)); }
+fn cmul(a: vec2f, b: vec2f) -> vec2f { return vec2f(a.x * b.x - a.y * b.y, a.x * b.y + a.y * b.x); }
+
+// · A Julia set's filaments as gas. z ↦ z² + c with c on the Mandelbrot set's edge, where the set is all filament; the
+// gas glows by the set's own distance estimate, |z| ln|z| / |z′|, coloured by the angle its orbit is caught at; a second
+// set, c a hair off, lies behind it redder, and both are stirred a little, as gas is.
+fn juliaDE(z0: vec2f, c: vec2f) -> vec2f {
+  var z = z0;
+  var dz = vec2f(1.0, 0.0);
+  var trap = 1e9;
+  var ang = 0.0;
+  for (var i = 0; i < 96; i++) {
+    dz = 2.0 * cmul(z, dz);
+    z = cmul(z, z) + c;
+    let r = dot(z, z);
+    if (r < trap) { trap = r; ang = atan2(z.y, z.x); }
+    if (r > 1e4) { break; }
+  }
+  let r = length(z);
+  return vec2f(select(1e9, 0.5 * r * log(r) / max(length(dz), 1e-9), r > 2.0), ang); // (nothing stays: a dendrite has no inside)
+}
+fn filaments(q: vec2f) -> vec4f {
+  let w = q + 0.06 * vec2f(fbm(vec3f(q * 3.0, 1.0), 4) - 0.5, fbm(vec3f(q * 3.0, 7.0), 4) - 0.5);
+  var L = vec3f(0.0);
+  for (var j = 0; j < 2; j++) {
+    let c = select(vec2f(-0.1011, 0.9563), vec2f(0.0, 1.0), j == 1); // two Misiurewicz points: their sets are dendrites
+    let e = juliaDE(cmul(w, vec2f(1.05, 0.3)) * select(1.0, 1.1, j == 1) + select(vec2f(0.0), vec2f(0.08, -0.05), j == 1), c);
+    let col = select(0.55 + 0.45 * cos(vec3f(0.0, 2.1, 4.2) + e.y + 2.6), vec3f(1.0, 0.3, 0.35), j == 1);
+    L += col * (exp(-e.x / (1.5 * pu)) + 0.35 * exp(-e.x / (10.0 * pu))) * select(1.0, 0.45, j == 1);
+  }
+  return vec4f(L * 0.05 * ragged(q, 1.0, 9.0), 0.0);
+}
+
+// · The hyperbolic plane, {7, 3}, as a veil like an aurora's. Every point of the Poincaré disc reflected into one
+// triangle (π/7, π/3, π/2) by its three mirrors, counting; the heptagons' edges are the circle's, measured back out by
+// how much the inversions shrank the way, so each is as thin on the sky as the next however near the rim. Lit as an
+// aurora is: oxygen's green low, its red above, in rays.
+fn veil(q: vec2f) -> vec4f {
+  let a = PI / 7.0;
+  let b = PI / 3.0;
+  let k = 1.0 / sqrt(cos(b) * cos(b) - sin(a) * sin(a));
+  let cd = cos(b) * k; // the third mirror: the circle about (cd, 0), radius cr, square to the disc's rim
+  let cr = sin(a) * k;
+  let n = vec2f(-sin(a), cos(a));
+  var z = q / 0.96;
+  var s = 1.0;
+  var flips = 0.0;
+  if (dot(z, z) >= 1.0) { return vec4f(0.0); }
+  for (var i = 0; i < 48; i++) {
+    var done = true;
+    let ang = atan2(z.y, z.x);
+    // turn by whole sevenths, then the two straight mirrors
+    let m = floor(ang / (2.0 * a));
+    if (m != 0.0) { let t = -2.0 * a * m; z = vec2f(z.x * cos(t) - z.y * sin(t), z.x * sin(t) + z.y * cos(t)); }
+    if (dot(z, n) > 0.0) { z -= 2.0 * dot(z, n) * n; flips += 1.0; done = false; }
+    let w = z - vec2f(cd, 0.0);
+    let l2 = dot(w, w);
+    if (l2 < cr * cr) { z = vec2f(cd, 0.0) + w * (cr * cr / l2); s *= cr * cr / l2; flips += 1.0; done = false; }
+    if (done) { break; }
+  }
+  let d = abs(length(z - vec2f(cd, 0.0)) - cr) / s * 0.96; // the edge, in uv
+  let r = length(q);
+  let rays = 0.45 + 0.55 * fbm(vec3f(q.x * 40.0, 0.0, 2.0), 3); // drawn down the sky, as an aurora's are
+  let low = smoothstep(0.6, -0.6, q.y);
+  let col = mix(vec3f(0.85, 0.15, 0.45), vec3f(0.25, 1.0, 0.45), low);
+  let edge = exp(-d * d / (3.0 * pu * pu)) + 0.25 * exp(-d / (12.0 * pu));
+  let fill = 0.025 * (0.5 + 0.5 * cos(PI * flips)) * smoothstep(1.0, 0.7, r); // its tiles faintly, one in two
+  return vec4f(col * (edge + fill) * rays * 0.05 * smoothstep(0.96, 0.75, r * (0.9 + 0.2 * fbm(vec3f(q * 2.0, 4.0), 3))), 0.0);
+}
+
+// · Star streams on strange attractors: one long orbit, its stars strung along it, thickest where it lingers and
+// coloured by its speed, slow and gold, fast and blue. Lorenz's (σ 10, ρ 28, β 8/3), its two wings; and Aizawa's
+// (a .95, b .7, c .6, d 3.5, e .25, f .1), an apple of orbits with a spout through its core.
+fn flow(p: vec3f, kind: i32) -> vec3f {
+  if (kind == 0) { return vec3f(10.0 * (p.y - p.x), p.x * (28.0 - p.z) - p.y, p.x * p.y - 8.0 / 3.0 * p.z); }
+  return vec3f((p.z - 0.7) * p.x - 3.5 * p.y, 3.5 * p.x + (p.z - 0.7) * p.y, 0.6 + 0.95 * p.z - p.z * p.z * p.z / 3.0 - (p.x * p.x + p.y * p.y) * (1.0 + 0.25 * p.z) + 0.1 * p.z * p.x * p.x * p.x);
+}
+fn streams(q: vec2f, kind: i32) -> vec4f {
+  if (dot(q, q) > 1.3) { return vec4f(0.0); }
+  let lz = kind == 0;
+  var p = select(vec3f(0.1, 0.0, 0.0), vec3f(1.0, 1.0, 20.0), lz);
+  let h = select(0.016, 0.006, lz);
+  for (var i = 0; i < 300; i++) { p += h * flow(p + 0.5 * h * flow(p, kind), kind); } // (by the midpoint rule: Euler's flings Aizawa's off)
+  let a = select(0.35, 0.6, lz);
+  let c = cos(a);
+  let sn = sin(a);
+  var last = vec2f(0.0);
+  var L = vec3f(0.0);
+  let w = 1.3 * pu;
+  let fast = select(vec2f(0.6, 3.0), vec2f(40.0, 160.0), lz);
+  for (var i = 0; i < 2200; i++) {
+    let v = flow(p + 0.5 * h * flow(p, kind), kind);
+    p += h * v;
+    // seen from a little off its axis
+    let y = select(vec2f(c * p.x - sn * p.y, p.z - 0.6) / 1.75, vec2f(c * p.x - sn * p.y, p.z - 25.0) / 27.0, lz);
+    if (i > 0) {
+      let e = y - last;
+      let t = clamp(dot(q - last, e) / max(dot(e, e), 1e-12), 0.0, 1.0);
+      let d2 = dot(q - last - e * t, q - last - e * t);
+      let star = 0.3 + 3.0 * pow(fract(sin(f32(i) * 12.9898) * 43758.5453), 12.0);
+      let col = mix(vec3f(1.0, 0.75, 0.4), vec3f(0.5, 0.7, 1.0), smoothstep(fast.x, fast.y, length(v)));
+      L += col * (exp(-d2 / (w * w)) * star + 0.04 * exp(-sqrt(d2) / (8.0 * w))) * length(e) / w;
+    }
+    last = y;
+  }
+  return vec4f(L * select(0.006, 0.0035, lz) * ragged(q, 1.15, 5.0), 0.0);
+}
+
+// · A galaxy seen through a Menger sponge of dust: cube within cube with every middle taken out, its tunnels lined up
+// with the eye but for a breath, standing in front of a spiral galaxy, gold in its heart and blue in its arms, whose
+// light comes through the sponge's holes, square within square, and reddens through its dust; its edges silvered where
+// that light grazes them.
+fn sponge(p: vec3f) -> f32 {
+  let b = abs(p) - vec3f(1.0);
+  var d = min(max(b.x, max(b.y, b.z)), 0.0) + length(max(b, vec3f(0.0)));
+  var s = 1.0;
+  for (var m = 0; m < 4; m++) {
+    let a = (p * s - 2.0 * floor(p * s * 0.5)) - 1.0;
+    s *= 3.0;
+    let r = abs(1.0 - 3.0 * abs(a));
+    let c = (min(max(r.x, r.y), min(max(r.y, r.z), max(r.z, r.x))) - 1.0) / s;
+    d = max(d, c);
+  }
+  return d;
+}
+fn mengerGalaxy(v: vec3f) -> vec4f {
+  let D = 2.6 / MARVEL[7].x.w;
+  let r = look(v, D, 0.3, 0.25);
+  // the galaxy, a disc in the plane z = −2.2 behind the sponge, where the ray meets it
+  let g = r.o + r.d * (-2.2 - r.o.z) / r.d.z;
+  let R = length(g.xy);
+  let ph = atan2(g.y, g.x) - log(max(R, 0.15)) / 0.35;
+  let cl = fbm(vec3f(g.xy * 3.0, 1.0), 4);
+  let arm = pow(0.5 + 0.5 * cos(2.0 * ph + 0.8 * cl), 5.0) * smoothstep(0.3, 0.8, R);
+  let back = (vec3f(1.0, 0.85, 0.62) * exp(-R / 0.35) * 2.5 + vec3f(0.5, 0.7, 1.0) * arm * exp(-R / 1.4) * (0.6 + cl) + vec3f(1.0, 0.25, 0.45) * arm * pow(cl, 5.0) * 6.0) * smoothstep(2.6, 1.6, R);
+  // the sponge, a box ±1, its axis along the eye's (the tilt undone), turned about it, and a breath off it
+  let ct = cos(0.3);
+  let st = sin(0.3);
+  let ca = cos(0.4);
+  let sa = sin(0.4);
+  let cb = cos(0.05);
+  let sb = sin(0.05);
+  var L = vec3f(0.0);
+  var T = vec3f(1.0);
+  let hb = ball(r.o, r.d, 1.75);
+  if (hb.y > 0.0) {
+    var t = max(hb.x, 0.0);
+    for (var i = 0; i < 160 && t < hb.y && T.g > 0.01; i++) {
+      let p = r.o + r.d * t;
+      let p0 = vec3f(p.x, ct * p.y + st * p.z, ct * p.z - st * p.y);
+      let p1 = vec3f(ca * p0.x - sa * p0.y, sa * p0.x + ca * p0.y, p0.z);
+      let d = sponge(vec3f(cb * p1.x - sb * p1.z, p1.y, sb * p1.x + cb * p1.z));
+      let w = max(0.004, px * t);
+      let dt = select(clamp(d, w, 0.08), 0.012, d < 0.0);
+      L += T * back * 0.6 * exp(-abs(d) / w) * w / max(dt, w); // its edges, silvered by the light behind
+      T *= exp(-select(0.0, 30.0, d < 0.0) * dt * vec3f(0.7, 1.0, 1.4));
+      t += dt;
+    }
+  }
+  return vec4f((L + T * back) * 0.05, 1.0 - T.g);
+}
+
+// · A ring nebula strung on a Kleinian limit set: the Apollonian gasket, every gap between three touching circles
+// filled with the one circle that touches all three (Descartes' theorem gives its curvature, its complex form its
+// centre), without end; the limit set of the group of inversions that makes it. Each circle a shell of gas round the hot
+// star at the middle: teal near it, hydrogen red outside, the outermost rim brightest, as a ring nebula's is.
+fn csqrt(z: vec2f) -> vec2f {
+  let r = length(z);
+  return vec2f(sqrt(max(0.5 * (r + z.x), 0.0)), sign(z.y + 1e-12) * sqrt(max(0.5 * (r - z.x), 0.0)));
+}
+// the circle (centre, curvature) in the gap between three touching ones, curvatures signed (the outer one's negative)
+fn soddy(a: vec3f, b: vec3f, c: vec3f) -> vec3f {
+  let k = a.z + b.z + c.z + 2.0 * sqrt(max(a.z * b.z + b.z * c.z + c.z * a.z, 0.0));
+  let s = a.xy * a.z + b.xy * b.z + c.xy * c.z;
+  let w = 2.0 * csqrt(cmul(a.xy, b.xy) * a.z * b.z + cmul(b.xy, c.xy) * b.z * c.z + cmul(c.xy, a.xy) * c.z * a.z);
+  // of the two roots, the one touching all three
+  let e = vec2f(
+    abs(length((s + w) / k - a.xy) - abs(1.0 / k + 1.0 / a.z)) + abs(length((s + w) / k - b.xy) - abs(1.0 / k + 1.0 / b.z)) + abs(length((s + w) / k - c.xy) - abs(1.0 / k + 1.0 / c.z)),
+    abs(length((s - w) / k - a.xy) - abs(1.0 / k + 1.0 / a.z)) + abs(length((s - w) / k - b.xy) - abs(1.0 / k + 1.0 / b.z)) + abs(length((s - w) / k - c.xy) - abs(1.0 / k + 1.0 / c.z)));
+  return vec3f(select((s - w) / k, (s + w) / k, e.x < e.y), k);
+}
+fn ringNebula(q: vec2f) -> vec4f {
+  let p = q / 0.92;
+  if (dot(p, p) > 1.1) { return vec4f(0.0); }
+  // the outer circle, and three inside it, each touching the other two and it
+  let ri = 2.0 * sqrt(3.0) - 3.0;
+  var C = array<vec3f, 4>(vec3f(0.0, 0.0, -1.0), vec3f(0.0, 1.0 - ri, 1.0 / ri), vec3f(-0.866 * (1.0 - ri), -0.5 * (1.0 - ri), 1.0 / ri), vec3f(0.866 * (1.0 - ri), -0.5 * (1.0 - ri), 1.0 / ri));
+  var near = vec2f(abs(length(p) - 1.0), 1.0); // the nearest rim, and its circle's radius
+  for (var j = 1; j < 4; j++) {
+    let d = abs(length(p - C[j].xy) - 1.0 / C[j].z);
+    if (d < near.x) { near = vec2f(d, 1.0 / C[j].z); }
+  }
+  // the gap p is in: bounded by the three circles nearest it
+  var inGap = true;
+  for (var j = 1; j < 4; j++) { if (length(p - C[j].xy) < 1.0 / C[j].z) { inGap = false; } }
+  var g = array<vec3f, 3>(C[0], C[1], C[2]);
+  if (inGap) {
+    var far = 0;
+    var fd = -1.0;
+    for (var j = 0; j < 4; j++) {
+      let d = abs(length(p - C[j].xy) - abs(1.0 / C[j].z));
+      if (d > fd) { fd = d; far = j; }
+    }
+    var n = 0;
+    for (var j = 0; j < 4; j++) { if (j != far) { g[n] = C[j]; n++; } }
+    for (var i = 0; i < 14; i++) {
+      let D = soddy(g[0], g[1], g[2]);
+      let rD = 1.0 / D.z;
+      let dD = length(p - D.xy) - rD;
+      if (abs(dD) < near.x) { near = vec2f(abs(dD), rD); }
+      if (dD < 0.0 || rD < 0.5 * pu) { break; }
+      // on into the smaller gap p is in: D takes the place of whichever of the three is farthest
+      var fj = 0;
+      var fdd = -1.0;
+      for (var j = 0; j < 3; j++) {
+        let d = abs(length(p - g[j].xy) - abs(1.0 / g[j].z));
+        if (d > fdd) { fdd = d; fj = j; }
+      }
+      g[fj] = D;
+    }
+  }
+  let d = near.x * 0.92;
+  let col = mix(vec3f(0.2, 0.95, 0.9), vec3f(1.0, 0.25, 0.3), smoothstep(0.2, 0.85, length(p)));
+  let shell = (exp(-d * d / (2.0 * pu * pu)) + 0.25 * exp(-d / (10.0 * pu))) * smoothstep(0.3 * pu, 2.0 * pu, near.y) * (0.4 + 0.6 * smoothstep(0.0, 0.3, near.y));
+  let star = vec3f(0.7, 0.85, 1.0) * 0.004 / (dot(p, p) + 0.0015);
+  return vec4f((col * shell * (0.5 + 1.5 * smoothstep(0.85, 1.0, length(p))) + star) * 0.05, 0.0);
+}
+
 fn marvel(k: i32, v: vec3f) -> vec4f {
   switch k {
     case 0: { return indra(v); }
     case 1: { return bulbGalaxy(v); }
-    default: { return kleinianNebula(v); }
+    case 2: { return kleinianNebula(v); }
+    case 3: { return streams(onPatch(v, k), 1); }
+    case 4: { return filaments(onPatch(v, k)); }
+    case 5: { return veil(onPatch(v, k)); }
+    case 6: { return streams(onPatch(v, k), 0); }
+    case 7: { return mengerGalaxy(v); }
+    default: { return ringNebula(onPatch(v, k)); }
   }
 }
 
@@ -397,8 +652,9 @@ var<private> px: f32; // a texel's width, in radians
 
 @fragment fn bakeFS(@builtin(position) pos: vec4f) -> @location(0) vec4f {
   let n = i32(B.ss);
-  let k = i32(B.layer);
+  let k = i32(B.layer) + select(0, 3, B.kind > 1.5); // (the strange ones follow the three in MARVEL)
   px = select(2.0, 2.0 * MARVEL[k].x.w, B.kind > 0.0) / B.size;
+  pu = 2.0 / B.size;
   var acc = vec4f(0.0);
   for (var i = 0; i < n; i++) {
     // a rotated grid of four samples (its first two a pair), or the middle

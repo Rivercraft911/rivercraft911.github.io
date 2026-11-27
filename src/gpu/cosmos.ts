@@ -1,20 +1,22 @@
 // The cosmos behind River's planet: deep space too rich to march every frame, so it is baked once, a few tiles a frame,
 // while the opening plays (universe.wgsl), and only read after (fields/cosmos.wgsl: any field may call cosmos(rd)).
 // The whole sky is a cube; each marvel in it, a fractal the size of a nebula or a galaxy, is its own patch of sky at
-// four times the cube's sharpness, laid over it with its own transmittance. Everything is baked coarse first, so a deep
-// link that lands straight on the planet has a sky in a moment, faded in out of black, and sharp a few seconds later.
+// four times the cube's sharpness, laid over it with its own transmittance; the strange ones, smaller and weirder, round
+// the rest of the sky at half that. Everything is baked coarse first, so a deep link that lands straight on the planet
+// has a sky in a moment, faded in out of black, and sharp a few seconds later.
 //
 // 8 bits a channel, sRGB, so the hardware filters it in linear light, its steps below the display's own wherever the
-// cosmos is dim. The cube is 6 × 1024² with three mips, 34 MB; each marvel 2048² with three, 22 MB.
+// cosmos is dim. The cube is 6 × 1024² with three mips, 34 MB; each marvel 2048² with three, 22 MB; each strange one
+// 1024², 5.6 MB.
 import universe from './universe.wgsl?raw'
 
 const FORMAT: GPUTextureFormat = 'rgba8unorm-srgb'
-const N = 1024, M = 2048, LEVELS = 4, PREVIEW = 2
+const N = 1024, M = 2048, S = 1024, LEVELS = 4, PREVIEW = 2
 const TILE = 64
 const BUDGET = 2400 // µs of GPU time a frame (an M4 Pro's), by the costs below
 const LAG = 8 // ms: the GPU busier than this with the frames before, and the bake waits
 const FADE = 2500, SHARPEN = 1500 // ms each comes in out of the dark over, once it is first baked; and sharpens over, once its finest level is
-const SKY = 0.075 // µs a sample of the sky
+const SKY = 0.11 // µs a sample of the sky (estimated with the nebulosity; the strange ones' costs too)
 // The marvels, in the stars' frame (planet.wgsl's beyond: y the planet's pole, x where its sun stands): where each stands
 // (longitude, latitude), how wide it is, and its turn about its own middle, in degrees; drawn in this order, so the
 // nearest last. `cost`: µs a sample, as measured, so each frame's share of the bake costs about the same.
@@ -23,9 +25,19 @@ export const MARVELS = [
   { at: [172, -7], width: 32, turn: -25, cost: 0.05 }, // a galaxy with a Mandelbulb at its heart
   { at: [248, -30], width: 46, turn: 0, cost: 0.038 }, // a Kleinian cathedral, its tracery dust against glowing gas
 ]
+// and the strange ones, spread round the rest of the sky so every way the eye turns has something uncanny in it
+export const STRANGE = [
+  { at: [322, -14], width: 30, turn: 10, cost: 0.4 }, // star streams on Aizawa's attractor
+  { at: [30, 22], width: 36, turn: -15, cost: 0.08 }, // Julia filaments as gas
+  { at: [210, 46], width: 62, turn: 0, cost: 0.05 }, // the hyperbolic plane {7, 3}, an aurora's veil
+  { at: [55, -44], width: 34, turn: 25, cost: 0.4 }, // star streams on Lorenz's attractor
+  { at: [298, 40], width: 30, turn: -30, cost: 0.25 }, // a galaxy seen through a Menger sponge of dust
+  { at: [150, -60], width: 30, turn: 0, cost: 0.06 }, // a ring nebula strung on the Apollonian gasket, a Kleinian limit set
+]
+const ALL = [...MARVELS, ...STRANGE] // as MARVEL holds them (fields/cosmos.wgsl); its last slot, how far each texture has come in
 
-// One texture's layer at one level: where it is drawn, its samples a texel, what it is (0 the sky, 1 a marvel), what a
-// sample costs, and how many of its tiles are done.
+// One texture's layer at one level: where it is drawn, its samples a texel, what it is (0 the sky, 1 a marvel, 2 a
+// strange one), what a sample costs, and how many of its tiles are done.
 type Job = { tex: GPUTexture; view: GPUTextureView; layer: number; level: number; ss: number; kind: number; cost: number; done: number }
 
 export class Cosmos {
@@ -33,6 +45,8 @@ export class Cosmos {
   group!: GPUBindGroup
   private sky: GPUTexture
   private marvels: GPUTexture
+  private strange: GPUTexture
+  private texs: GPUTexture[]
   private smp: GPUSampler
   private where: GPUBuffer
   private u: GPUBuffer
@@ -41,24 +55,26 @@ export class Cosmos {
   private downPipe?: GPURenderPipeline
   private bakeGroup?: GPUBindGroup
   private jobs: Job[] = []
-  private base = [LEVELS, LEVELS] // the finest level each may be read at; LEVELS: none yet
+  private base = [LEVELS, LEVELS, LEVELS] // the finest level each texture may be read at; LEVELS: none yet
   private lag = 0
   private probing = false
-  private shown = [0, 0] // when the sky and the marvels were first there to read, and sharp (performance.now()), 0 not yet
-  private sharp = [0, 0]
-  private faded = [0, 0] // how far each has come in, as last written
+  private shown = [0, 0, 0] // when each was first there to read, and sharp (performance.now()), 0 not yet
+  private sharp = [0, 0, 0]
+  private faded = [0, 0, 0] // how far each has come in, as last written
   private one = new Float32Array(1)
 
   constructor(readonly device: GPUDevice) {
     const d = device, usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT
     this.sky = d.createTexture({ size: [N, N, 6], format: FORMAT, mipLevelCount: LEVELS, usage })
     this.marvels = d.createTexture({ size: [M, M, MARVELS.length], format: FORMAT, mipLevelCount: LEVELS, usage })
+    this.strange = d.createTexture({ size: [S, S, STRANGE.length], format: FORMAT, mipLevelCount: LEVELS, usage })
+    this.texs = [this.sky, this.marvels, this.strange]
     this.smp = d.createSampler({ magFilter: 'linear', minFilter: 'linear', mipmapFilter: 'linear' })
-    this.where = d.createBuffer({ size: 8 * 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
+    this.where = d.createBuffer({ size: 16 * 48, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
     this.u = d.createBuffer({ size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST })
     // each marvel's right (and the tangent of half its width), up and middle on the sky
-    const w = new Float32Array(MARVELS.length * 12), R = Math.PI / 180
-    MARVELS.forEach(({ at: [lon, lat], width, turn }, k) => {
+    const w = new Float32Array(ALL.length * 12), R = Math.PI / 180
+    ALL.forEach(({ at: [lon, lat], width, turn }, k) => {
       const c = [Math.cos(lat * R) * Math.cos(lon * R), Math.sin(lat * R), Math.cos(lat * R) * Math.sin(lon * R)]
       const e = [-Math.sin(lon * R), 0, Math.cos(lon * R)] // east
       const n = [e[1] * c[2] - e[2] * c[1], e[2] * c[0] - e[0] * c[2], e[0] * c[1] - e[1] * c[0]] // north
@@ -73,16 +89,19 @@ export class Cosmos {
         { binding: 1, visibility: F, texture: { viewDimension: '2d-array' } },
         { binding: 2, visibility: F, sampler: {} },
         { binding: 3, visibility: F, buffer: {} },
+        { binding: 4, visibility: F, texture: { viewDimension: '2d-array' } },
       ],
     })
     this.bind()
-    // coarse first, all of it; then sharp, the sky before the marvels
+    // coarse first, all of it; then sharp, the sky before the marvels, the strange ones last
     const job = (tex: GPUTexture, layer: number, level: number, ss: number, kind: number, cost: number) =>
       this.jobs.push({ tex, view: this.level(tex, layer, level), layer, level, ss, kind, cost: cost * ss, done: 0 })
     for (let f = 0; f < 6; f++) job(this.sky, f, PREVIEW, 1, 0, SKY)
     MARVELS.forEach((m, k) => job(this.marvels, k, PREVIEW, 1, 1, m.cost))
+    STRANGE.forEach((m, k) => job(this.strange, k, PREVIEW, 1, 2, m.cost))
     for (let f = 0; f < 6; f++) job(this.sky, f, 0, 1, 0, SKY)
     MARVELS.forEach((m, k) => job(this.marvels, k, 0, 2, 1, m.cost))
+    STRANGE.forEach((m, k) => job(this.strange, k, 0, 1, 2, m.cost))
   }
 
   // What fields read: each texture from the finest level baked whole.
@@ -96,6 +115,7 @@ export class Cosmos {
         { binding: 1, resource: view(this.marvels, this.base[1], '2d-array') },
         { binding: 2, resource: this.smp },
         { binding: 3, resource: { buffer: this.where } },
+        { binding: 4, resource: view(this.strange, this.base[2], '2d-array') },
       ],
     })
   }
@@ -135,22 +155,22 @@ export class Cosmos {
     this.jobs.shift()
     if (this.jobs.some((j) => j.tex === J.tex && j.level === J.level)) return // the rest of this level is still to come
     if (J.level === 0) this.filter(enc, J.tex)
-    this.base[+(J.tex === this.marvels)] = J.level
-    const i = +(J.tex === this.marvels)
+    const i = this.texs.indexOf(J.tex)
+    this.base[i] = J.level
     this.shown[i] ||= performance.now()
     if (J.level === 0) this.sharp[i] = Math.max(performance.now(), this.shown[i] + FADE)
     this.bind()
   }
 
   // Each comes in out of the dark over FADE once it is first there, coarse, and sharpens over SHARPEN once its finest
-  // level is: how far, 0 to 1 and then to 3, in the first marvel's up.w and middle.w (cosmos.wgsl).
+  // level is: how far, 0 to 1 and then to 3, in MARVEL's last slot (cosmos.wgsl).
   private fade() {
     const now = performance.now(), ease = (s: number) => (s = Math.min(1, Math.max(0, s))) * s * (3 - 2 * s)
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 3; i++) {
       const v = (this.shown[i] ? ease((now - this.shown[i]) / FADE) : 0) + (this.sharp[i] ? 2 * ease((now - this.sharp[i]) / SHARPEN) : 0)
       if (v === this.faded[i]) continue
       this.one[0] = this.faded[i] = v
-      this.device.queue.writeBuffer(this.where, 28 + 16 * i, this.one)
+      this.device.queue.writeBuffer(this.where, 15 * 48 + 4 * i, this.one)
     }
   }
 
