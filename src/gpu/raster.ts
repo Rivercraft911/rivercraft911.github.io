@@ -7,6 +7,7 @@ import prelude from './field.wgsl?raw'
 import rasterWGSL from './raster.wgsl?raw'
 import { FIELDS, PLANET } from './fields'
 import { Mesh, type Solids } from './mesh'
+import { Cosmos } from './cosmos'
 
 export type Field = {
   shader: number // index into FIELDS
@@ -58,6 +59,7 @@ export class Raster {
   private none!: GPUTextureView
   private ball = new Float32Array(4)
   readonly mesh: Mesh
+  readonly cosmos: Cosmos // the sky beyond, for any field that reads it: group 1 (fields/cosmos.wgsl)
   private cells?: GPUTexture
   private groups: GPUBindGroup[] = []
   private views: GPUTextureView[] = [] // the field's frame, the cells, the field's distances
@@ -78,6 +80,7 @@ export class Raster {
     this.blankDist = d.createTexture({ size: [1, 1], format: 'r16float', usage: GPUTextureUsage.TEXTURE_BINDING })
     this.none = this.blank.createView()
     this.mesh = new Mesh(d)
+    this.cosmos = new Cosmos(d)
     this.data = FIELDS.map(({ data: [w, h, b = 1, mips = 1] = [1, 1] }) =>
       d.createTexture({
         size: [w, h],
@@ -105,8 +108,8 @@ export class Raster {
         vertex: { module, entryPoint: 'vs' },
         fragment: { module, entryPoint: fs, targets: lay === 'auto' ? [{ format, blend }] : [{ format, blend }, { format: 'r32float' }] }, // a field's light, and its distance
       })
-    const solids = this.mesh.compile()
-    const r = d.createShaderModule({ code: rasterWGSL }), fl = d.createPipelineLayout({ bindGroupLayouts: [layout] })
+    const solids = this.mesh.compile(), sky = this.cosmos.compile()
+    const r = d.createShaderModule({ code: rasterWGSL }), fl = d.createPipelineLayout({ bindGroupLayouts: [layout, this.cosmos.layout] })
     ;[this.light, this.cell, this.text, this.halfPipe] = await Promise.all([pipe(r, 'lightFS', acc, ADD), pipe(r, 'cellFS', 'rgba32float'), pipe(r, 'textFS', acc, ADD), pipe(r, 'halfFS', FLOAT)])
     this.fields = await Promise.all(
       FIELDS.map(async (f, i) => {
@@ -115,7 +118,7 @@ export class Raster {
         return { pipe: await pipe(d.createShaderModule({ code: prelude + f.code }), 'fs', FLOAT, undefined, fl), u, group }
       }),
     )
-    await solids
+    await Promise.all([solids, sky])
     this.ready = true
   }
 
@@ -138,6 +141,7 @@ export class Raster {
   // Renders the field (and its text) for this frame, ahead of the phosphor's pass.
   render(enc: GPUCommandEncoder, f: Field | undefined, w: number, h: number, aspect: number, dpr: number, gain: number) {
     this.on = false
+    this.cosmos.bake(enc) // a few tiles of the sky a frame, until it is whole
     for (let px = 0; pictures.length && px < 1 << 20; ) { // about a megapixel a frame
       const { shader, img, x, y, mip } = pictures.shift()!
       this.device.queue.copyExternalImageToTexture({ source: img }, { texture: this.data[shader], origin: [x, y], mipLevel: mip, premultipliedAlpha: true }, [img.width, img.height])
@@ -188,7 +192,7 @@ export class Raster {
       d.queue.writeBuffer(S.u, 16, G.p)
       const at = (view: GPUTextureView): GPURenderPassColorAttachment => ({ view, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 0] })
       const r = enc.beginRenderPass({ colorAttachments: [at(view), at(dist)] })
-      r.setPipeline(S.pipe), r.setBindGroup(0, S.group), r.draw(3), r.end()
+      r.setPipeline(S.pipe), r.setBindGroup(0, S.group), r.setBindGroup(1, this.cosmos.group), r.draw(3), r.end()
     }
     if (!f.k) return // dark: its data kept, nothing swept
     this.on = true

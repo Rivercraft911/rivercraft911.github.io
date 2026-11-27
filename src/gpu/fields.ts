@@ -19,8 +19,9 @@ export const R01 = FIELDS.push({ code: camera + film + r01, data: [320, 120, 2] 
 // r the same as g but 37, 17 texels on, so one bilinear tap reads a lattice at two depths (planet.wgsl); the second
 // mip is never read, only there so a picture may be copied in.
 import planet from './fields/planet.wgsl?raw'
+import cosmos from './fields/cosmos.wgsl?raw'
 import { pictures } from './raster'
-export const PLANET = FIELDS.push({ code: camera + planet, data: [256, 256, 4, 2] }) - 1
+export const PLANET = FIELDS.push({ code: camera + cosmos + planet, data: [256, 256, 4, 2] }) - 1
 {
   const px = new Uint8ClampedArray(4 << 16)
   for (let i = 0, s = 1; i < 1 << 16; i++) px[4 * i + 1] = (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) >>> 24, px[4 * i + 3] = 255

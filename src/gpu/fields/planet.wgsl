@@ -807,7 +807,7 @@ fn beyond(rd: vec3f, L: vec3f) -> vec3f {
     let bulge = exp(-(1.0 - gl) / 0.05 - gb * gb / 0.02);
     lane = smoothstep(0.35, 0.75, 0.6 * noise(d * 7.0 + 3.0) + 0.4 * noise(d * 19.0)) * exp(-gb * gb / 0.006);
     let disc = (0.3 * exp(-gb * gb / 0.06) + exp(-gb * gb / 0.012) * (0.5 + noise(d * 11.0 + 20.0))) * (0.6 + 0.4 * gl);
-    c = (disc * vec3f(0.6, 0.72, 1.0) + 2.5 * bulge * vec3f(1.0, 0.8, 0.55)) * (1.0 - 0.85 * lane) * 0.02;
+    _ = disc; _ = bulge; // the galaxy's glow is the cosmos's now (cosmos.wgsl); only its dust lanes still thin the stars
   }
   // the stars
   let ad = abs(d);
@@ -823,7 +823,7 @@ fn beyond(rd: vec3f, L: vec3f) -> vec3f {
     let is = hash(key + vec3u(0u, 0u, 12u));
     let sp = (id + 0.15 + 0.7 * at.xy) / n;
     let v = normalize(vec3f(1.0, f.xy)) - normalize(vec3f(1.0, sp));
-    let many = pow(1.0 + dot(sp, sp), -1.5) * (0.25 + 0.75 * exp(-gb * gb / 0.05)) * (1.0 - 0.7 * lane); // the cell's share of sky; the plane; the dust
+    let many = pow(1.0 + dot(sp, sp), -1.5) * (0.25 + 0.75 * exp(-gb * gb / 0.05)) * (1.0 - 0.8 * cosmosDust(d)); // the cell's share of sky; the plane; the dust
     if (is.x < many) {
       let flux = select(1.0, 0.09, j == 1) * 0.04 / (is.y + 0.04);
       c += mix(vec3f(1.0, 0.7, 0.45), vec3f(0.7, 0.82, 1.0), smoothstep(0.1, 0.8, is.z + 0.3 * at.z)) * flux * exp(-dot(v, v) / (0.9 * w * w)) * 3.8e-4 / w;
@@ -833,7 +833,7 @@ fn beyond(rd: vec3f, L: vec3f) -> vec3f {
   let el = acos(clamp(dot(rd, L), -1.0, 1.0));
   let lat = abs(dot(d.xy, vec2f(-sl.y, sl.x)));
   c += vec3f(1.0, 0.93, 0.82) * (0.012 * pow(max(el, 0.02), -2.2) * exp(-lat / (0.06 + 0.22 * el)) + 0.012 * exp(-(PI - el) * (PI - el) / 0.03));
-  return c / 0.11; // at the exposure the world is seen at (planet.ts EXPOSE)
+  return (c + cosmos(d)) / 0.11; // and the fractal cosmos beyond (cosmos.wgsl), at the exposure the world is seen at (planet.ts EXPOSE)
 }
 
 fn field(q: vec2f) -> vec3f {
