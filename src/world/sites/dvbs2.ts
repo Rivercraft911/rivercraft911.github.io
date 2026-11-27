@@ -18,7 +18,7 @@
 import { clamp, hash } from '../../acts/scene'
 import { Frames, rc, rings } from '../../dsp/dvbs2'
 import { ball, box, dome, make, pipe, tube } from '../make'
-import { ctx, cross, dot, frame, part, site, solid, unit, type V } from '../ctx'
+import { ctx, cross, frame, part, site, solid, unit, type V } from '../ctx'
 import { PLACES, type About } from '../places'
 
 type V3 = [number, number, number]
@@ -126,14 +126,15 @@ const at = (p: number[], x: number, y: number, z: number): V3 => {
   const c = Math.cos(p[3]), s = Math.sin(p[3])
   return [p[0] + x * c + z * s, p[1] + y, p[2] + x * s - z * c]
 }
-// The link, at true size, as it lay on the bench. At each S3's U.FL a pigtail of 1.13 mm micro-coax to an SMA jack,
-// heat-shrunk at its back; the transmitter's jack takes a jumper of RG316 (2.5 mm, its FEP jacket tan), an SMA plug at
-// each end (a hex nut 8 mm across flats, its body, a crimp ferrule and heat-shrink for strain relief), which crosses the
-// pool hanging under its own weight and runs along the south bank into the 30 dB attenuator, an SMA jack-to-plug
-// barrel, its gold body banded, whose plug takes the receiver's pigtail. The connectors lie along the banks; the cables
-// bend round to them (Catmull–Rom through the points they pass).
+// The link, at true size, every joint mated. At each S3's U.FL a plug and a pigtail of 1.13 mm micro-coax, straight off
+// the board into an SMA jack, heat-shrunk at its back; the transmitter's jack takes a jumper of RG316 (2.5 mm, its FEP
+// jacket tan), an SMA plug at each end (a hex nut 8 mm across flats screwed over the jack's thread, its body, a crimp
+// ferrule and heat-shrink for strain relief), which bends away, crosses the pool hanging under its own weight and comes
+// ashore into the 30 dB attenuator, an SMA jack-to-plug barrel, its gold body banded, whose plug is screwed onto the
+// receiver's jack, its pigtail straight into the receiver's U.FL. The connectors lie along the banks, east–west, in
+// line with each S3's U.FL; the jumper bends round to them (Catmull–Rom through the points it passes).
 const UTX = at(TX, -8.8, 2.4, -4.9), URX = at(RX, -8.8, 2.4, -4.9), HEX = 8 / Math.sqrt(3) // the U.FLs; an SMA nut's corner radius
-const YN = TX[1] + HEX, YS = RX[1] + HEX, XN = -25, XS = -16 // the north and south runs of connectors: their height and line
+const YN = TX[1] + HEX, YS = RX[1] + HEX, ZN = UTX[2], ZS = URX[2] // the north and south runs: their height and line
 const spline = (q: V3[], n = 6): V3[] => {
   const out: V3[] = [q[0]]
   for (let i = 0; i + 1 < q.length; i++) {
@@ -146,32 +147,33 @@ const spline = (q: V3[], n = 6): V3[] => {
   return out
 }
 const RG316 = mat(0.55, 0.36, 0.22, 0, 0.45), NICKEL = mat(0.75, 0.75, 0.74, 1, 0.3), BAND = mat(0.05, 0.05, 0.06, 0, 0.5)
-// connector pieces along z, from z0, s the way (+1 north, −1 south): [r at start, r at end, length, sides, finish]
+// connector pieces along x, from x0, s the way (+1 east, −1 west): [r at start, r at end, length, sides, finish]
 type Piece = [number, number, number, number, ReturnType<typeof mat>]
-const JACK: Piece[] = [[1.5, 1.5, 12, 16, BLACK], [2, 2, 5, 16, GOLD], [HEX, HEX, 3, 6, GOLD], [3.15, 3.15, 6, 24, GOLD]] // back to front
-const PLUG: Piece[] = [[HEX, HEX, 7, 6, NICKEL], [3, 3, 3, 24, GOLD], [2.2, 2.2, 5, 16, GOLD], [1.8, 1.45, 14, 16, BLACK]] // front to back
-const ATTEN: Piece[] = [[3.15, 3.15, 6, 24, GOLD], [4.3, 4.3, 5, 32, GOLD], [4.34, 4.34, 4, 32, BAND], [4.3, 4.3, 7, 32, GOLD], [HEX, HEX, 3, 6, GOLD], [HEX, HEX, 7, 6, NICKEL]]
+const JACK: Piece[] = [[1.5, 1.5, 12, 16, BLACK], [2, 2, 5, 16, GOLD], [HEX, HEX, 3, 6, GOLD], [3.15, 3.15, 6, 24, GOLD]] // back to front (26 mm)
+const PLUG: Piece[] = [[HEX, HEX, 7, 6, NICKEL], [3, 3, 3, 24, GOLD], [2.2, 2.2, 5, 16, GOLD], [1.8, 1.45, 14, 16, BLACK]] // front to back (29)
+const ATTEN: Piece[] = [[3.15, 3.15, 6, 24, GOLD], [4.3, 4.3, 5, 32, GOLD], [4.34, 4.34, 4, 32, BAND], [4.3, 4.3, 7, 32, GOLD], [HEX, HEX, 3, 6, GOLD], [HEX, HEX, 7, 6, NICKEL]] // (32)
 const run = (x: number, y: number, z: number, s: number, ps: Piece[]) => {
-  for (const [r0, r1, l, n, m] of ps) tube(m, [x, y, z], [0, 0, s], r0, r1, l, n, true), (z += s * l)
-  return z
+  for (const [r0, r1, l, n, m] of ps) tube(m, [x, y, z], [s, 0, 0], r0, r1, l, n, true), (x += s * l)
+  return x
 }
 const flip = (ps: Piece[]) => ps.map(([r0, r1, l, n, m]): Piece => [r1, r0, l, n, m]).reverse()
-// the north run, south from the transmitter's jack's back: the jack, then the jumper's plug on it (its nut over the
-// jack's thread); the south run, south from where the jumper comes ashore: its other plug, the attenuator (its jack's
-// thread under that nut), the receiver's jack (its thread under the attenuator's plug)
-const N0 = 112, N1 = N0 - 26 + 2, NE = N1 - 29, S0 = -58, S1 = S0 - 29 + 2, S2 = S1 - 32 + 2, SE = S2 - 26
-const PIG_N = spline([[UTX[0], UTX[1] + 0.8, UTX[2]], [-8, 4.4, 87.5], [-12, 3, 94], [-15.5, 2.3, 104], [-19.5, 3, 114], [-23.5, 4.8, 118.5], [XN, YN, N0 + 4], [XN, YN, N0]])
-const SPAN = spline([[XN, YN, NE], [XN, YN - 0.6, NE - 7], [-24, 3.6, 36], [-22, 2.3, 10], [-20, 2.3, -15], [-18, 3.4, -38], [-16.5, YS - 0.6, S0 + 6], [XS, YS, S0]], 8)
-const PIG_S = spline([[XS, YS, SE], [XS, YS - 0.5, SE - 4], [-14.5, 4.4, SE - 9], [-10, 3.2, SE - 10], [-6.5, 3.4, SE - 2], [-5, 4.3, -128], [-4.8, 4.9, -117], [URX[0], URX[1] + 0.8, URX[2]]])
+// A plug's nut goes 5 mm over its jack's 6 mm thread. The north run, west from the transmitter's jack's back: the jack,
+// the jumper's plug on it. The south run, east from where the jumper comes ashore: its other plug, the attenuator (its
+// jack's thread under that nut), the receiver's jack (its thread under the attenuator's plug nut).
+const OVER = 5, N0 = -12, N1 = N0 - 26 + OVER, NE = N1 - 29, S0 = -90, S1 = S0 + 29 - OVER, S2 = S1 + 32 - OVER, SE = S2 + 26
+const PIG_N = spline([[UTX[0], UTX[1] + 0.8, ZN], [-7.5, 5.3, ZN], [-10, 6, ZN], [N0 - 2, YN, ZN]]) // (it ends 2 mm into the jack's shrink)
+// (no bend in it tighter than RG316's 12.5 mm, five times its width)
+const SPAN = spline([[NE + 2, YN, ZN], [NE - 6, YN - 0.3, ZN], [-76, 5, 83], [-84, 4, 72], [-84, 3.4, 58], [-70.5, 2.7, 41.5], [-56.6, 2.2, 21.6], [-50, 2, -8], [-56.6, 2.2, -37.6], [-70.5, 2.7, -57.5], [-88, 3.4, -70], [-104, 4, -80], [-114, 4.6, -92], [-115, 5, -103], [-108, YS - 0.4, -110], [-98, YS, ZS], [S0 + 2, YS, ZS]], 6)
+const PIG_S = spline([[SE - 2, YS, ZS], [SE + 1.5, YS - 0.2, ZS], [-8.5, 5.9, ZS], [-6.4, 5.3, ZS], [URX[0], URX[1] + 0.8, ZS]]) // (it starts 2 mm into the jack's shrink)
 // the beads' way, and where it is hidden in a connector
-const WAY: V3[] = [...PIG_N, [XN, YN, NE], ...SPAN.slice(1), [XS, YS, SE], ...PIG_S.slice(1)]
+const WAY: V3[] = [...PIG_N, [NE, YN, ZN], ...SPAN.slice(1, -1), [S0, YS, ZS], [SE, YS, ZS], ...PIG_S.slice(1)]
 const HIDE = [PIG_N.length - 1, PIG_N.length, PIG_N.length + SPAN.length - 1, PIG_N.length + SPAN.length] // [from, to) a vertex range twice
 make('coax', () => {
   pipe(BLACK, PIG_N, 0.57, 8), pipe(BLACK, PIG_S, 0.57, 8) // the pigtails
   pipe(RG316, SPAN, 1.25, 12)
   for (const u of [UTX, URX]) tube(NICKEL, [u[0], u[1], u[2]], [0, 1, 0], 1, 1, 1.25, 16, true) // the U.FL plugs on their jacks
-  run(XN, YN, N0, -1, JACK), run(XN, YN, N1, -1, PLUG)
-  run(XS, YS, S0, -1, flip(PLUG)), run(XS, YS, S1, -1, ATTEN), run(XS, YS, S2, -1, flip(JACK))
+  run(N0, YN, ZN, -1, JACK), run(N1, YN, ZN, -1, PLUG)
+  run(S0, YS, ZS, 1, flip(PLUG)), run(S1, YS, ZS, 1, ATTEN), run(S2, YS, ZS, 1, flip(JACK))
 })
 // The jumpers: SPI from the camera to the transmitter (SCK, CS, MOSI, READY, GND), and from the receiver to the W5500
 // (SCLK, MOSI, MISO, CS, 3V3, GND); Ethernet on to the screen.
@@ -209,7 +211,7 @@ for (let i = 0; i < NP; i++) {
   if (i) LEN[i] = LEN[i - 1] + Math.hypot(PATH[i][0] - PATH[i - 1][0], PATH[i][1] - PATH[i - 1][1], PATH[i][2] - PATH[i - 1][2])
 }
 // the beads are hidden in the connectors' runs; past the attenuator's plug they are the receiver's own
-const L = LEN[NP - 1], IN = [LEN[HIDE[0]], LEN[HIDE[1]], LEN[HIDE[2]], LEN[HIDE[3]]], FROM_ATT = IN[2] + (S0 - S2)
+const L = LEN[NP - 1], IN = [LEN[HIDE[0]], LEN[HIDE[1]], LEN[HIDE[2]], LEN[HIDE[3]]], FROM_ATT = IN[2] + (S2 + OVER - S0)
 
 // ---- the signal ----------------------------------------------------------------------------------------------------
 const PSK8 = rings('8PSK', '3/4', 14, [[8, 1, 0]])
@@ -223,7 +225,6 @@ const s0 = { i: 0, q: 0 }, s1 = { i: 0, q: 0 }
 type F = { x: number; v: number }
 const follow = (f: F, goal: number, w: number, dt: number) => ((f.v += (w * w * (goal - f.x) - 2 * w * f.v) * dt), (f.x += f.v * dt))
 const apart: F = { x: 0, v: 0 }, shown: F = { x: 0, v: 0 }, held = { tx: { x: 0, v: 0 }, rx: { x: 0, v: 0 } } as Record<string, F>
-const spin: Record<string, number> = { tx: 0, rx: 0 }
 let start = 0, was = false, framed = 0
 // Each frame the receiver finds (as the last of its header comes in), for the music (sound.ts): how many there have
 // been, and a pitch from its MODCOD, a semitone a step from 240 Hz at the bench's 14 (valley.ts's tonic).
@@ -245,31 +246,22 @@ function put(id: string, x: number, y: number, z: number, a: V, b: V, cc: V, k =
   for (let i = 0; i < 3; i++) w[i] += (a[i] * mx + b[i] * my + cc[i] * mz) * MM
   return solid(id, w, a, b, cc, Math.max(m.hi[0] - m.lo[0], m.hi[1] - m.lo[1], m.hi[2] - m.lo[2]) * MM, k, glow)
 }
-// v turned th about unit axis a, in place
-function rot(v: V, a: V, th: number) {
-  const cs = Math.cos(th), sn = Math.sin(th), d = dot(a, v) * (1 - cs)
-  const x = a[1] * v[2] - a[2] * v[1], y = a[2] * v[0] - a[0] * v[2], z = a[0] * v[1] - a[1] * v[0]
-  ;(v[0] = v[0] * cs + x * sn + a[0] * d), (v[1] = v[1] * cs + y * sn + a[1] * d), (v[2] = v[2] * cs + z * sn + a[2] * d)
-}
 // axes for a thing turned th from east about the vertical
 function turned(th: number) {
   const cs = Math.cos(th), sn = Math.sin(th)
   for (let i = 0; i < 3; i++) (ax[i] = E[i] * cs + N[i] * sn), (ay[i] = O[i]), (az[i] = E[i] * sn - N[i] * cs)
 }
 
-// A XIAO (`id`, its place p): lifted `a` and its can over it when apart; picked, a little higher, whole, and turning
-// slowly over about its own length, so both faces come round.
+// A XIAO (`id`, its place p): it stays where it is, wired and plugged in; when apart, or picked, its can lifts off the S3.
 function board(id: string, p: number[], dt: number, here: boolean) {
-  const f = held[id], a = apart.x
+  const f = held[id], a = Math.max(apart.x, f.x)
   follow(f, here && ctx.picked === id ? 1 : 0, 2.6, dt)
-  spin[id] = f.x > 0.01 ? spin[id] + 0.3 * dt : 0
-  const y = p[1] + 16 * a + 12 * f.x, over = spin[id] * f.x
+  const y = p[1]
   turned(p[3])
   world(p[0], y, p[2], c)
-  rot(ay, ax, over), rot(az, ax, over)
   put('xiao', p[0], y, p[2], ax, ay, az)
-  // the can, over the S3 (its middle 3 mm toward the U.FL end, 1.6 to the side), lifted off when apart
-  const lift = 1.2 + 12 * a * (1 - f.x) // (picked, it is whole again)
+  // the can, over the S3 (its middle 3 mm toward the U.FL end, 1.6 to the side)
+  const lift = 1.2 + 12 * a
   for (let i = 0; i < 3; i++) w[i] = c[i] + (ay[i] * lift + ax[i] * -3 + az[i] * 1.6) * MM
   const m = ctx.models['xiao-can']
   if (m) {
@@ -302,7 +294,7 @@ export function draw(k: number) {
   put('coax', 0, 0, 0, E, O, N), put('jumpers', 0, 0, 0, E, O, N) // (made in the bench's own millimetres)
   if (here) {
     world(CAM[0], CAM[1] + 43, CAM[2], c), part('camera', c, 43 * MM)
-    world(XS, YS, S1 - 16, c), part('coax', c, 16 * MM)
+    world(S1 + 16, YS, ZS, c), part('coax', c, 16 * MM)
     world(ETH[0], ETH[1] + 5, ETH[2], c), part('w5500', c, 19 * MM)
     world(SCR[0], SCR[1] + SY, SCR[2], c), part('screen', c, 52 * MM)
   }
@@ -338,12 +330,12 @@ export function draw(k: number) {
     let i = 1
     while (i < NP - 1 && LEN[i] < s) i++
     const g = (s - LEN[i - 1]) / (LEN[i] - LEN[i - 1]), P = PATH[i - 1], R = PATH[i]
-    const r = RING * f
+    const thin = s < IN[0] || s > IN[3], r = RING * f * (thin ? 0.5 : 1) // (round a pigtail, a ring as much smaller)
     const x = P[0] + (R[0] - P[0]) * g + r * (I * SIDE[i][0] + Q * LIFT[i][0])
     const y = P[1] + (R[1] - P[1]) * g + r * (I * SIDE[i][1] + Q * LIFT[i][1])
     const z = P[2] + (R[2] - P[2]) * g + r * (I * SIDE[i][2] + Q * LIFT[i][2])
     world(x, y, z, c)
-    solid(KINDS[kind], c, E, O, N, 2 * BEAD * MM * f, 0.3, 9 * f)
+    solid(KINDS[kind], c, E, O, N, 2 * BEAD * MM * f * (thin ? 0.6 : 1), 0.3, 9 * f)
   }
 
   // the picture, once the frames are found
@@ -360,3 +352,4 @@ export const about: Record<string, About> = {
   w5500: { name: 'W5500', does: 'An Ethernet module on the receiver’s SPI: the decoded transport stream goes out as UDP at 10 Mb/s.' },
   screen: { name: 'the video, received', does: 'Both fisheye streams as received, as the laptop on the bench played them.' },
 }
+
