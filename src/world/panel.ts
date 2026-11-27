@@ -49,7 +49,7 @@ export function panel(p: Page) {
     { class: 'page', id: 'world-page' },
     el('header', {}, el('h1', {}, p.name), el('p', { class: 'what' }, p.what)),
     el('section', {}, head('×1', 'the problem'), el('p', {}, p.problem)),
-    el('section', {}, head('×2', 'what River built'), ...p.built.map((b) => el('p', {}, b))),
+    el('section', {}, head('×2', 'what I built'), ...p.built.map((b) => el('p', {}, b))),
     el('section', { class: 'proof' }, head('×4', 'the proof'), el('p', { class: 'num' }, p.proof[0]), el('p', {}, p.proof[1])),
     el('section', {}, head('×8', 'on the bench'), ...media),
     el('p', { class: 'status' }, p.status),

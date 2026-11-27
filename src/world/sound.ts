@@ -139,8 +139,8 @@ const inChord = (n: number) => { const c = mod12(n - chord); return c === 0 || c
 const ok = (n: number) => PENTA.includes(mod12(n)) || inChord(n)
 // n moved by k of the notes the melody may sing (k < 0 is down)
 function walk(n: number, k: number) {
-  for (let d = Math.sign(k), j = Math.abs(k); j > 0; ) if (ok((n += d))) j--
-  return n
+  for (let d = Math.sign(k), j = Math.abs(k), g = 0; j > 0 && g < 48; g++) if (ok((n += d))) j-- // (bounded: never a hang)
+  return Number.isFinite(n) ? n : 0
 }
 const weigh = (to: number) => MOTION[mod12(to - chord)] * (to === home ? 1 + 0.6 * away : 1) * (to === 4 ? 0.5 : 1)
 function next() {
@@ -211,7 +211,9 @@ function melody(e: number) {
   if (rand() >= dens * (strong ? 1 : k % 2 ? 0.3 : 0.6) * (k >= 13 ? 0.2 : 1)) return
   const step = rand() < 0.15 ? 3 : rand() < 0.5 ? 1 : 2
   mel = walk(mel, rand() < 0.5 + (mel - centre) / 24 ? -step : step)
-  if (strong) while (!inChord(mel)) mel = walk(mel, mel > centre ? -1 : 1)
+  // onto a chord tone, one way only (an octave at most holds one): turning back each step could pace forever between
+  // two tones neither in the chord (under IV or iii there are such neighbours), and the page with it
+  if (strong) for (let d = mel > centre ? -1 : 1, i = 0; i < 12 && !inChord(mel); i++) mel = walk(mel, d)
   bells.strike(doh() * 2 ** (mel / 12), (strong ? 0.15 : 0.1) * (0.7 + 0.3 * rand()), clamp(sun + 0.4 * (rand() - 0.5), -1, 1), 2.2 + rand(), 1.3)
 }
 // A place's answer: a tone of the chord over the key's tonic an octave up (root, fifth, third, octave, twelfth),
