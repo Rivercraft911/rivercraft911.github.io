@@ -9,7 +9,7 @@ export type Part =
   | { k: 'sinc'; f: number; rc: number; p: number }
   | { k: 'band'; lo: number; hi: number; p: number }
 
-export type Media = { src: string; alt: string; video?: boolean }
+export type Media = { src: string; alt: string; video?: boolean; poster?: string; size?: [w: number, h: number] }
 
 export type Project = {
   slug: string
@@ -23,6 +23,8 @@ export type Project = {
   numbers: [string, string][]
   body: string[]
   media: Media[]
+  proof?: Media[] // what shows it working, first on its page and large
+  boards?: string[] // River's boards in it (world/content.ts BOARDS): both faces, and the schematic
   links: [string, string][]
   demo?: 'esp' | 'yapogee' | 'ulam' | 'raster' | 'scope' | 'walk'
   log: [number, number][] // [week since 2024-10-28, commits]: the waterfall
@@ -31,6 +33,10 @@ export type Project = {
 
 const GH = 'https://github.com/Rivercraft911/'
 const RAW = 'https://raw.githubusercontent.com/Rivercraft911/'
+const MEDIA = `${import.meta.env.BASE_URL}media/`
+// River's live-video bench, as recorded: esp-dvbs2 carrying Pigeon Vision's two cameras
+export const LIVE: Media = { src: `${MEDIA}esp-dvbs2/live.mp4`, poster: `${MEDIA}esp-dvbs2/live.jpg`, video: true, size: [1280, 720],
+  alt: 'Live video over esp-dvbs2, as recorded: two 360° cameras on a CM5, one ESP32-S3 sending at 2420 MHz down coax to another, stitched to a sphere' }
 const ORBIT = 1 / (92.9 * 60) // a ~93-minute low Earth orbit. TODO River: SAMWISE's real period
 const primes = (n: number) => {
   const s = new Uint8Array(n), out: number[] = []
@@ -74,35 +80,42 @@ export const PROJECTS: Project[] = [
   },
   {
     slug: 'samwise',
-    title: 'SAMWISE ADCS',
-    remarkable: "PCB magnetorquer coils for Stanford SSI's CubeSat, trace width tuned over 6 layers",
+    title: 'SAMWISE',
+    remarkable: 'Stanford SSI’s CubeSat. River laid out its magnetorquers: coils etched through 6-layer boards',
     freq: ORBIT,
     span: 0.5,
     signature: 'A magnetorquer pushes against Earth’s field, which turns past it once an orbit: ≈0.18 mHz.',
     sig: [{ k: 'lines', f: [ORBIT], p: [-8] }],
     years: '2024 – 2026',
     numbers: [
-      ['coil', '6 layers, 2 oz copper'],
-      ['optimizes', 'trace width for magnetic moment under a power limit'],
-      ['radios', 'S-band SX1280 and UHF RFM98PW LoRa'],
+      ['River’s part', 'designed the Z coil panel and the Pico radio hat; re-laid the XY coil panels’ traces'],
+      ['coil panels', '6 layers of 2 oz copper; two panels a face in parallel, five coils a board in series'],
+      ['optimizer', 'the trace width for the most magnetic moment under a power limit'],
+      ['radios', 'S-band LoRa1280F27 (SX1280) and UHF RFM98PW LoRa, on the Pico hat'],
       ['range test', 'transmitter, receiver, observer, S-band image transfer'],
     ],
     body: [
-      'SAMWISE is the Stanford Student Space Initiative CubeSat. For its attitude control I wrote a tool that finds the trace width that maximizes a PCB magnetorquer coil’s magnetic moment, given the copper weight, the layer count, the supply and a power limit, with live graphs as you turn the knobs.',
-      'For its avionics: a Raspberry Pi Pico breakout carrying the S-band and UHF LoRa modules and the bus to the rest of the stack, and the range-test firmware that drove them, down to sending images over S-band.',
+      'SAMWISE is the Stanford Student Space Initiative’s CubeSat. Its magnetorquers are coils etched into six-layer circuit boards, the XY and Z coil panels, two panels to a face in parallel and five coils a board in series: River designed the Z panel and re-laid the XY panels’ coils. Current through them pushes against Earth’s field, which is how the satellite turns itself without fuel. For coils like these River wrote a tool that finds the trace width giving the most magnetic moment for the copper weight, layer count, supply and power limit, with live graphs as the knobs turn.',
+      'Its radios were brought up on River’s Pico radio hat, a Raspberry Pi Pico carrying the S-band and UHF LoRa modules and the bus to the rest of the stack, driven by River’s range-test firmware down to sending images over S-band.',
     ],
     media: [
       { src: `${RAW}magtorque-optimization/main/images/screenshot1.png`, alt: 'The magnetorquer optimizer: magnetic moment against trace width' },
       { src: `${RAW}magtorque-optimization/main/images/screenshot2.png`, alt: 'The magnetorquer optimizer’s parameter sweep' },
-      { src: `${RAW}SoftwareDebugPicoHat/main/Plots/Board3dRender.png`, alt: 'Render of the Pico breakout board for the SAMWISE radios' },
     ],
+    boards: ['coil', 'coil-xy', 'picohat'],
     links: [
       ['magtorque-optimization', `${GH}magtorque-optimization`],
+      ['coil panels', 'https://github.com/stanford-ssi/samwise-avionics'],
       ['Pico radio hat', `${GH}SoftwareDebugPicoHat`],
       ['range-test firmware', `${GH}RangeTestSoftware`],
     ],
     log: [[0, 1], [1, 9], [14, 7], [17, 1], [65, 7], [66, 3], [68, 9], [69, 34]],
-    todo: ['SAMWISE orbit period, launch status and your role in its ADCS', 'a photo of flight hardware, if public'],
+    todo: [
+      'SAMWISE’s orbit period and launch status',
+      'the XY coil panel’s silkscreen names Eric Liu and Maya Bridgman (v2.2); your commits re-laid its traces and set the 0.17 mm width, so the page says “re-laid”. Say if it should say more',
+      'the 2.4 GHz ground station hat is left out: its silkscreen reads “Kristopher Luo, Austin Chan, Ver 1.1” and its history in samwise-avionics has no commits of yours. If a version of it is yours, say which, and it goes back in (bake-boards.mjs, content.ts BOARDS, this entry’s boards)',
+      'a photo of flight hardware, if public',
+    ],
   },
   {
     slug: 'infiniterecon',
@@ -132,7 +145,7 @@ export const PROJECTS: Project[] = [
   {
     slug: 'peep',
     title: 'PEEP',
-    remarkable: "The world's smallest IR-triggered keystroke injector: 12.06 × 8 mm",
+    remarkable: 'A TV remote makes it type: the world’s smallest IR-triggered keyboard, 12.06 × 8 mm',
     freq: 38_000,
     span: 0.5,
     signature: 'Its receiver listens for a 38 kHz IR carrier; a keyed 562.5 µs burst spreads it into sinc² sidebands.',
@@ -145,11 +158,12 @@ export const PROJECTS: Project[] = [
       ['re-arm', '250 ms of IR silence'],
     ],
     body: [
-      'A USB keyboard the size of a fingertip that plugs straight into a USB-A port on its own board edge. An infrared burst from across the room starts its stored macro; it types it as ordinary keyboard reports, ignores IR while it types, and re-arms after 250 ms of quiet.',
+      'A USB keyboard the size of a fingertip that plugs straight into a USB-A port on its own board edge. Any burst of 38 kHz infrared, a TV remote’s from across the room, starts its stored macro; it types it as ordinary keyboard reports, ignores IR while it types, and re-arms after 250 ms of quiet.',
       'A XIAO ESP32-C6 serves as a Wi-Fi to IR remote. For systems you own or may test.',
     ],
+    proof: [{ src: `${RAW}PEEP/main/docs/media/peep-on-fingertip.jpg`, alt: 'An assembled PEEP board on a fingertip' }],
+    boards: ['peep'],
     media: [
-      { src: `${RAW}PEEP/main/docs/media/peep-on-fingertip.jpg`, alt: 'An assembled PEEP board on a fingertip' },
       { src: `${RAW}PEEP/main/docs/media/peep-in-usb-a.jpg`, alt: 'PEEP inside a USB-A port' },
       { src: `${RAW}PEEP/main/docs/media/peep-usb-contacts.jpg`, alt: 'The USB contacts on PEEP’s board edge' },
       { src: `${RAW}PEEP/main/docs/media/pcb-panel.jpg`, alt: 'A panel of PEEP boards' },
@@ -270,11 +284,11 @@ export const PROJECTS: Project[] = [
       'One S3 frames, codes, modulates and pulse-shapes DVB-S2 and sends it out of its own Wi-Fi radio. A second S3 pulls it back in through its own radio and demodulates and decodes every frame on the chip. No PC, no external DAC or ADC, no FPGA.',
       'The radio hides a test engine that plays samples from RAM into its I/Q DAC: a fresh 16 380-sample bank every 196.75 µs at 80 MS/s, which at 240 MHz is 47 220 cycles to make 15 740 new samples: three cycles a sample. So every possible output of the shaping filter is computed once into a table, making samples is copying rows, and the heavy loops run on the S3’s 128-bit vector unit. It started as a goal of 9.68 Mb/s for live video and kept going.',
     ],
+    proof: [LIVE],
     media: [
       { src: `${RAW}esp-dvbs2/main/docs/img/rf-40mhz.png`, alt: '40 MHz QPSK spectrum and spectrogram transmitted by an ESP32-S3, captured by a B200' },
       { src: `${RAW}esp-dvbs2/main/docs/img/rx-5m.png`, alt: 'What the receiving S3 sees at 12.64 Mb/s: spectrum, spectrogram and constellation' },
       { src: `${RAW}esp-dvbs2/main/docs/img/rf-36mhz.png`, alt: '36 MHz 8PSK spectrum and spectrogram transmitted by an ESP32-S3' },
-      { src: `${RAW}esp-dvbs2/main/examples/live-video/bench.jpg`, alt: 'The live-video bench, one S3 to another' },
     ],
     links: [
       ['source', `${GH}esp-dvbs2`],
@@ -303,12 +317,15 @@ export const PROJECTS: Project[] = [
       'Red, green and blue lasers combine through two dichroic mirrors onto a spinning polygon mirror; each facet sweeps one line. An IR sensor sees each facet go by, an interrupt clocks the mirror and arms a timer for the instant the beam reaches the screen, and 320 pixels go out the GPIO ports, each on its own absolute timestamp so jitter never accumulates. Then the galvo steps, odd lines down and even lines back up, and at the top the framebuffers swap.',
       'Colour is one byte a pixel, rrrgggbb, precomputed at boot into four GPIO port words, so painting a pixel is one lookup and four writes. Postmortemly known as Icarus: the polygon motor caught fire on demo day and the galvo never answered. R-02 is planned. Built with Amy for CS107E.',
     ],
+    proof: [
+      { src: `${MEDIA}r01/polyspin.mp4`, alt: 'The polygon mirror spinning up on the bench', video: true, size: [540, 960] },
+      { src: `${MEDIA}r01/blinktest.mp4`, alt: 'Blink test: the green laser’s line off the polygon, on a paper screen', video: true, size: [540, 960] },
+    ],
+    boards: ['laserbrain', 'laserdriver'],
     media: [
-      { src: `${RAW}R-01_Raster_Laser_Projector/master/images/POLYSPIN.mp4`, alt: 'The polygon mirror spinning up', video: true },
       { src: `${RAW}R-01_Raster_Laser_Projector/master/images/LaserDriver.jpeg`, alt: 'The RGB laser driver board: twelve iC-HG30 channels' },
       { src: `${RAW}R-01_Raster_Laser_Projector/master/images/laserBrain.jpeg`, alt: 'LaserBrain, the power and interface hat for the MangoPi' },
       { src: `${RAW}R-01_Raster_Laser_Projector/master/images/CAD_R-01_SS.png`, alt: 'R-01’s CAD: optics, polygon, galvo and chassis' },
-      { src: `${RAW}R-01_Raster_Laser_Projector/master/images/BLINKTEST.mp4`, alt: 'Laser blink test', video: true },
     ],
     links: [['source', `${GH}R-01_Raster_Laser_Projector`]],
     demo: 'raster',

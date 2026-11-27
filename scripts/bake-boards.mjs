@@ -1,5 +1,6 @@
-// Bakes River's boards for the long zoom. Per board: a top-down picture, public/media/boards/<id>.webp, cropped
-// to the Edge.Cuts bounding box, and its geometry, src/boards/<id>.json, in mm from that box's top-left with y
+// Bakes River's boards, for the pages and once for the long zoom. Per board: both faces, public/media/boards/<id>.webp
+// from above and <id>-back.webp from below (turned over side to side, as a hand turns it), each cropped to the
+// Edge.Cuts bounding box, and its geometry, src/boards/<id>.json, in mm from that box's top-left with y
 // down, so (x / w, y / h) is the picture's uv. KiCad renders a copy of each board, since kicad-cli leaves a lock
 // file beside whatever it opens and the sources are not ours to touch; KIPRJMOD points home so the project's own
 // 3D models still resolve. Parts overhang the outline, so a second render with every model missing finds the
@@ -7,20 +8,23 @@
 // of the board seen closer, so the hole is still sharp as it fills the screen. `npm run boards -- <id…>` renders
 // only those (the geometry is cheap and always baked). Needs KiCad 10, ffmpeg and cwebp.
 // The world's monuments carry their signals on this geometry (src/world/copper.ts), so it also has the board's
-// thickness and every pad that is on a routed net; the boards after the coil are geometry alone.
+// thickness and every pad that is on a routed net. bake-schematics.mjs reads this list too.
 import { execFileSync } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { basename, dirname, join } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const GH = '/Users/river/Documents/github/', PV = '/Users/river/Documents/stanford/SSI/IREC/Pigeon_Vision/PigeonVision/hardware/'
+const SATS = '/Users/river/Documents/stanford/SSI/SATS/'
 // In the order the film falls through them. A source is a local file, or a repo path read from its clone when
 // there is one, else fetched. `stackup` recolours the picture, by stackup layer type. `hole` is the hole the zoom
 // falls through, [x, y, drill, pad] in mm (pad = drill: unplated), and `close` the close-ups around it, each a
-// square that many mm across, 512 px, or [mm, px].
-const WHITE = { 'Top Silk Screen': '#101010FF', 'Bottom Silk Screen': '#101010FF', 'Top Solder Mask': '#F6F6F1F4', 'Bottom Solder Mask': '#F6F6F1F4' }
-const BOARDS = [
-  { id: 'gnss', title: 'GNSS IQ Breakout', project: 'GNSS front end', file: GH + 'Personal PCBs/GNSS-IQ-Breakout/hardware/GNSS-IQ-Breakout.kicad_pcb',
+// square that many mm across, 512 px, or [mm, px]. `skip`: parts' 3D models left out (as bake-models.mjs leaves them).
+const ink = (silk, mask) => ({ 'Top Silk Screen': silk, 'Bottom Silk Screen': silk, 'Top Solder Mask': mask, 'Bottom Solder Mask': mask })
+const WHITE = ink('#101010FF', '#F6F6F1F4'), BLACK = ink('White', 'Black') // as the boards were made (and bake-models.mjs paints them)
+export const BOARDS = [
+  { id: 'gnss', title: 'GNSS IQ Breakout', project: 'GNSS front end', stackup: BLACK, file: GH + 'Personal PCBs/GNSS-IQ-Breakout/hardware/GNSS-IQ-Breakout.kicad_pcb',
     hole: [19.45, 17.34, 0.3, 0.6], close: [11.25, 5.6, 2.8, 1.4] }, // a via between the front end and the lock LED
   { id: 'heart', title: 'Rava Heart', project: 'Rava Heart', stackup: WHITE, repo: 'Rivercraft911/rava-heart', path: 'hardware/HeartArray.kicad_pcb', clone: GH + 'rava-heart',
     hole: [47, 76.25, 2.2, 3.8], close: [23.5, 11.75, 5.9, 2.9] }, // H3, the mounting hole on the heart's axis
@@ -30,17 +34,28 @@ const BOARDS = [
     hole: [2.4, 2.4, 2.2, 3.8], close: [12.5, 6.25, 3.1] }, // H1, the top-left mounting hole
   { id: 'strobe', title: 'strobeGlasses MK1', project: 'strobeGlasses', repo: 'Rivercraft911/strobeGlasses', path: 'strobeGlassesMK1/strobeGlassesMK1.kicad_pcb', clone: GH + 'strobeGlasses',
     hole: [25.85, 6, 0.3, 0.6], close: [10.3, 5.15, 2.6, 1.3] }, // a via beside the microcontroller
-  { id: 'peep', title: 'PEEP', project: 'PEEP', repo: 'Rivercraft911/PEEP', path: 'PCB/peep/peep.kicad_pcb', clone: GH + 'PEEP',
+  { id: 'peep', title: 'PEEP', project: 'PEEP', stackup: BLACK, repo: 'Rivercraft911/PEEP', path: 'PCB/peep/peep.kicad_pcb', clone: GH + 'PEEP',
     hole: [4.63, 2.22, 0.3, 0.6], close: [3, 1.5, 0.75] }, // a via in the second contact
   { id: 'coil', title: 'Magnetorquer coil', project: 'SAMWISE', repo: 'stanford-ssi/samwise-avionics', path: 'Universal_Z_MagTorq/Coil_Panel_Z_v1/Coil_Panel_Z.kicad_pcb', clone: GH + 'samwise-avionics' },
-  // not in the zoom: geometry alone, for the world (bake-models.mjs has their solids)
-  { id: 'pigeon-carrier', title: 'Pigeon carrier', project: 'Pigeon Vision', file: PV + 'carrier/PigeonCarrier/PigeonCarrier.kicad_pcb', bare: true },
-  { id: 'yapogee-s3', title: 'Yapogee S3', project: 'Pigeon Vision', file: PV + 'yapogee-s3/kicad/YapogeeS3.kicad_pcb', bare: true },
-  { id: 'picohat', title: 'Pico debug hat', project: 'SAMWISE', file: GH + 'samwise-groundstation/SoftwareDebugPicoHat/SoftwareDebugPicoHat.kicad_pcb', bare: true },
+  // not in the zoom: for the pages
+  { id: 'coil-xy', title: 'XY magnetorquer coil', project: 'SAMWISE', repo: 'stanford-ssi/samwise-avionics', path: 'Universal_XY_MagTorq/Coil_Panel_XY.kicad_pcb', clone: GH + 'samwise-avionics' },
+  { id: 'picohat', title: 'Pico radio hat', project: 'SAMWISE', file: GH + 'samwise-groundstation/SoftwareDebugPicoHat/SoftwareDebugPicoHat.kicad_pcb' },
+  { id: 'pigeon-carrier', title: 'Pigeon carrier', project: 'Pigeon Vision', file: PV + 'carrier/PigeonCarrier/PigeonCarrier.kicad_pcb' },
+  { id: 'yapogee-s3', title: 'Yapogee S3', project: 'Pigeon Vision', file: PV + 'yapogee-s3/kicad/YapogeeS3.kicad_pcb' },
+  { id: 'finertia', title: 'Finertia', project: 'BLEPS', file: SATS + 'Satellite-Avionics-rotor/project-janus/ADCS/rotor-controller/Rotor.kicad_pcb', skip: /2610T/ }, // (Faulhaber's motor model stays out)
 ]
 
 const KICAD = '/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli', FFMPEG = '/opt/homebrew/bin/ffmpeg', CWEBP = '/opt/homebrew/bin/cwebp'
 const PCM = join(homedir(), 'Documents/KiCad/10.0/3rdparty') // older boards name the plugin libraries by older versions' variables
+// Where a part's 3D model is, by the names boards give them (as bake-models.mjs finds them): KiCad 10 ships its library
+// as STEP alone.
+const LIB = '/Applications/KiCad/KiCad.app/Contents/SharedSupport/3dmodels'
+const VARS = { KICAD8_3RD_PARTY: PCM, KICAD9_3RD_PARTY: PCM, KICAD10_3RD_PARTY: PCM, KICAD6_3DMODEL_DIR: LIB, KICAD7_3DMODEL_DIR: LIB, KICAD8_3DMODEL_DIR: LIB,
+  KICAD9_3DMODEL_DIR: LIB, KICAD10_3DMODEL_DIR: LIB, RIVERS_DIR: GH + 'RiversKicadLibrary', SAMWISE_AVIONICS: GH + 'samwise-avionics' }
+const found = (p, home) => {
+  const f = resolve(dirname(home), p.replace(/\$\{(\w+)\}/g, (v, k) => (k === 'KIPRJMOD' ? dirname(home) : VARS[k] ?? v)))
+  return [f, f.replace(/\.wrl$/i, '.step')].find(existsSync)
+}
 const RENDER = 4096 // px, square: the board's long side comes out near 3930, twice the picture's
 const SIDE = 2048, Q = 80 // the picture's long side; WebP quality
 const PAN = 0.0782, ZOOM = 0.25 // a kicad-cli --pan of 1 moves the board this much of its long side; it zooms no further than about 0.3 × that side in mm (both measured)
@@ -159,11 +174,12 @@ function picture(b, src, home, tmp) {
   const f = join(tmp, `${b.id}.kicad_pcb`), bare = join(tmp, `${b.id}-bare.kicad_pcb`)
   const pro = home.replace(/\.kicad_pcb$/, '.kicad_pro')
   const paint = (m, t) => (b.stackup?.[t] ? `(type "${t}") (color "${b.stackup[t]}")` : m) // kicad-cli renders stackup colours
-  writeFileSync(f, src.replace(/\(type "([^"]+)"\)(?:\s*\(color "[^"]*"\))?/g, paint))
+  const parts = src.replace(/\(model "([^"]*)"/g, (m, p) => `(model "${b.skip?.test(p) ? '/-/' : found(p, home) ?? p}"`)
+  writeFileSync(f, parts.replace(/\(type "([^"]+)"\)(?:\s*\(color "[^"]*"\))?/g, paint))
   writeFileSync(bare, src.replaceAll('(model "', '(model "/-/')) // models nowhere: no parts
   if (existsSync(pro)) copyFileSync(pro, f.replace(/pcb$/, 'pro')) // its text variables
   const out = join(tmp, 'render.png') // kicad-cli renders a little short of the size it is asked for, by more when small
-  const render = (file, quality, size = RENDER, view = []) => (execFileSync(KICAD, ['pcb', 'render', '--side', 'top', '--background', 'transparent', '--quality', quality,
+  const render = (file, quality, size = RENDER, view = [], side = 'top') => (execFileSync(KICAD, ['pcb', 'render', '--side', side, '--background', 'transparent', '--quality', quality,
     '-w', size, '-h', size, ...view, '-D', `KIPRJMOD=${dirname(home)}`, '-D', `KICAD8_3RD_PARTY=${PCM}`, '-D', `KICAD9_3RD_PARTY=${PCM}`, '-o', out, file].map(String), { stdio: 'pipe' }), rgba(out))
   // the outline is where the bare board is at least half there; the camera frames the outline either way
   const outline = (m) => {
@@ -182,11 +198,14 @@ function picture(b, src, home, tmp) {
     execFileSync(CWEBP, ['-quiet', '-q', Q, '-m', 6, '-sharp_yuv', '-alpha_filter', 'best', '-o', webp, png].map(String))
     return readFileSync(webp).length
   }
-  const [x0, y0, x1, y1] = outline(render(bare, 'basic'))
-  const { W, px } = render(f, 'high'), cw = x1 - x0 + 1, ch = y1 - y0 + 1, crop = Buffer.alloc(cw * ch * 4)
-  lift(px)
-  for (let y = 0; y < ch; y++) px.copy(crop, y * cw * 4, ((y0 + y) * W + x0) * 4, ((y0 + y) * W + x1 + 1) * 4)
-  const bytes = save(b.id, crop, cw, ch, ['-vf', `scale=${SIDE}:${SIDE}:force_original_aspect_ratio=decrease:flags=lanczos`])
+  const face = (side, name) => {
+    const [x0, y0, x1, y1] = outline(render(bare, 'basic', RENDER, [], side))
+    const { W, px } = render(f, 'high', RENDER, [], side), cw = x1 - x0 + 1, ch = y1 - y0 + 1, crop = Buffer.alloc(cw * ch * 4)
+    lift(px)
+    for (let y = 0; y < ch; y++) px.copy(crop, y * cw * 4, ((y0 + y) * W + x0) * 4, ((y0 + y) * W + x1 + 1) * 4)
+    return [cw, ch, save(name, crop, cw, ch, ['-vf', `scale=${SIDE}:${SIDE}:force_original_aspect_ratio=decrease:flags=lanczos`])]
+  }
+  const [cw, ch, top] = face('top', b.id), [, , back] = face('bottom', `${b.id}-back`)
 
   // The close-ups, each the middle P px of a render a little larger. Zoomed, the render still centres the board's
   // box and scales as the zoom (at ½ the board fits, so its size there gives the scale), and a pan puts the hole in
@@ -211,7 +230,7 @@ function picture(b, src, home, tmp) {
     console.log(`  ${b.id}-${j}: ${mm} mm at ${P} px, zoom ${Z.toFixed(2)} of ${R} px, hole at ${bx.toFixed(1)},${by.toFixed(1)} px, ${(2 * Math.sqrt(area / Math.PI) / ppm).toFixed(3)} mm across`)
     return box
   })
-  return [`${cw}x${ch} → ${SIDE} px, ${bytes} B`, close]
+  return [`${cw}x${ch} → ${SIDE} px, ${top} + ${back} B`, close]
 }
 
 // The transparent disc nearest (cx, cy) that does not touch the edge: its centroid and area, px.
@@ -235,9 +254,9 @@ function disc({ W, H, px }, cx, cy) {
   return best
 }
 
-const only = process.argv.slice(2), tmp = mkdtempSync(join(tmpdir(), 'boards-'))
-mkdirSync(OUT, { recursive: true }), mkdirSync(MEDIA, { recursive: true })
-try {
+const only = process.argv.slice(2), tmp = process.argv[1] === fileURLToPath(import.meta.url) && mkdtempSync(join(tmpdir(), 'boards-'))
+if (tmp) try {
+  mkdirSync(OUT, { recursive: true }), mkdirSync(MEDIA, { recursive: true })
   const list = [], was = existsSync(new URL('list.json', OUT)) ? JSON.parse(readFileSync(new URL('list.json', OUT), 'utf8')) : []
   for (const b of BOARDS) {
     let home = b.file ?? join(b.clone ?? '', b.path)
@@ -247,7 +266,6 @@ try {
     }
     const src = readFileSync(home, 'utf8'), [g, n] = geometry(b, src), json = JSON.stringify(g)
     writeFileSync(new URL(`${b.id}.json`, OUT), json)
-    if (b.bare) { console.log(b.id, `${g.w}x${g.h} mm`, `${g.tracks.length}/${n} tracks`, `${g.pads.length} pads`, `${json.length} B`); continue }
     const [pic, close] = !only.length || only.includes(b.id) ? picture({ ...b, w: g.w, h: g.h }, src, home, tmp) : ['picture kept', was.find((w) => w.id === b.id)?.close]
     list.push({ id: g.id, title: g.title, project: g.project, w: g.w, h: g.h, ...(b.hole && { hole: b.hole, close }) })
     console.log(b.id, `${g.w}x${g.h} mm`, `${g.tracks.length}/${n} tracks`, `${g.vias.length} vias`, `${g.layers.length} layers`, `${json.length} B;`, pic)

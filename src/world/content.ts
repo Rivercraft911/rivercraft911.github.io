@@ -1,13 +1,36 @@
 // What the world's pages say: projects.ts, the source of truth, plus the work since. Facts come from River's repos
 // and READMEs; anything unsure is listed in a `todo`, which is River's to settle and is never shown.
-import { PROJECTS, type Project } from '../band/projects'
+import { LIVE, PROJECTS, type Project } from '../band/projects'
 
-export type Work = Pick<Project, 'slug' | 'title' | 'remarkable' | 'years' | 'numbers' | 'body' | 'media' | 'links' | 'todo'>
+export type Work = Pick<Project, 'slug' | 'title' | 'remarkable' | 'years' | 'numbers' | 'body' | 'media' | 'proof' | 'boards' | 'links' | 'todo'>
 
 const GH = 'https://github.com/Rivercraft911/'
 const RAW = 'https://raw.githubusercontent.com/Rivercraft911/'
 const SSI = 'https://raw.githubusercontent.com/stanford-ssi/'
-const BOARDS = `${import.meta.env.BASE_URL}media/boards/` // River's boards, rendered top-down from KiCad (bake-boards.mjs)
+
+// River's boards, each with both faces rendered from KiCad (bake-boards.mjs: media/boards/<id>.webp from above,
+// <id>-back.webp from below) and every sheet of its schematic (bake-schematics.mjs: media/schematics/<id>.pdf). `as`: the
+// other names a place may call it by (its model's, bake-models.mjs).
+export type Board = { name: string; mm: [w: number, h: number]; layers: number; as?: string[] }
+export const BOARDS: Record<string, Board> = {
+  'pigeon-carrier': { name: 'Pigeon Vision carrier', mm: [144.78, 143.37], layers: 6 },
+  'yapogee-s3': { name: 'Yapogee S3', mm: [55, 43.18], layers: 4 },
+  gnss: { name: 'Ephemeris 1', mm: [45, 34], layers: 4, as: ['ephemeris'] },
+  laserbrain: { name: 'LaserBrain', mm: [100, 100], layers: 4 },
+  laserdriver: { name: 'LaserDriverRGB', mm: [50, 50], layers: 4 },
+  peep: { name: 'PEEP', mm: [12.06, 8], layers: 4 },
+  strobe: { name: 'Strobe Glasses MK1', mm: [41.2, 15.25], layers: 2, as: ['strobe-board'] },
+  heart: { name: 'Rava Heart', mm: [94, 88.3], layers: 4 },
+  'coil-xy': { name: 'XY coil panel', mm: [81.5, 215.5], layers: 6 },
+  coil: { name: 'Z coil panel', mm: [96.97, 97.33], layers: 6, as: ['coil-z'] },
+  picohat: { name: 'Pico radio hat', mm: [69.03, 54.7], layers: 4 },
+  finertia: { name: 'Finertia', mm: [26, 26], layers: 6 },
+}
+// The board a name means (an id here, one of its other names, or its picture's file), if it is one of River's.
+export const board = (name = '') => {
+  const s = name.replace(/^.*\//, '').replace(/(-back)?\.webp$/, '')
+  return s in BOARDS ? s : Object.keys(BOARDS).find((id) => BOARDS[id].as?.includes(s))
+}
 
 // Who, and how to reach them. An empty slot renders nothing.
 export const CONTACT = {
@@ -25,11 +48,11 @@ export const BEST: Record<string, string> = {
   valley: 'DVB-S2 at 69.8 Mb/s out of a $5 Wi-Fi chip',
   launch: 'live rocket video from a hacked $5 ESP32; 0 of 5.7 M frames failed',
   lighthouse: 'RGB laser raster off a 27 000 RPM polygon',
-  bench: 'a keystroke injector 12.06 × 8 mm, set off by IR',
+  bench: 'a TV remote makes it type; a USB keyboard 12.06 × 8 mm',
   glasses: 'open strobe glasses, 2 – 20 frames/s, released as MK1',
   hearts: '144 LEDs; twin hearts beat as one over ESP-NOW',
   receiver: 'a $33 GPS front end; cold fixes on recorded sky',
-  station: 'SAMWISE CubeSat: 6-layer PCB magnetorquer coils',
+  station: 'SAMWISE CubeSat: its magnetorquer coils, etched in 6-layer boards',
   bleps: 'next: a 1U CubeSat with four cameras, in design',
   core: 'a prime of 100 million digits, hunted on one Mac',
 }
@@ -69,7 +92,7 @@ export const ORDER: Entry[] = [
     see: 'A fingertip of a board in a USB-A port; three 38 kHz IR bursts arrive from across the room and it types.',
   },
   {
-    slug: 'strobeglasses', status: 'MK1 released, 19 Nov 2026', proof: '2 – 20 frames/s, 20 – 80 % dark, from one ATtiny402',
+    slug: 'strobeglasses', status: 'MK1 released 19 Nov 2026; being built', proof: '2 – 20 frames/s, 20 – 80 % dark, from one ATtiny402',
     see: 'Two lenses blinking. At Balanced, 5 frames/s and 50 % dark, each lens is dark 100 ms of every 200, and inside every dark window the drive flips ±3.3 V every 5 ms (balanced AC near 100 Hz), so a scope across a valve shows a burst of square wave, then flat. A double tap and the right eye runs half a frame behind the left. Anything turning seen through them strobes: at 20 frames/s and 80 % dark each valve is clear 10 ms in 50.',
   },
   {
@@ -77,7 +100,7 @@ export const ORDER: Entry[] = [
     see: 'Two hearts on the planet, one at the antipode, beating together; the follower a light-time late.',
   },
   {
-    slug: 'samwise', status: '', proof: '6-layer PCB magnetorquer coils, trace width tuned for moment', // TODO(River): its status
+    slug: 'samwise', status: '', proof: 'its magnetorquers: coils etched in 6-layer boards, trace width tuned for moment', // TODO(River): its status
     see: 'A 2U detumbling in the planet’s field by B-dot, a time-lapse in real units.',
   },
   {
@@ -131,6 +154,7 @@ const NEW: Work[] = [
       { src: `${SSI}Satellite-Avionics/feature/bleps-rotor-controller/project-janus/ADCS/rotor-controller/review/Reaction-Wheel-Controller-assembly.png`, alt: 'Finertia, the reaction wheel controller, on its Faulhaber 2610 motor, rendered from KiCad' },
       { src: `${SSI}Satellite-Avionics/feature/bleps-rotor-controller/project-janus/ADCS/rotor-controller/review/Finertia-routing.png`, alt: 'Finertia’s routing: six layers in 26 × 26 mm' },
     ],
+    boards: ['finertia'],
     links: [
       ['Finertia', 'https://github.com/stanford-ssi/Satellite-Avionics/tree/feature/bleps-rotor-controller/project-janus/ADCS/rotor-controller'],
       ['optical simulator', 'https://rivercraft911.github.io/cubesat-imaging-sim/'],
@@ -164,6 +188,8 @@ const NEW: Work[] = [
       'Yapogee S3 carries the S3. It makes DVB-S2 at 2.42 GHz, and an RFFC5072A mixes it with a 3.70 GHz LO down to 1.28 GHz. The LO sits above the signal, so the spectrum comes out mirrored, and the I/Q go out conjugated to mirror it back. A separate GRF5613 board is the PA. Round them is the carrier, a six-layer board 144.78 mm across for the CM5, both cameras, power and sensors: 148 parts and 645 filled and capped vias.',
       'The link already works end to end on the bench, one S3 to another through coax and 30 dB of attenuation: sixteen back-to-back 540 s runs, 2.4 hours on air, 5 725 408 frames decoded and none failed, both cameras at 30.0 frames/s. On the ground, an AntSDR E200 at 12 MS/s feeds a Mac that already decodes the flight profile from recorded samples. The carrier is released for fab and Yapogee S3 is routed; bring-up and the RF chain under power come next.',
     ],
+    proof: [LIVE],
+    boards: ['pigeon-carrier', 'yapogee-s3'],
     media: [{ src: `${RAW}esp-dvbs2/main/examples/live-video/bench.jpg`, alt: 'The live-video bench: the transmitting S3 by the cameras, coax and attenuator, the receiving S3 and its W5500' }],
     links: [
       ['source', 'https://github.com/stanford-ssi/PigeonVision'],
@@ -175,7 +201,7 @@ const NEW: Work[] = [
       'your role in your words (81 of the repo’s 84 commits are yours: the carrier, Yapogee S3, the flight and ground software)',
       'the flight: which IREC, and when (the page says only that it flies at IREC)',
       'the PA: 1 W at its output is hardware/rf-frontend’s planning target, and clean modulated 1 W is not yet qualified. Show it?',
-      'pictures of the carrier and Yapogee S3: photos, or say yes to baking their top-down renders (bake-boards.mjs); flight footage when there is some',
+      'photos of the real carrier and Yapogee S3 (the page shows their KiCad renders, both faces); flight footage when there is some',
     ],
   },
   {
@@ -193,10 +219,8 @@ const NEW: Work[] = [
       'A heart-shaped board that beats: a slow double pulse, and shaking it adds an extra beat. Put two near each other and they find each other over ESP-NOW and beat together. Tilt one and red liquid sloshes round inside it; hold the button for a second and both play I ♥ U.',
       'Scripts generated the outline, placed the LEDs and routed the power, and a browser simulator runs the same effects with no hardware at all.',
     ],
-    media: [
-      { src: `${BOARDS}heart.webp`, alt: 'Rava Heart from above, rendered from its KiCad board' },
-      { src: `${RAW}rava-heart/main/assets/pcb-front-back.png`, alt: 'KiCad renders of the front and back' },
-    ],
+    boards: ['heart'],
+    media: [],
     links: [['source', `${GH}rava-heart`], ['simulator', `${GH}rava-heart/tree/main/firmware/simulator`]],
     todo: ['a short video of two hearts in sync (assets/heart-demo.gif is 9 MB; an mp4 would load fast)'],
   },
@@ -216,8 +240,8 @@ const NEW: Work[] = [
       'Spacecraft GPS receivers are quoted in the thousands of dollars. Ephemeris 1 is the front end of an in-house one for about $33 of parts: a MAX2769B takes GPS L1 in through the SMA and hands raw I/Q to the host header, and the receiver behind it is firmware on an RP2350.',
       'The receiver already works on recorded signals. Fed a real rooftop recording from cold, the Pico tracked six satellites and fixed in 55 s, a median 2.56 m (horizontally) from GNSS-SDR’s fixes on the same data; on a simulated 550 km orbit it holds 1.30 m p95 at 5 Hz. The first boards are on the bench for assembly, and tests on a Safran simulator follow bring-up.',
     ],
+    boards: ['gnss'],
     media: [
-      { src: `${BOARDS}gnss.webp`, alt: 'Ephemeris 1 from above, rendered from its KiCad board' },
       { src: `${RAW}Ephemeris-1/main/docs/software/measurements/cttc/separation.png`, alt: 'Horizontal, vertical and 3D separation between the Pico’s fixes and GNSS-SDR’s on the same rooftop recording' },
     ],
     links: [['source', `${GH}Ephemeris-1`], ['assembly BOM', 'https://rivercraft911.github.io/Ephemeris-1/assembly/ibom.html']],
@@ -240,21 +264,21 @@ const NEW: Work[] = [
     body: [
       'Strobe glasses for visual reaction-time training, open source, to take on the expensive ones. An LCD light valve slides down into each rim of a printed frame and switches between clear and dark. One button runs it: a tap cycles the presets, a hold edits the rate and darkness of a custom one, and a double tap sets the eyes going together or alternating, the right half a frame behind the left. At 5 frames/s and 50 % dark the left eye goes dark for 100 ms, then the right for 100 ms.',
       'A liquid crystal must never sit on DC, so the ATtiny402’s timer cuts every dark window into balanced pairs near 100 Hz, +3.3 V then −3.3 V for 5 ms each, and stopping finishes the pair and drives both leads low. Left floating, a valve’s voltage takes 477 ms to fall from 90 % to 10 %; shorting its leads clears it far faster. The settings survive power cycles.',
-      'MK1 is released: the KiCad board and its BOM, the firmware, and a top-loading frame and brow cover to print in PETG or resin, held on by two screws from above.',
+      'MK1 is released, and River is building the first pair: the KiCad board and its BOM, the firmware, and a top-loading frame and brow cover to print in PETG or resin, held on by two screws from above.',
     ],
     media: [
       { src: `${RAW}strobeGlasses/main/assets/strobe-glasses.gif`, alt: 'MK1, rendered, both lenses switching between dark and clear' },
-      { src: `${BOARDS}strobe.webp`, alt: 'The MK1 board from above, rendered from KiCad' },
       { src: `${RAW}strobeGlasses/main/mechanical/top-load-brow.png`, alt: 'The swept brow: a recessed screw, and the four lens wires through the shoulder guide' },
       { src: `${RAW}strobeGlasses/main/assets/lcd-5v-psu-off.png`, alt: 'Voltage across one LCD valve after the 5 V supply turns off: 477 ms from 90 % to 10 %' },
     ],
+    boards: ['strobe'],
     links: [
       ['source', `${GH}strobeGlasses`],
       ['firmware and controls', `${GH}strobeGlasses/tree/main/firmware/strobe_glasses`],
       ['print and assemble', `${GH}strobeGlasses/blob/main/mechanical/TOP_LOAD.md`],
     ],
     todo: [
-      'has MK1 been built and worn? A photo of the real glasses (the GIF and the JPG are renders)',
+      'a photo of the real glasses once built (the GIF and the JPG are renders)',
       'optical numbers: how dark is dark, and how fast a driven valve clears (only the 477 ms floating decay is measured)',
     ],
   },

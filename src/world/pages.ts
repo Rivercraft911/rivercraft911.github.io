@@ -4,10 +4,15 @@
 // corner, so the 30-second version is always one glance away; with a page open it folds to a dial of numbers, the
 // place tuned to lit, and every page's bar steps to the places either side (or ← and →, or a number key).
 // /<slug> under the base lands on the place that holds it.
+// A project's page opens with what shows it working, large (a click lends it to the stage, over the world), then
+// River's boards in it, both faces (a click turns one over), each with its schematic. At a place, its parts are named
+// beside themselves once they hold still, and a part clicked has its card at the head of the page.
 import './pages.css'
 import { PLACES } from './places'
-import { BEST, CONTACT, NOW, ORDER, WORKS, type Work } from './content'
+import { BEST, BOARDS, CONTACT, NOW, ORDER, WORKS, board, type Work } from './content'
 import type { Media } from '../band/projects'
+import { ctx, look, parts, seen as spot } from './ctx'
+import { view } from '../acts/scene'
 
 const BASE = import.meta.env.BASE_URL // '/', or '/next/' while the world is being made
 const TITLE = document.title
@@ -55,21 +60,42 @@ const index = el(
 )
 
 // ---- a page: the place's projects, one after another ---------------------------------------------------------------
-const figure = (m: Media) =>
-  el(
+// A picture or a video; a proof's is large, plays without controls, and a click lends it to the stage.
+const MEDIA = `${BASE}media/`
+const sized = (w: number, h: number) => ({ width: String(w), height: String(h) }) // (its shape, before it loads)
+const figure = (m: Media, proof = false) => {
+  const at = { ...(m.size ? sized(...m.size) : {}), ...(proof ? { tabindex: '0', role: 'button', 'aria-label': `${m.alt} (larger)` } : {}) }
+  return el(
     'figure',
-    {},
+    proof ? { style: `flex: ${m.size ? m.size[0] / m.size[1] : 1.5}` } : {},
     m.video
-      ? el('video', { 'data-src': m.src, muted: '', loop: '', playsinline: '', controls: '', preload: 'none', 'aria-label': m.alt })
-      : el('img', { 'data-src': m.src, alt: m.alt, decoding: 'async' }),
+      ? el('video', { 'data-src': m.src, ...(m.poster ? { 'data-poster': m.poster } : {}), muted: '', loop: '', playsinline: '', preload: 'none', ...(proof ? {} : { controls: '' }), 'aria-label': m.alt, ...at })
+      : el('img', { 'data-src': m.src, alt: m.alt, decoding: 'async', ...at }),
     el('figcaption', { 'aria-hidden': 'true' }, m.alt),
   )
+}
+// One of River's boards, either face up: a click turns it over, side to side, as a hand would.
+const face = (id: string) => {
+  const b = BOARDS[id], wh = sized(b.mm[0] * 10, b.mm[1] * 10)
+  return el(
+    'figure',
+    { class: 'board' },
+    el('button', { type: 'button', 'aria-pressed': 'false', 'aria-label': `${b.name}: turn it over` },
+      el('img', { 'data-src': `${MEDIA}boards/${id}.webp`, alt: `${b.name}, top`, decoding: 'async', ...wh }),
+      el('img', { 'data-src': `${MEDIA}boards/${id}-back.webp`, alt: `${b.name}, underside`, decoding: 'async', ...wh })),
+    el('figcaption', {}, el('b', {}, b.name), tie(` ${b.mm[0]} × ${b.mm[1]} mm · ${b.layers} layers`), el('span', { class: 'faces' }, el('i', {}, 'top'), ' / ', el('i', {}, 'underside')),
+      el('a', out(`${MEDIA}schematics/${id}.pdf`), 'schematic ↗')),
+  )
+}
 function article(w: Work) {
-  const a = el('article', { id: `w-${w.slug}` }, el('h2', { tabindex: '-1' }, w.title), el('p', { class: 'yr' }, w.years), el('p', { class: 'rem' }, tie(w.remarkable)))
+  const a = el('article', { id: `w-${w.slug}` })
+  if (w.proof?.length) a.append(el('div', { class: 'proof' }, ...w.proof.map((m) => figure(m, true))))
+  a.append(el('h2', { tabindex: '-1' }, w.title), el('p', { class: 'yr' }, w.years), el('p', { class: 'rem' }, tie(w.remarkable)))
+  if (w.boards?.length) a.append(...w.boards.map(face))
   if (w.numbers.length) a.append(el('dl', {}, ...w.numbers.flatMap(([d, v]) => [el('dt', {}, d), el('dd', {}, tie(v))])))
   a.append(...w.body.map((b) => el('p', {}, tie(b))))
   if (w.links.length) a.append(el('ul', { class: 'links' }, ...w.links.map(([t, u]) => el('li', {}, el('a', out(u), t)))))
-  a.append(...w.media.map(figure))
+  a.append(...w.media.map((m) => figure(m)))
   return a
 }
 const sheets = PLACES.map((_, k) => {
@@ -80,32 +106,62 @@ const where = el('span', { class: 'where', 'aria-hidden': 'true' })
 const step = (key: string) => el('a', { class: 'step', href: BASE, 'data-k': '0', 'aria-keyshortcuts': key }, '')
 const prev = step('ArrowLeft'), next = step('ArrowRight')
 const close = el('button', { type: 'button', title: 'Esc', 'aria-keyshortcuts': 'Escape' }, 'all work')
-const scroll = el('div', { class: 'scroll' }, ...sheets)
+const card = el('section', { class: 'card', hidden: '', 'aria-live': 'polite' }) // a part clicked (below)
+const scroll = el('div', { class: 'scroll' }, card, ...sheets)
 const leaf = el('section', { class: 'page' }, el('p', { class: 'bar' }, prev, where, next, close), scroll)
-const root = el('div', { id: 'w', hidden: '' }, index, leaf)
+const stage = el('div', { class: 'stage', hidden: '' })
+const shelf = el('div', { class: 'tags' }) // the parts' names
+const root = el('div', { id: 'w', hidden: '' }, index, leaf, shelf, stage)
 
 // Pictures load as they near the reader, and arrive the way R-01 paints: odd lines down, then the even ones.
 const still = matchMedia('(prefers-reduced-motion: reduce)')
-const near = new IntersectionObserver(
-  (es) => es.forEach((e) => {
-    if (!e.isIntersecting) return
-    const m = e.target.firstElementChild as HTMLImageElement | HTMLVideoElement
+const load = (f: Element) => {
+  for (const m of f.querySelectorAll<HTMLImageElement | HTMLVideoElement>('[data-src]')) {
+    if (m.src) continue
+    if (m instanceof HTMLVideoElement) (m.muted = true), (m.preload = 'auto'), m.dataset.poster && (m.poster = m.dataset.poster) // (the attribute alone does not mute it)
     m.src = m.dataset.src!
-    if (m instanceof HTMLVideoElement) m.muted = true // the attribute alone does not mute it
-    near.unobserve(e.target)
-  }),
-  { root: scroll, rootMargin: '0px 0px 100% 0px' },
-)
+  }
+}
+const near = new IntersectionObserver((es) => es.forEach((e) => e.isIntersecting && (load(e.target), near.unobserve(e.target))), { root: scroll, rootMargin: '0px 0px 100% 0px' })
+const inview = new WeakSet<Element>()
 const seen = new IntersectionObserver(
-  (es) => es.forEach((e) => {
-    const f = e.target, m = f.firstElementChild!
-    if (e.isIntersecting && m instanceof HTMLImageElement && !m.complete) m.addEventListener('load', () => f.classList.add('drawn'), { once: true })
-    else if (e.isIntersecting) f.classList.add('drawn')
-    if (m instanceof HTMLVideoElement && m.src) e.isIntersecting && !still.matches ? m.play().catch(() => {}) : m.pause()
-  }),
+  (es) => {
+    es.forEach((e) => {
+      const f = e.target, m = f.querySelector('img')
+      e.isIntersecting ? inview.add(f) : inview.delete(f)
+      if (e.isIntersecting && m && !m.complete) m.addEventListener('load', () => f.classList.add('drawn'), { once: true })
+      else if (e.isIntersecting) f.classList.add('drawn')
+    })
+    play()
+  },
   { root: scroll, threshold: 0.2 },
 )
-for (const f of scroll.querySelectorAll('figure')) near.observe(f), seen.observe(f)
+// (once painted in, a figure drops the mask that painted it: one left on a playing video costs every frame)
+const done = (e: AnimationEvent) => e.animationName === 'w-even' && (e.currentTarget as Element).classList.add('done')
+const observe = (e: Element) => { for (const f of e.querySelectorAll('figure')) near.observe(f), seen.observe(f), f.addEventListener('animationend', done) }
+observe(scroll)
+// A video plays while its page is open and it is in view, or while it is on the stage; only there, and with reduced
+// motion only on the stage, where the reader put it.
+function play() {
+  const open = root.classList.contains('open') && !root.hidden
+  for (const v of root.querySelectorAll('video')) {
+    const on = open && (v === lent || (!still.matches && shown >= 0 && sheets[shown].contains(v) && inview.has(v.parentElement!)))
+    if (on) load(v.parentElement!), v.play().catch(() => {})
+    else v.pause()
+  }
+}
+
+// ---- the stage: a proof lent out large over the world, until a click or Escape puts it back ------------------
+let lent: HTMLElement | null = null
+const gap = el('div')
+function lend(m: HTMLElement | null) {
+  if (lent) gap.replaceWith(lent), (lent = null)
+  stage.hidden = !m
+  if (m) (gap.style.height = `${m.offsetHeight}px`), m.replaceWith(gap), stage.append(m), (lent = m)
+  play()
+}
+stage.addEventListener('click', (e) => (e.stopPropagation(), lend(null))) // (the picture is home before the click reaches the page)
+addEventListener('keydown', (e) => e.key === 'Escape' && lent && (lend(null), e.stopImmediatePropagation()), true) // (before the world's Escape)
 
 // ---- showing: a page once the camera has flown there ------------------------------------------------------------
 let shown = -1, timer = 0, landing = deep() >= 0
@@ -114,13 +170,11 @@ let fly: (k: number) => void = () => {}, live = () => false
 // Place k's page, after `after` seconds of flight; k < 0 puts it away.
 export function page(k: number, after = 0) {
   clearTimeout(timer)
+  lend(null), carry('')
   const mine = root.contains(document.activeElement) // the reader is in the words: keep them there
   entries.forEach((a, j) => (j === k ? a.setAttribute('aria-current', 'page') : a.removeAttribute('aria-current')))
-  root.classList.remove('open')
-  if (shown >= 0 && k !== shown) {
-    if (mine) entries[shown].focus({ preventScroll: true })
-    for (const v of sheets[shown].querySelectorAll('video')) v.pause()
-  }
+  root.classList.remove('open'), play()
+  if (shown >= 0 && k !== shown && mine) entries[shown].focus({ preventScroll: true })
   leaf.inert = true
   if (k < 0) return (shown = -1), (document.title = TITLE), measure()
   if (landing) (after = 0.5), (landing = false) // a deep link came for the words: they need not wait for the flight
@@ -143,7 +197,7 @@ export function page(k: number, after = 0) {
     const at = document.getElementById(`w-${location.pathname.split('/').filter(Boolean).pop()}`) // /driftwood: its own article
     scroll.scrollTop = at && sheets[k].contains(at) && at !== sheets[k].firstElementChild ? at.offsetTop - 24 : 0
     if (mine) sheets[k].querySelector('h2')!.focus({ preventScroll: true })
-    measure()
+    play(), measure()
   }, after * 1000)
 }
 
@@ -168,7 +222,7 @@ export function mount(go: (k: number) => void, on: () => boolean) {
   document.body.append(root)
   requestAnimationFrame(function watch() {
     const laying = !live() && performance.now() - laid < 200, shows = live() || laying
-    if (root.hidden === shows) (root.hidden = !shows), measure()
+    if (root.hidden === shows) (root.hidden = !shows), play(), measure()
     if (root.classList.contains('arriving') !== laying) {
       root.classList.toggle('arriving', laying)
       if (!laying) for (const b of flyers) b.style.visibility = 'hidden'
@@ -234,12 +288,19 @@ export const hovered = () => over
 export const within = (t: EventTarget | null) => t instanceof Node && root.contains(t)
 
 root.addEventListener('click', (e) => {
-  const a = (e.target as Element).closest<HTMLElement>('a[data-k]')
+  const t = e.target as Element, b = t.closest('.board'), m = t.closest('.proof figure > :first-child')
+  if (b && !t.closest('a')) return b.querySelector('button')!.setAttribute('aria-pressed', String(b.classList.toggle('over')))
+  if (m) return lend(m as HTMLElement)
+  const a = t.closest<HTMLElement>('a[data-k]')
   if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return
   e.preventDefault()
   fly(+a.dataset.k!)
 })
 close.addEventListener('click', () => fly(-1))
+root.addEventListener('keydown', (e) => {
+  const m = (e.target as Element).closest('.proof figure > :first-child')
+  if (m && (e.key === 'Enter' || e.key === ' ')) e.preventDefault(), lend(m as HTMLElement)
+})
 leaf.addEventListener('wheel', (e) => e.stopPropagation(), { passive: true }) // reading, not changing altitude
 addEventListener(
   'popstate',
@@ -250,3 +311,56 @@ addEventListener(
   },
   true,
 )
+
+// ---- a part clicked: its card, at the head of the page ---------------------------------------------------------
+// What the place says the part is (places.ts `about`), and if it is one of River's boards, both its faces and its
+// schematic. It follows ctx.picked, however that changed; clicking the part again, or the card's ×, puts it back.
+const pick = (id: string) => ((ctx.picked = ctx.picked === id ? '' : id), dispatchEvent(new CustomEvent('part', { detail: ctx.picked })))
+let carded = ''
+function carry(id: string) {
+  const a = id && shown >= 0 ? PLACES[shown].about?.[id] : undefined, b = board(a?.board)
+  carded = id, (card.hidden = !a)
+  if (!a) return
+  const x = el('button', { type: 'button', class: 'x', 'aria-label': 'put it back' }, '×')
+  x.addEventListener('click', () => pick(id))
+  card.replaceChildren(x, el('p', { class: 'yr' }, 'part'), el('h3', {}, a.name), el('p', { class: 'rem' }, tie(a.does)), ...(b ? [face(b)] : []))
+  observe(card)
+  scroll.scrollTo({ top: 0, behavior: still.matches ? 'auto' : 'smooth' })
+}
+
+// ---- the parts, named where they stand ------------------------------------------------------------------------
+// At a place, each part it says what it is (`about`) is named beside itself once it holds still on the screen, the
+// camera at rest and nothing picked: a word on a hairline, never under the words or over another name, fading in and
+// out. A name can be clicked as its part can. The planet calls this every frame, after it has placed everything.
+type Tag = { e: HTMLElement; x: number; y: number; still: number; at: number; w: number }
+const tags: Record<string, Tag>[] = PLACES.map(() => ({})), all: Tag[] = [], taken: number[] = []
+let tick = 0
+export function label() {
+  const k = ctx.focus, about = k >= 0 && !root.hidden && !lent && ctx.since >= 0 ? PLACES[k].about : undefined, dt = Math.max(ctx.dt, 1e-3)
+  const right = innerWidth * (1 - Math.max(cover[0], 0)) - 16, bottom = innerHeight * (1 - cover[1]) - 16
+  tick++, (taken.length = 0)
+  if (ctx.picked !== carded && root.classList.contains('open')) carry(ctx.picked)
+  for (let i = 0; about && i < parts.n; i++) {
+    const q = parts.list[i], a = about[q.id]
+    if (!a || !look(q.c)) continue
+    let t = tags[k][q.id]
+    if (!t) {
+      const e = el('button', { type: 'button', class: 'tag', tabindex: '-1', 'data-part': q.id, style: `--c: ${ink(k)}` }, a.name)
+      shelf.append(e), all.push((t = tags[k][q.id] = { e, x: 0, y: 0, still: 0, at: 0, w: 20 + 7.3 * a.name.length }))
+    }
+    const D = Math.hypot(q.c[0] - ctx.E[0], q.c[1] - ctx.E[1], q.c[2] - ctx.E[2]), r = ((q.r / D) * ctx.p[3] * innerHeight) / 2
+    const x = ((spot.x / view.a + 1) * innerWidth) / 2 + 0.7 * r, y = ((1 - spot.y) * innerHeight) / 2
+    t.still = Math.hypot(x - t.x, y - t.y) < 30 * dt ? t.still + dt : 0 // (under 30 px/s)
+    t.x = x, t.y = y, t.at = tick
+    let on = t.still > 0.6 && !ctx.picked && x > 8 && x + t.w < right && y > 16 && y < bottom
+    for (let j = 0; on && j < taken.length; j += 3) on = Math.abs(y - taken[j + 1]) > 18 || x > taken[j] + taken[j + 2] || taken[j] > x + t.w
+    if (on) taken.push(x, y, t.w)
+    t.e.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`
+    t.e.classList.toggle('on', on)
+  }
+  for (const t of all) if (t.at !== tick) t.e.classList.remove('on')
+}
+shelf.addEventListener('click', (e) => {
+  const id = (e.target as HTMLElement).closest<HTMLElement>('.tag')?.dataset.part
+  if (id) pick(id)
+})

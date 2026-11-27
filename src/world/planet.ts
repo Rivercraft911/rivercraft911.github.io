@@ -13,7 +13,7 @@ import { PLACES } from './places'
 import { ctx, cross, dot, frame, len, look, parts, seen, site, stand, turn, unit, type V } from './ctx'
 import { made } from './make'
 import { HALF, sight } from './sites/bleps'
-import { covered, hovered, mount, page, route, within } from './pages'
+import { covered, hovered, label, mount, page, route, within } from './pages'
 import { sound } from './sound'
 
 const p = ctx.p
@@ -413,6 +413,7 @@ export const planet: Scene = {
     const c = covered(), fe = framed ? 1 - Math.exp(-4 * dt) : ((framed = true), 1) // (from the first frame as the arrival left it: clear of the index)
     side[0] += (c[0] - side[0]) * fe, side[1] += (c[1] - side[1]) * fe
     paint(f, now, t, dt, focus, DEBUG ? +(dbg.get('ap') ?? 0) : focus >= 0 && flight < 0 ? 1 : 0, true, 0, focus >= 0 && flight < 0 ? t - fstart - flen : -1)
+    label() // the parts' names, where they now stand
     return sound()
   },
 }
