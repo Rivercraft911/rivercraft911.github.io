@@ -40,10 +40,10 @@ const LAMPS: Record<string, string> = { heart: 'mat_2' } // which of a model's m
 export function attach(d: GPUDevice) {
   mount((k) => go(k, lastBuild), () => active) // the words: the index, a deep link's place, the history
   const base = `${import.meta.env.BASE_URL}media/models/`
-  fetch(`${base}list.json`)
+  fetch(`${base}list.json?v=${__BUILD__}`) // (asked for as this build's, past any cache's older copy)
     .then((r) => (r.ok ? r.json() : []))
     .then((list: { id: string; file: string }[]) => {
-      for (const m of list) model(d, base + m.file + (LAMPS[m.id] ? `#lamp=${LAMPS[m.id]}` : '')).then((g) => (models[m.id] = g))
+      for (const m of list) model(d, `${base}${m.file}?v=${__BUILD__}` + (LAMPS[m.id] ? `#lamp=${LAMPS[m.id]}` : '')).then((g) => (models[m.id] = g))
     })
     .catch(() => {})
   for (const [id, url] of made()) model(d, url).then((g) => (models[id] = g)) // and what is not in CAD yet (make.ts)

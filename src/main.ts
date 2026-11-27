@@ -19,6 +19,17 @@ import { r01 } from './world/r01'
 import { attach, planet } from './world/planet'
 import { deep } from './world/pages'
 
+// A page a cache kept from an older build (GitHub Pages lets a page live 10 minutes): load the newest instead, at a
+// URL no cache has seen.
+if (import.meta.env.PROD)
+  fetch(`${import.meta.env.BASE_URL}version.json`, { cache: 'no-store' })
+    .then((r) => r.json())
+    .then(({ id }: { id: string }) => {
+      const u = new URL(location.href)
+      if (id !== __BUILD__ && u.searchParams.get('v') !== id) u.searchParams.set('v', id), location.replace(u)
+    })
+    .catch(() => {})
+
 const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
 const beam = new Beam()
