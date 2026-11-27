@@ -195,12 +195,10 @@ function print() {
   if (ctx.t - began < FADE) return
   next = (shown + 1) % pics.length, began = ctx.t, printed = -1
 }
-// A click on the screen, or on R-01 itself (or its name), prints; so does clicking it again to put it back.
-let was = ''
+// A click on the screen, or on R-01 itself (or its name), prints the next frame, and the camera goes to watch it.
 addEventListener('part', (ev) => {
   const id = (ev as CustomEvent<string>).detail
-  if (id === 'screen' || id === 'r01' || (!id && (was === 'screen' || was === 'r01'))) print()
-  was = id
+  if (id === 'screen' || id === 'r01') print()
 })
 // What is coming apart, and the boards picked: each a critically damped follower, [where, how fast].
 const go = new Float64Array(6), turned = [0, 0] // (and how long each board has been turning, picked)
@@ -334,7 +332,7 @@ export function draw(k: number) {
   if (spin < 1.5) put('r01-polygon-mirror', [POLY[0], POLY[1], POLY[2] + up], e0, e1, Z0)
   else put('r01-whirl', [POLY[0], POLY[1], POLY[2] + up], X0, U, [0, 1, 0], 1)
   // River's boards: where the assembly has them, KiCad's x and its y down the page turned 135° about the vertical,
-  // top up; out beside R-01 as it comes apart; and picked, stood up before the camera, turning
+  // top up; out beside R-01 as it comes apart; and picked, lifted a little where they are and stood up, turning
   if (far < 1.2) {
     board('laserdriver', [-26.87, 10.24, -98.22 + up], [-26.87 - 200 * S[0] + 20 * T[0], 10.24 - 200 * S[1] + 20 * T[1], -165], kOut, pD, 0, dt, here)
     board('laserbrain', [0, 1.61, -46.71], [-60 * T[0] - 175 * S[0], -60 * T[1] - 175 * S[1], -70], kOut, pB, 1, dt, here)
@@ -392,10 +390,11 @@ export function draw(k: number) {
     }
   }
 
-  // ---- what can be clicked ----
+  // ---- what can be clicked (each as big as it is, so the camera comes to it as near as that) ----
   if (here) {
-    part('screen', at(sc, c), SW * MM)
-    part('r01', at([0, 1.6, -90], c), 90 * MM)
+    part('screen', at(sc, c), (SW + 3) * MM)
+    part('optics', at([0, 1.62, -135 + up], c), 90 * MM)
+    part('r01', at([0, 21.69, -61.82], c), 111 * MM)
   }
 }
 
@@ -414,22 +413,20 @@ function screen(h: number, L: number, o: number[]) {
   for (let i = 0; i < 3; i++) o[i] = sc[i] + x * S[i] + y * U[i]
 }
 
-// A board at rest at assembly point `rest`, out beside R-01 at `out` as it comes apart (k), and picked (p) stood up in
-// the open on the camera's side of R-01, facing the camera and turning slowly about the vertical: both its faces. Its
-// axes: KiCad's x, the board's top, KiCad's y down the page; as assembled, turned 135° about the vertical, top up.
-const RZ = [-Math.SQRT1_2, -Math.SQRT1_2, 0], DOWN = [0, 0, 1], hold = [0, 0, 0], way = [0, 0, 0], BY = [0, 0, 0], BZ = [0, 0, 0], BX = [0, 0, 0]
-const GOAL = [-200 * S[0] - 100 * T[0], -200 * S[1] - 100 * T[1], -170]
+// A board at rest at assembly point `rest`, out beside R-01 at `out` as it comes apart (k), and picked (p) lifted a
+// little higher where it is and stood up, turning slowly about the vertical: both its faces, where the camera comes to
+// see them. Its axes: KiCad's x, the board's top, KiCad's y down the page; as assembled, turned 135° about the
+// vertical, top up.
+const RZ = [-Math.SQRT1_2, -Math.SQRT1_2, 0], DOWN = [0, 0, 1], hold = [0, 0, 0], BY = [0, 0, 0], BZ = [0, 0, 0], BX = [0, 0, 0]
+const FACE = Math.atan2(-S[1], -S[0]), LIFT = 45 // (standing, it first faces the camera's side of R-01)
 function board(id: string, rest: number[], out: number[], k: number, p: number, which: number, dt: number, here: boolean) {
   const m = ctx.models[id]
   if (!m) return
   turned[which] = p > 0.01 ? turned[which] + dt : 0
-  at(GOAL, way)
-  for (let i = 0; i < 3; i++) way[i] = ctx.E[i] - way[i]
-  const a = Math.atan2(dot(way, B), dot(way, A)) + 0.35 * turned[which] // toward the camera, level, and on round
+  const a = FACE + 0.35 * turned[which]
   BY[0] = Math.cos(a), BY[1] = Math.sin(a), BY[2] = 0
   for (let i = 0; i < 3; i++) {
-    hold[i] = rest[i] + (out[i] - rest[i]) * k
-    hold[i] += (GOAL[i] - hold[i]) * p
+    hold[i] = rest[i] + (out[i] - rest[i]) * k - (i === 2 ? LIFT * p : 0)
     BY[i] = U[i] + (BY[i] - U[i]) * p
     BZ[i] = RZ[i] + (DOWN[i] - RZ[i]) * p
   }
@@ -443,23 +440,15 @@ function board(id: string, rest: number[], out: number[], k: number, p: number, 
 
 // ---- the camera ----------------------------------------------------------------------------------------------------------
 // At rest the camera stands behind R-01 and to its left, the light going away from it to the screen; arriving, it starts
-// close on the optics and draws back; when it comes apart, nearer the boards; a board picked, close on it; the screen
-// picked, square to it.
+// close on the optics and draws back; when it comes apart, nearer the boards. (A part picked, the world takes the camera
+// to it.)
 const off = [0, 0, 0], LOOK = [0, 0, 0], OPTICS = [10, 25, ZB], MIDDLE = [(G[0] + SC[0]) / 2, (G[1] + SC[1]) / 2, G[2] + 10]
-export function steer(since: number, picked: string, o: Steer) {
+export function steer(since: number, _picked: string, o: Steer) {
   if (!n[0] && !n[1] && !n[2]) return false // (not drawn yet)
   const [d, pitch, yaw] = PLACES[PLACES.findIndex((P) => P.id === 'lighthouse')].view
   const on = (p: number[]) => {
     at(p, off)
     for (let i = 0; i < 3; i++) o.at[i] = off[i] - n[i] * 1.01
-  }
-  if (picked === 'laserbrain' || picked === 'laserdriver') {
-    on(GOAL)
-    return (o.d = picked === 'laserbrain' ? 0.24 : 0.15), (o.pitch = 0.15), (o.yaw = yaw - 0.3), true
-  }
-  if (picked === 'screen') {
-    on(sc) // (from R-01's side of it, clear of R-01 and of what came out of it)
-    return (o.d = 0.27), (o.pitch = 0.12), (o.yaw = TURN + Math.PI - 0.55), true
   }
   if (since > APART) {
     on([-90 * S[0], -90 * S[1], -150])
@@ -485,6 +474,7 @@ export const about: Record<string, About> = {
     does: 'The MangoPi’s hat, with Amy: every rail from one 15 V jack (−5 V for the galvo, 3.5, 6 and 9 V for the lasers, 12 and 24 V for the polygon), the galvo’s SPI DAC made differential, the polygon’s clock lifted to 5 V, the facet sensor, and the cable to the laser driver.',
     board: 'laserbrain',
   },
+  optics: { name: 'The optics', does: 'Three lasers; two dichroic mirrors join green and then blue to red; the polygon, four facets on a printer’s motor, sweeps each line while an IR sensor sees each facet go by; the galvo steps the lines.' },
   screen: { name: 'The frame', does: '320 × 120, odd lines down and even lines back up; click to print the next.' },
   r01: { name: 'R-01', does: 'Three lasers joined by two dichroics, a polygon sweeping each line, a galvo stepping them; click to print the next frame.' },
 }
