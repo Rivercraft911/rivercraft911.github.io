@@ -15,7 +15,8 @@
 // side, two Z boards to each end, five copper spirals in series in each, every axis's set glowing faintly with its
 // current (V/R × duty). A few seconds after we come to rest (or on a click) they lift off their faces along each face's
 // normal, and River's radio test bench floats in beside: a Pico carrying the S-band and UHF LoRa modules. Clicked, a
-// board comes to the camera and turns, to show both faces.
+// board rises out of the satellite toward where it was seen from, holds still there and turns to show both faces, the
+// others going home; the camera comes to it.
 import { TAU, clamp } from '../../acts/scene'
 import { ctx, cross, dot, len, part, solid, unit, type V } from '../ctx'
 import type { About, Steer } from '../places'
@@ -85,8 +86,10 @@ export const NORMAL = cross(orbit(1, RAAN, INC, 0, [0, 0, 0]), orbit(1, RAAN, IN
 // (as baked) y is its top face, z down its page: on a long side its page runs toward −Z, on an end toward ∓Y. The
 // boards' boxes sit 1.3 mm under their mid-planes (the connector beneath). The test bench floats in on the camera's side.
 const SAT = 347.6, MID: V = [6.9, -0.1, 59], SEAT = [[50.4, 52], [50.4, 52], [108.5, 110]], LIFT = [60, 100], UNDER = -1.3
-type Board = { id: string; model: string; size: number; f: number; l: number; q: number[]; k: number; pk: number; th: number }
-const SIDE = ['+X', '−X', '+Y', '−Y', '+Z', '−Z'], board = (id: string, model: string, size: number, f: number, l: number) => ({ id, model, size, f, l, q: [1, 0, 0, 0], k: 0, pk: 0, th: 0 })
+// A board: where it is (k, how far it has lifted), how far it is held (pk) and turned (th); held, where it stands (p0, from
+// the bus) and how it stood as it was picked (q0), and what it turns about.
+type Board = { id: string; model: string; size: number; f: number; l: number; q: number[]; k: number; pk: number; th: number; p0: V; q0: number[]; spin: V }
+const SIDE = ['+X', '−X', '+Y', '−Y', '+Z', '−Z'], board = (id: string, model: string, size: number, f: number, l: number) => ({ id, model, size, f, l, q: [1, 0, 0, 0], k: 0, pk: 0, th: 0, p0: [0, 0, 0], q0: [1, 0, 0, 0], spin: [0, 0, 1] })
 const BOARDS: Board[] = []
 for (let f = 0; f < 6; f++) for (let l = 0; l < 2; l++) BOARDS.push(board(`coil${SIDE[f].replace('−', '-')}${l ? '' : '-inner'}`, f < 4 ? 'coil-xy' : 'coil', f < 4 ? 215.5 : 97.3, f, l))
 BOARDS.push(board('picohat', 'picohat', 83.2, -1, 0))
@@ -100,7 +103,8 @@ for (const B of BOARDS) // (a face's outer board answers for the pair: they are 
   if (B.l && B.f >= 0) ABOUT[B.id] = { name: `Magnetorquer coil board, ${SIDE[B.f]}`, board: B.f < 4 ? 'coil-xy' : 'coil',
     does: `A magnetorquer coil board, ${B.f < 4 ? 'X and Y: 81.5 × 215.5 mm, two to each long side' : 'Z: 97 × 97 mm, two to each end'}, ${COIL}` }
 
-// minimum jerk; a board by its id; and a quaternion from a rotation's columns (and back, rot), blended the short way
+// minimum jerk; a board by its id; a quaternion from a rotation's columns (and back, rot), turned th about a world axis,
+// and blended the short way
 const ease = (s: number) => s * s * s * (10 - 15 * s + 6 * s * s)
 function byId(id: string) {
   for (const B of BOARDS) if (B.id === id) return B
@@ -116,6 +120,12 @@ function quat(a: V, b: V, cc: V, o: number[]) {
   else (s = 2 * Math.sqrt(1 + m[8] - m[0] - m[4])), (o[0] = (m[3] - m[1]) / s), (o[1] = (m[2] + m[6]) / s), (o[2] = (m[5] + m[7]) / s), (o[3] = s / 4)
   return o
 }
+function turned(a: V, th: number, q: number[], o: number[]) {
+  const c = Math.cos(th / 2), s = Math.sin(th / 2), x = a[0] * s, y = a[1] * s, z = a[2] * s, [w0, x0, y0, z0] = q
+  o[0] = c * w0 - x * x0 - y * y0 - z * z0, o[1] = c * x0 + w0 * x + y * z0 - z * y0
+  o[2] = c * y0 + w0 * y + z * x0 - x * z0, o[3] = c * z0 + w0 * z + x * y0 - y * x0
+  return o
+}
 function blend(a: number[], b: number[], k: number) {
   const g = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3] < 0 ? -k : k
   for (let i = 0; i < 4; i++) a[i] = a[i] * (1 - k) + b[i] * g
@@ -123,13 +133,13 @@ function blend(a: number[], b: number[], k: number) {
   for (let i = 0; i < 4; i++) a[i] /= n
 }
 
-// ---- the place: the bus, its boards lifting off, one brought to the camera ---------------------------------------
+// ---- the place: the bus, its boards lifting off, one held up to look at ---------------------------------------
 export const VIEW: [number, number, number] = [0.28, 0.3, 0.55] // the camera's rest: distance, elevation, bearing
-const APART = 3.5, LIFTS = 2.8, PICK = 1.6, ROUND = 0.035, TURN = 0.35 // s at rest, then s to come apart; s to the camera; rad/s
-let go = 0, held = '', shown = 0, near = 9, settled = false, steered = 0 // how far apart (0–1, linear), the board followed
-const cam = { yaw: 0, pitch: VIEW[1], zoom: 1 }, seen = { yaw: 0, pitch: 0, d: 0 } // the camera steered, and as last seen
-const eye: V = [0, 0, 0], e0: V = [0, 0, 0], N1: V = [0, 0, 0], r: V = [0, 0, 0], up: V = [0, 0, 0], v: V = [0, 0, 0]
-const at: V = [0, 0, 0], ax: V = [0, 0, 0], ay: V = [0, 0, 0], az: V = [0, 0, 0], qd = [1, 0, 0, 0], show: V = [0, 0, 0]
+const APART = 3.5, LIFTS = 2.8, PICK = 1.6, ROUND = 0.035, TURN = 0.35, CLEAR = 260 * MM // s; s; s; rad/s; rad/s; radii
+let go = 0, held = '', shown = 0, near = 9, settled = false, steered = 0, looked = false, bear = 0 // how far apart (0–1)
+const cam = { yaw: 0, pitch: VIEW[1], zoom: 1 }, seen = { yaw: 0, pitch: 0, d: 0 }, before = { ...seen } // the camera steered; as last seen; as a board was picked
+const n0: V = [0, 0, 0], e0: V = [0, 0, 0], N1: V = [0, 0, 0], eye: V = [0, 0, 0], rt: V = [0, 0, 0], up: V = [0, 0, 0], v: V = [0, 0, 0]
+const at: V = [0, 0, 0], ax: V = [0, 0, 0], ay: V = [0, 0, 0], az: V = [0, 0, 0], qd = [1, 0, 0, 0]
 
 export function draw(k: number) {
   const dt = ctx.dt, here = ctx.focus === k, rest = here && ctx.since >= 0, u0 = u
@@ -146,35 +156,33 @@ export function draw(k: number) {
   solid('samwise', at, X, Z, az, SAT * MM)
   near = Math.hypot(c[0] - ctx.E[0], c[1] - ctx.E[1], c[2] - ctx.E[2])
   if (near > 0.8) return
-  if (rest && go === 0) part('samwise', c, 0.05)
+  if (rest && go === 0) part('samwise', at, (SAT * MM) / 2)
 
   // apart: after a while at rest, or once anything is clicked; back together as we leave
   go = clamp(go + (dt / LIFTS) * (rest && (ctx.since > APART || ctx.picked) ? 1 : -1))
-  cam.yaw += ROUND * dt * (1 - 0.6 * ease(go)) * (1 - shown)
-  // the camera's side of the bus, as planet.ts's restAt has it in the orbit's frame, and its right and up; and where
-  // the camera was last seen, in the same terms
-  unit(where(r))
-  const h = dot(NORMAL, r), cp = Math.cos(cam.pitch), sp = Math.sin(cam.pitch), sy = Math.sin(VIEW[2] + cam.yaw), cy = Math.cos(VIEW[2] + cam.yaw)
-  for (let i = 0; i < 3; i++) e0[i] = NORMAL[i] - r[i] * h
-  unit(e0), cross(r, e0, N1)
-  for (let i = 0; i < 3; i++) (v[i] = ctx.E[i] - c[i] - show[i] * shown), (eye[i] = cp * (sy * e0[i] + cy * N1[i]) + sp * r[i])
-  seen.d = len(v), seen.pitch = Math.asin(clamp(dot(v, r) / seen.d, -1, 1)), seen.yaw = Math.atan2(dot(v, e0), dot(v, N1)) - VIEW[2]
-  for (let i = 0; i < 3; i++) up[i] = ctx.p[8 + i]
-  cross(up, eye, r), unit(r), cross(eye, r, up)
-  // the board the camera follows: the one picked, or the one going back
+  // the orbit's frame at the bus (planet.ts's restAt), where the camera was last seen in it, and the side of the bus the
+  // camera was on as it opened (the test bench comes in there, and stays)
+  unit(where(n0))
+  const h = dot(NORMAL, n0)
+  for (let i = 0; i < 3; i++) (e0[i] = NORMAL[i] - n0[i] * h), (v[i] = ctx.E[i] - c[i])
+  unit(e0), cross(n0, e0, N1)
+  seen.d = len(v), seen.pitch = Math.asin(clamp(dot(v, n0) / seen.d, -1, 1)), seen.yaw = Math.atan2(dot(v, e0), dot(v, N1)) - VIEW[2]
+  if (go === 0) bear = VIEW[2] + cam.yaw
+  const cp = Math.cos(VIEW[1]), sp = Math.sin(VIEW[1]), sy = Math.sin(bear), cy = Math.cos(bear)
+  for (let i = 0; i < 3; i++) (eye[i] = cp * (sy * e0[i] + cy * N1[i]) + sp * n0[i]), (up[i] = n0[i])
+  cross(up, eye, rt), unit(rt), cross(eye, rt, up)
+  // the board held, or going back
+  if (ctx.picked && rest && !looked) (looked = true), Object.assign(before, seen)
   if (byId(ctx.picked)) held = ctx.picked
   const H = byId(held)
   shown = H ? ease(H.pk) : 0
-  for (let i = 0; i < 3; i++) show[i] = eye[i] * 0.08 // where a board is shown: toward the camera from the bus, radii
 
   for (let j = 0; j < BOARDS.length; j++) {
-    const B = BOARDS[j]
-    // how far it has lifted (staggered round the faces; the rest back home while one is shown), and how far it has come
-    // to the camera, turning (face on as it arrives)
+    const B = BOARDS[j], mine = ctx.picked === B.id, start = mine && !B.pk
+    // how far it has lifted (staggered round the faces; the rest go home while one is held), and how far it is held
     B.k = ease(clamp(1.5 * go - (0.5 * j) / BOARDS.length)) * (B.id === held ? 1 : 1 - shown)
-    B.pk = clamp(B.pk + (dt / PICK) * (ctx.picked === B.id ? 1 : -1))
-    B.th = B.pk > 0 ? B.th + TURN * dt : -TURN * PICK
-    if (B.k <= 0 && B.f < 0) continue
+    B.pk = clamp(B.pk + (dt / PICK) * (mine ? 1 : -1))
+    if (B.k <= 0 && B.f < 0 && !B.pk) continue
     if (B.f >= 0) {
       // on its face, or off it along the normal, in the body's frame
       const i = B.f >> 1, g = B.f & 1 ? -1 : 1, d = g * (SEAT[i][B.l] + LIFT[B.l] * B.k), n = AX[i]
@@ -185,37 +193,47 @@ export function draw(k: number) {
       if (i < 2) cross(ay, az, ax)
       else cross(ax, ay, az)
     } else {
-      // the test bench: in from the camera's left, below the bus and nearer, bobbing
+      // the test bench: in from the left of the bus as the camera saw it open, below it and nearer, bobbing
       for (let m = 0; m < 3; m++) {
-        at[m] = c[m] + MM * (-r[m] * (115 + 260 * (1 - B.k)) - 100 * up[m] + eye[m] * (170 + 12 * Math.sin(0.4 * ctx.t)))
+        at[m] = c[m] + MM * (-rt[m] * (115 + 260 * (1 - B.k)) - 100 * up[m] + eye[m] * (170 + 12 * Math.sin(0.4 * ctx.t)))
         ay[m] = eye[m] * 0.94 + up[m] * 0.34, az[m] = -up[m]
       }
       unit(ay), cross(ay, az, ax), unit(ax), cross(ax, ay, az)
     }
     quat(ax, ay, az, B.q)
+    // held: risen toward where it was picked from until it stands clear of the satellite's arrays (260 mm out from the
+    // bus toward the eye, or as it was if nearer), and still there in the world, the bus turning on under it, the board
+    // turning about its own length
+    if (start) {
+      for (let m = 0; m < 3; m++) (B.p0[m] = at[m] - c[m]), (B.spin[m] = az[m]), (v[m] = ctx.E[m] - at[m])
+      unit(v)
+      const out = Math.max(0, CLEAR - dot(B.p0, v))
+      for (let m = 0; m < 3; m++) B.p0[m] += out * v[m]
+      for (let m = 0; m < 4; m++) B.q0[m] = B.q[m]
+    }
     const pk = ease(B.pk)
+    B.th = pk > 0 ? B.th + TURN * dt * pk : 0
     if (pk > 0) {
-      // shown: in front of the bus, upright, turning about the camera's up to show both faces
-      const ct = Math.cos(B.th), st = Math.sin(B.th)
-      for (let m = 0; m < 3; m++) (ay[m] = ct * eye[m] + st * r[m]), (az[m] = -up[m]), (at[m] += (c[m] + show[m] - at[m]) * pk)
-      cross(ay, az, ax)
-      blend(B.q, quat(ax, ay, az, qd), pk)
+      blend(B.q, turned(B.spin, B.th, B.q0, qd), pk)
+      for (let m = 0; m < 3; m++) at[m] += (c[m] + B.p0[m] - at[m]) * pk
     }
     rot(B.q, ax, ay, az)
     const s = B.size * MM, lit = B.f >= 0 ? Math.abs(duty[B.f >> 1]) : 0
     solid(B.model, at, ax, ay, az, s, 1, 0.04 + 0.6 * lit)
-    if (rest && B.k > 0.6 && B.id in ABOUT) part(B.id, at, 0.45 * s)
+    if (rest && (B.k > 0.6 || mine) && B.id in ABOUT) part(B.id, at, s / 2)
   }
 }
 
-// While it rests here: round the bus, slowly; back a little as it comes apart; in to a board brought to the camera.
-// Taken back after the visitor has had it (a gap in being asked), from wherever they left it.
+// While it rests here: round the bus, slowly; back a little as it comes apart. (Not asked while the visitor holds the
+// camera or a board: it carries on from wherever they left it, or, after a board, from where it was picked.)
 export function steer(_since: number, _picked: string, o: Steer) {
-  const now = performance.now(), H = byId(held), d = VIEW[0] * (1 + 0.35 * ease(go)) * (1 - shown) + (H ? 2.2 * H.size * MM : 0) * shown
-  if (now - steered > 250) (cam.yaw = seen.yaw + TAU * Math.round((cam.yaw - seen.yaw) / TAU)), (cam.pitch = seen.pitch), (cam.zoom = seen.d / d)
-  steered = now
+  const now = performance.now(), d = VIEW[0] * (1 + 0.35 * ease(go))
+  const was = looked ? before : seen // (where the camera goes back to, let go of a board: as it was when it was picked)
+  if (now - steered > 250) (cam.yaw = was.yaw + TAU * Math.round((cam.yaw - was.yaw) / TAU)), (cam.pitch = was.pitch), (cam.zoom = was.d / d)
+  steered = now, looked = false
+  cam.yaw += ROUND * ctx.dt * (1 - 0.6 * ease(go))
   o.d = d * cam.zoom, o.pitch = cam.pitch, o.yaw = VIEW[2] + cam.yaw
-  for (let i = 0; i < 3; i++) o.at[i] = show[i] * shown
+  o.at[0] = o.at[1] = o.at[2] = 0
   return near < 0.8
 }
 
