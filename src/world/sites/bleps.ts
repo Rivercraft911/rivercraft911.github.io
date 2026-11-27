@@ -5,8 +5,8 @@
 // Inside it, River's work, from River's own CAD: the TT&C board (Yapling), the payload board with its Jetson Orin NX,
 // the cameras on it (the main camera, a FRAMOS IMX676C behind a 16 mm f/1.9, looking down through the deck; the 360
 // pair, IMX676Cs behind fisheyes back to back, one through the deck, one through the rear face), the star tracker
-// (a FRAMOS IMX900M behind an Edmund 16 mm f/1.8) up through the rear face under its baffle, and Finertia, the wheels'
-// motor-control board.
+// (a FRAMOS IMX900M behind an Edmund 16 mm f/1.8) up through the rear face under its baffle, and the three reaction
+// wheels, each a FAULHABER 2610 (FAULHABER's own model, whole) with Finertia, River's motor-control board, on its back.
 //
 // The pointing. It looks straight down, and as one of River's places comes within reach (60° off nadir) it turns to
 // hold it in the main camera, and lets it go behind. The orbit runs 547× life from afar, as SAMWISE's does, and slows
@@ -14,7 +14,8 @@
 // 155.7 km square.
 // Apart. A few seconds after the camera comes to rest (or on a click) the sides slide off with their wings, the rear
 // face rises with its dipole and the deck drops, and River's work comes out of the frame into an exploded view across
-// the camera's view, each piece where it can be clicked: clicked, it comes to the camera and turns, to show both faces.
+// the camera's view, the three reaction wheels first and to the front, each piece where it can be clicked: clicked,
+// the camera goes to it (planet.ts), and it lifts a little and turns, to show both faces.
 import { clamp } from '../../acts/scene'
 import { PLACES } from '../places'
 import { ctx, cross, dot, frame, part, site, solid, unit, type V } from '../ctx'
@@ -76,37 +77,45 @@ export function draw(k: number) {
 // which of the bus's axes its own x, y, z lie along (1 x, 2 y, 3 z, signed); where it goes apart, mm, along the camera's
 // right, up and toward it as it rests here (the 1U's own pieces: along the bus's axes); and how far into coming apart
 // it sets off. The 1U's pieces are baked in the bus's frame already. A card lies across the long axis, its parts
-// toward +z; a camera's lens is its model's −y.
-type Piece = { id: string; model: string; at: V; ax: number[]; out: V; from: number; body: boolean; k: number; pk: number; th: number; q: number[] }
-const CARD = [1, 3, -2], UP = [1, 2, 3], SKY = [1, -2, -3] // (a lens down, or up)
-const piece = (id: string, model: string, at: V, ax: number[], out: V, from: number, body = false): Piece => ({ id, model, at, ax, out, from, body, k: 0, pk: 0, th: 0, q: [1, 0, 0, 0] })
+// toward +z; a camera's lens is its model's −y. A wheel is a FAULHABER 2610 (its shaft its model's +y) with Finertia
+// on its back, 3.2 mm off the housing, its parts facing out: one on each of the bus's axes. The wheels come out first,
+// to the front.
+type Piece = { id: string; model: string; at: V; ax: number[]; out: V; from: number; body: boolean; k: number; pk: number; th: number }
+const CARD = [1, 3, -2], UP = [1, 2, 3], SKY = [1, -2, -3], ALONG = [2, 1, -3] // (a lens down, or up; a shaft along x)
+const piece = (id: string, model: string, at: V, ax: number[], out: V, from: number, body = false): Piece => ({ id, model, at, ax, out, from, body, k: 0, pk: 0, th: 0 })
 const PIECES: Piece[] = [
   piece('bleps', 'bleps-frame', [0, 0, 0], UP, [0, 0, 0], 0, true),
   piece('deck', 'bleps-deck', [0, 0, 0], UP, [0, -55, 0], 0.05, true),
   piece('rear', 'bleps-rear', [0, 0, 0], UP, [0, 75, 0], 0, true),
-  piece('side+x', 'bleps-side-px', [0, 0, 0], UP, [75, 0, 0], 0, true),
+  piece('side+x', 'bleps-side-px', [0, 0, 0], UP, [140, -110, 0], 0, true), // (the two the camera looks past go out and down)
   piece('side-x', 'bleps-side-nx', [0, 0, 0], UP, [-75, 0, 0], 0.03, true),
-  piece('end+z', 'bleps-end-pz', [0, 0, 0], UP, [0, 0, 75], 0.06, true),
+  piece('end+z', 'bleps-end-pz', [0, 0, 0], UP, [0, -110, 140], 0.06, true),
   piece('end-z', 'bleps-end-nz', [0, 0, 0], UP, [0, 0, -75], 0.09, true),
-  piece('payload-carrier', 'payload-carrier', [0, 0, 8], CARD, [-130, 5, 15], 0.35),
-  piece('yapling', 'yapling', [0, 0, -42], CARD, [130, 15, 15], 0.4),
-  piece('finertia', 'finertia', [-22, 22, -24], CARD, [105, -95, 25], 0.45),
-  piece('cam-main', 'cam-main', [23, -40.5, -22], UP, [-55, -115, 35], 0.4),
-  piece('cam-360', 'cam-360', [35, -43.6, 40], UP, [10, -125, 35], 0.45),
+  piece('finertia', 'faulhaber-2610', [-28, 18, -26], ALONG, [-42, -8, 190], 0.2),
+  piece('finertia-y', 'faulhaber-2610', [-26, -16, 26], UP, [0, 4, 205], 0.25),
+  piece('finertia-z', 'faulhaber-2610', [26, 16, -26], CARD, [42, -8, 190], 0.3),
+  piece('payload-carrier', 'payload-carrier', [0, 0, 8], CARD, [-135, 10, 10], 0.4),
+  piece('yapling', 'yapling', [0, 0, -42], CARD, [135, 18, 10], 0.45),
+  piece('cam-main', 'cam-main', [23, -40.5, -22], UP, [-115, -150, 30], 0.45),
+  piece('cam-360', 'cam-360', [35, -43.6, 40], UP, [115, -150, 30], 0.5),
   piece('cam-360-up', 'cam-360', [-35, 43.6, 40], SKY, [-80, 110, 25], 0.5),
-  piece('star-tracker', 'star-tracker', [28, 30, 30], SKY, [35, 105, 30], 0.45),
-  piece('star-baffle', 'star-baffle', [28, 59, 30], SKY, [35, 165, 30], 0.5),
+  piece('star-tracker', 'star-tracker', [28, 30, 30], SKY, [35, 105, 30], 0.5),
+  piece('star-baffle', 'star-baffle', [28, 59, 30], SKY, [35, 165, 30], 0.55),
 ]
 // (the camera's right, up and toward it, in the bus's frame, as it rests here: from VIEW's bearing)
 {
   const yw = 0.75, R = [Math.cos(yw), 0, -Math.sin(yw)], T = [Math.sin(yw), 0, Math.cos(yw)]
   for (const P of PIECES) if (!P.body) P.out = [0, 1, 2].map((i) => P.out[0] * R[i] + P.out[1] * (i === 1 ? 1 : 0) + P.out[2] * T[i])
 }
+const FRONT = [0, 1, 2].map((i) => PIECES.filter((P) => P.model === 'faulhaber-2610').reduce((a, P) => a + P.out[i] / 3, 0)) // the wheels' middle, apart
+const WHEEL = (axis: string) => ({ name: `Reaction wheel, ${axis}: Finertia on its motor`, board: 'finertia', does: `River’s FOC motor-control board on the back of a FAULHABER 2610, whose rotor is the wheel, turning the satellite about its ${axis} axis: an RP2350A on CAN commutates the motor through its bridge from the motor’s own Hall sensors. To slew the 0.00496 kg·m² axis at 1°/s the wheel takes up 86.6 µN·m·s, 1 047 rpm. Finertia is 26 × 26 mm, 6 layers.` })
 export const about: Record<string, About> = {
   bleps: { name: 'BLEPS', does: 'Stanford SSI’s next satellite, a 1U CubeSat, 10 × 10 × 11.35 cm, as River’s optical simulator builds it: four wings of cells, the deck with its patch antenna, the 433 MHz tape dipole.' },
+  finertia: WHEEL('x'),
+  'finertia-y': WHEEL('y'),
+  'finertia-z': WHEEL('z'),
   yapling: { name: 'Yapling, the TT&C board', board: 'yapling', does: 'The satellite’s whole radio, River’s main work on BLEPS: an ESP32-S3 makes the S-band DVB-S2 downlink (esp-dvbs2) through a GRF5526 PA, a 433 MHz LoRa module is the UHF link, and an RP2350B runs it, booting from MRAM. 80 × 80 mm, 4 layers.' },
   'payload-carrier': { name: 'Payload board', board: 'payload-carrier', does: 'River’s 80 × 80 mm carrier for a Jetson Orin NX, which runs the cameras: four I-PEX micro-coax links come in from them, and two more run down the backplane.' },
-  finertia: { name: 'Finertia', board: 'finertia', does: 'The FOC motor-control board for the reaction wheels, on the motor’s 26 mm flange: an RP2350A on CAN commutates a Faulhaber 2610 through a DRV8311P bridge, its phase currents Kelvin-sensed. 26 × 26 mm, 6 layers.' },
   'cam-main': { name: 'Main camera', does: 'Looks straight down at the Earth: a FRAMOS IMX676C, 3552 × 3552 colour at 2 µm, behind a Commonlands CIL160, 16 mm f/1.9, on an MC50A micro-coax adapter. About 13 g.' },
   'cam-360': { name: '360 camera, down', does: 'One of a pair back to back, an IMX676C behind a Commonlands CIL220 fisheye that sees a 215° cone; with its twin on the far face, the whole sphere round the satellite. About 12 g.' },
   'cam-360-up': { name: '360 camera, up', does: 'The other of the pair, looking away from the Earth through the rear face: an IMX676C behind a CIL220 fisheye, a 215° cone. About 12 g.' },
@@ -116,91 +125,65 @@ export const about: Record<string, About> = {
 
 const ease = (s: number) => s * s * s * (10 - 15 * s + 6 * s * s)
 const AXES = [X, Y, Z], ax: V = [0, 0, 0], ay: V = [0, 0, 0], az: V = [0, 0, 0], at: V = [0, 0, 0], col = [ax, ay, az]
-const eye: V = [0, 0, 0], e0: V = [0, 0, 0], N1: V = [0, 0, 0], rr: V = [0, 0, 0], up: V = [0, 0, 0], qd = [1, 0, 0, 0]
-const APART = 4, SPREAD = 3.2, PICK = 1.6, TURN = 0.35, SHOW = 150 // s at rest, then s to come apart; s to the camera; rad/s; mm toward it
+const bx: V = [0, 0, 0], by: V = [0, 0, 0], bz: V = [0, 0, 0], bc: V = [0, 0, 0], o: V = [0, 0, 0]
+const APART = 4, SPREAD = 3.2, PICK = 1.2, TURN = 0.35, LIFT = 18, BACK = 13.67 // s at rest, then s to come apart; s to lift out; rad/s; mm; Finertia's middle behind its motor's
 export const VIEW: [number, number, number] = [0.2, 0.42, 0.75] // the camera's rest: distance, elevation, bearing
-let go = 0, held = '', shown = 0, near = 9
-const byId = (id: string) => PIECES.find((P) => P.id === id)
+let go = 0, near = 9
+// v turned th about the bus's y (through nothing: a direction)
+function spin(v: V, th: number) {
+  const c = Math.cos(th), s = Math.sin(th), d = dot(Y, v)
+  cross(Y, v, o)
+  for (let i = 0; i < 3; i++) v[i] = v[i] * c + o[i] * s + Y[i] * d * (1 - c)
+}
 function pieces(k: number) {
   const dt = ctx.dt, rest = ctx.focus === k && ctx.since >= 0
   near = Math.hypot(B[0] - ctx.E[0], B[1] - ctx.E[1], B[2] - ctx.E[2])
+  if (near > 0.8) go = 0
   // apart: after a while at rest, or once anything is clicked; back together as we leave
   go = clamp(go + (dt / SPREAD) * (rest && (ctx.since > APART || ctx.picked) ? 1 : -1))
-  if (rest && go === 0) part('bleps', B, 0.04)
-  // the camera's way from the bus as it rests here (planet.ts's restAt, in the orbit's frame), its right and up
-  unit(where(rr))
-  const h = dot(NORMAL, rr), cp = Math.cos(VIEW[1]), sp = Math.sin(VIEW[1])
-  for (let i = 0; i < 3; i++) e0[i] = NORMAL[i] - rr[i] * h
-  unit(e0), cross(rr, e0, N1)
-  for (let i = 0; i < 3; i++) (eye[i] = cp * (Math.sin(VIEW[2]) * e0[i] + Math.cos(VIEW[2]) * N1[i]) + sp * rr[i]), (up[i] = ctx.p[8 + i])
-  cross(up, eye, rr), unit(rr), cross(eye, rr, up)
-  if (byId(ctx.picked)?.body === false) held = ctx.picked // (the bus itself, clicked, only comes apart)
-  const H = byId(held)
-  shown = H ? ease(H.pk) : 0
+  if (near < 0.8) part('bleps', B, 60 * MM)
   for (const P of PIECES) {
-    P.k = ease(clamp((go - P.from) / (1 - P.from))) * (P.id === held ? 1 : 1 - shown) // (the rest close up while one is shown)
+    P.k = ease(clamp((go - P.from) / (1 - P.from)))
+    // picked: lifted a little further out, where it is, and turned slowly about the bus's y to show both faces; let
+    // go, it settles back and turns home the short way
     P.pk = P.body ? 0 : clamp(P.pk + (dt / PICK) * (ctx.picked === P.id ? 1 : -1))
-    P.th = P.pk > 0 ? P.th + TURN * dt : -TURN * PICK
+    if (ctx.picked === P.id) P.th += TURN * dt
+    else P.th -= (P.th - 2 * Math.PI * Math.round(P.th / (2 * Math.PI))) * (1 - Math.exp(-2 * dt))
     const m = ctx.models[P.model]
-    if (!m || (near > 0.8 && !P.body) || (P.k === 0 && P.pk === 0 && CARD === P.ax)) continue // (a card is out of sight inside till it comes out)
-    // in the bus, or out of it, in the bus's frame
+    if (!m || (near > 0.8 && !P.body) || (P.k === 0 && P.pk === 0 && (CARD === P.ax || P.model === 'faulhaber-2610'))) continue // (a card or a wheel is out of sight inside till it comes out)
     for (let i = 0; i < 3; i++) {
       const a = P.ax[i], c = AXES[Math.abs(a) - 1], g = Math.sign(a)
       for (let j = 0; j < 3; j++) col[i][j] = g * c[j]
     }
     const s = 1000 * Math.max(m.hi[0] - m.lo[0], m.hi[1] - m.lo[1], m.hi[2] - m.lo[2]) // mm across its widest
+    const pk = ease(P.pk), lift = (LIFT * pk) / (Math.hypot(P.out[0], P.out[1], P.out[2]) || 1)
     for (let j = 0; j < 3; j++) {
       // (a piece of the 1U is baked where it sits in the bus: its box's middle)
       const o0 = P.body ? 500 * (m.hi[0] + m.lo[0]) : P.at[0], o1 = P.body ? 500 * (m.hi[1] + m.lo[1]) : P.at[1], o2 = P.body ? 500 * (m.hi[2] + m.lo[2]) : P.at[2]
-      at[j] = B[j] + MM * ((o0 + P.out[0] * P.k) * X[j] + (o1 + P.out[1] * P.k) * Y[j] + (o2 + P.out[2] * P.k) * Z[j])
+      const f = P.k + lift
+      at[j] = B[j] + MM * ((o0 + P.out[0] * f) * X[j] + (o1 + P.out[1] * f) * Y[j] + (o2 + P.out[2] * f) * Z[j])
     }
-    const pk = ease(P.pk)
-    if (pk > 0) {
-      // shown: before the bus, toward the camera, turning about the camera's up to show both faces
-      quat(ax, ay, az, P.q)
-      const ct = Math.cos(P.th), st = Math.sin(P.th)
-      for (let j = 0; j < 3; j++) (ay[j] = ct * eye[j] + st * rr[j]), (az[j] = -up[j]), (at[j] += (B[j] + MM * SHOW * eye[j] - at[j]) * pk)
-      cross(ay, az, ax)
-      blend(P.q, quat(ax, ay, az, qd), pk)
-      rot(P.q, ax, ay, az)
+    if (P.th) spin(ax, P.th), spin(ay, P.th), spin(az, P.th)
+    if (P.model !== 'faulhaber-2610') {
+      solid(P.model, at, ax, ay, az, s * MM)
+      if (!P.body && P.k > 0.3) part(P.id, at, 0.5 * s * MM)
+      continue
     }
+    // a wheel: the motor, and Finertia on its back, facing out
     solid(P.model, at, ax, ay, az, s * MM)
-    if (rest && !P.body && P.k > 0.6 && P.id in about) part(P.id, at, 0.45 * s * MM)
+    for (let j = 0; j < 3; j++) (bx[j] = ax[j]), (by[j] = -ay[j]), (bz[j] = -az[j]), (bc[j] = at[j] - BACK * MM * ay[j])
+    solid('finertia', bc, bx, by, bz, 26 * MM)
+    for (let j = 0; j < 3; j++) bc[j] = at[j] - 5 * MM * ay[j]
+    if (P.k > 0.3) part(P.id, bc, 16 * MM)
   }
 }
 
-// a quaternion from a rotation's columns, its columns back, and a blend of two the short way
-const mq = new Array(9)
-function quat(a: V, b: V, c: V, o: number[]) {
-  mq[0] = a[0], mq[1] = b[0], mq[2] = c[0], mq[3] = a[1], mq[4] = b[1], mq[5] = c[1], mq[6] = a[2], mq[7] = b[2], mq[8] = c[2]
-  const m = mq, t = m[0] + m[4] + m[8]
-  let s
-  if (t > 0) (s = 2 * Math.sqrt(1 + t)), (o[0] = s / 4), (o[1] = (m[7] - m[5]) / s), (o[2] = (m[2] - m[6]) / s), (o[3] = (m[3] - m[1]) / s)
-  else if (m[0] > m[4] && m[0] > m[8]) (s = 2 * Math.sqrt(1 + m[0] - m[4] - m[8])), (o[0] = (m[7] - m[5]) / s), (o[1] = s / 4), (o[2] = (m[1] + m[3]) / s), (o[3] = (m[2] + m[6]) / s)
-  else if (m[4] > m[8]) (s = 2 * Math.sqrt(1 + m[4] - m[0] - m[8])), (o[0] = (m[2] - m[6]) / s), (o[1] = (m[1] + m[3]) / s), (o[2] = s / 4), (o[3] = (m[5] + m[7]) / s)
-  else (s = 2 * Math.sqrt(1 + m[8] - m[0] - m[4])), (o[0] = (m[3] - m[1]) / s), (o[1] = (m[2] + m[6]) / s), (o[2] = (m[5] + m[7]) / s), (o[3] = s / 4)
-  return o
-}
-function rot(q: number[], a: V, b: V, c: V) {
-  const [s, x, y, z] = q
-  a[0] = 1 - 2 * (y * y + z * z), a[1] = 2 * (x * y + s * z), a[2] = 2 * (x * z - s * y)
-  b[0] = 2 * (x * y - s * z), b[1] = 1 - 2 * (x * x + z * z), b[2] = 2 * (y * z + s * x)
-  c[0] = 2 * (x * z + s * y), c[1] = 2 * (y * z - s * x), c[2] = 1 - 2 * (x * x + y * y)
-}
-function blend(a: number[], b: number[], k: number) {
-  const g = a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3] < 0 ? -k : k
-  for (let i = 0; i < 4; i++) a[i] = a[i] * (1 - k) + b[i] * g
-  const n = Math.hypot(a[0], a[1], a[2], a[3])
-  for (let i = 0; i < 4; i++) a[i] /= n
-}
-
-// While it rests here: back a little as it comes apart, so the whole exploded view is in the frame; in to a piece
-// brought to the camera, the 1U closed up behind it.
+// While it rests here: as it comes apart, round to the wheels in front, the rest of it about them in the frame. (A part clicked takes the camera to itself: planet.ts.)
 export function steer(_since: number, _picked: string, o: Steer) {
-  const H = byId(held), m = H && ctx.models[H.model], size = m ? 1000 * Math.max(m.hi[0] - m.lo[0], m.hi[1] - m.lo[1], m.hi[2] - m.lo[2]) : 0
-  o.d = VIEW[0] * (1 + 0.45 * ease(go)) * (1 - shown) + 3.2 * size * MM * shown
+  const g = ease(go)
+  o.d = VIEW[0] * (1 + 0.05 * g)
   o.pitch = VIEW[1], o.yaw = VIEW[2]
-  for (let i = 0; i < 3; i++) o.at[i] = MM * SHOW * eye[i] * shown
+  for (let i = 0; i < 3; i++) o.at[i] = 0.85 * g * MM * (FRONT[0] * X[i] + FRONT[1] * Y[i] + FRONT[2] * Z[i])
   return near < 0.8
 }
 

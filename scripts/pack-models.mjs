@@ -105,8 +105,11 @@ function pack(glb) {
 }
 
 const list = JSON.parse(readFileSync(new URL('list.json', DIR), 'utf8'))
+// Models whose makers allow them shared only whole and unaltered (FAULHABER's 2610) are sent as meshed, never packed.
+const WHOLE = new Set(['faulhaber-2610'])
 let before = 0, after = 0
 for (const m of list) {
+  if (WHOLE.has(m.id)) continue
   const f = new URL(m.file, DIR), glb = readFileSync(f)
   let out
   try {

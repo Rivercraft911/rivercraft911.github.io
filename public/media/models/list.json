@@ -2,7 +2,7 @@
  {
   "id": "peep",
   "file": "peep.glb",
-  "bytes": 493912,
+  "bytes": 253696,
   "tris": 15282,
   "bounds": [
    -0.00603,
@@ -20,7 +20,7 @@
  {
   "id": "heart",
   "file": "heart.glb",
-  "bytes": 3821928,
+  "bytes": 1926700,
   "tris": 107014,
   "bounds": [
    -0.04711,
@@ -38,7 +38,7 @@
  {
   "id": "strobe-board",
   "file": "strobe-board.glb",
-  "bytes": 1088328,
+  "bytes": 553008,
   "tris": 34697,
   "bounds": [
    -0.02193,
@@ -56,7 +56,7 @@
  {
   "id": "ephemeris",
   "file": "ephemeris.glb",
-  "bytes": 3906636,
+  "bytes": 1765840,
   "tris": 92241,
   "bounds": [
    -0.0285,
@@ -74,7 +74,7 @@
  {
   "id": "laserbrain",
   "file": "laserbrain.glb",
-  "bytes": 3869636,
+  "bytes": 1949968,
   "tris": 113570,
   "bounds": [
    -0.05,
@@ -92,7 +92,7 @@
  {
   "id": "laserdriver",
   "file": "laserdriver.glb",
-  "bytes": 3904348,
+  "bytes": 1970780,
   "tris": 128901,
   "bounds": [
    -0.025,
@@ -110,7 +110,7 @@
  {
   "id": "coil",
   "file": "coil.glb",
-  "bytes": 570084,
+  "bytes": 291348,
   "tris": 19236,
   "bounds": [
    -0.04849,
@@ -128,7 +128,7 @@
  {
   "id": "pigeon-carrier",
   "file": "pigeon-carrier.glb",
-  "bytes": 3964544,
+  "bytes": 2009908,
   "tris": 110874,
   "bounds": [
    -0.0729,
@@ -146,7 +146,7 @@
  {
   "id": "yapogee-s3",
   "file": "yapogee-s3.glb",
-  "bytes": 3685924,
+  "bytes": 1861444,
   "tris": 109465,
   "bounds": [
    -0.0335,
@@ -164,7 +164,7 @@
  {
   "id": "picohat",
   "file": "picohat.glb",
-  "bytes": 3324600,
+  "bytes": 1688724,
   "tris": 114173,
   "bounds": [
    -0.04173,
@@ -182,7 +182,7 @@
  {
   "id": "strobe-frame",
   "file": "strobe-frame.glb",
-  "bytes": 631232,
+  "bytes": 327772,
   "tris": 26406,
   "bounds": [
    -0.07516,
@@ -200,7 +200,7 @@
  {
   "id": "r01-base",
   "file": "r01-base.glb",
-  "bytes": 2953892,
+  "bytes": 1500000,
   "tris": 92744,
   "bounds": [
    -0.09102,
@@ -218,7 +218,7 @@
  {
   "id": "r01-duct",
   "file": "r01-duct.glb",
-  "bytes": 19108,
+  "bytes": 10532,
   "tris": 600,
   "bounds": [
    -0.08,
@@ -236,7 +236,7 @@
  {
   "id": "r01-deck",
   "file": "r01-deck.glb",
-  "bytes": 1134848,
+  "bytes": 577044,
   "tris": 40028,
   "bounds": [
    -0.09,
@@ -254,7 +254,7 @@
  {
   "id": "r01-lid",
   "file": "r01-lid.glb",
-  "bytes": 296320,
+  "bytes": 151200,
   "tris": 10722,
   "bounds": [
    -0.08841,
@@ -272,7 +272,7 @@
  {
   "id": "r01-galvo-mirror",
   "file": "r01-galvo-mirror.glb",
-  "bytes": 1956,
+  "bytes": 1928,
   "tris": 20,
   "bounds": [
    -0.00606,
@@ -290,7 +290,7 @@
  {
   "id": "r01-polygon-mirror",
   "file": "r01-polygon-mirror.glb",
-  "bytes": 4672,
+  "bytes": 3292,
   "tris": 112,
   "bounds": [
    -0.01004,
@@ -308,7 +308,7 @@
  {
   "id": "pigeon-tube",
   "file": "pigeon-tube.glb",
-  "bytes": 214176,
+  "bytes": 108756,
   "tris": 7104,
   "bounds": [
    -0.0762,
@@ -326,7 +326,7 @@
  {
   "id": "finertia",
   "file": "finertia.glb",
-  "bytes": 3434856,
+  "bytes": 1726996,
   "tris": 111647,
   "bounds": [
    -0.013,
@@ -344,7 +344,7 @@
  {
   "id": "samwise",
   "file": "samwise.glb",
-  "bytes": 2958888,
+  "bytes": 1488464,
   "tris": 74145,
   "bounds": [
    -0.16399,
@@ -362,7 +362,7 @@
  {
   "id": "coil-xy",
   "file": "coil-xy.glb",
-  "bytes": 858336,
+  "bytes": 436428,
   "tris": 28808,
   "bounds": [
    -0.04075,
@@ -380,7 +380,7 @@
  {
   "id": "pigeon-cm5",
   "file": "pigeon-cm5.glb",
-  "bytes": 2591688,
+  "bytes": 1303976,
   "tris": 95374,
   "bounds": [
    -0.0275,
@@ -398,7 +398,7 @@
  {
   "id": "pigeon-camera",
   "file": "pigeon-camera.glb",
-  "bytes": 146896,
+  "bytes": 77632,
   "tris": 4740,
   "bounds": [
    -0.02146,
@@ -416,7 +416,7 @@
  {
   "id": "pigeon-shell",
   "file": "pigeon-shell.glb",
-  "bytes": 153688,
+  "bytes": 77888,
   "tris": 5456,
   "bounds": [
    -0.0381,
@@ -434,7 +434,7 @@
  {
   "id": "yapling",
   "file": "yapling.glb",
-  "bytes": 2977368,
+  "bytes": 1502568,
   "tris": 80857,
   "bounds": [
    -0.03997,
@@ -452,7 +452,7 @@
  {
   "id": "payload-carrier",
   "file": "payload-carrier.glb",
-  "bytes": 2928176,
+  "bytes": 1324428,
   "tris": 66112,
   "bounds": [
    -0.04005,
@@ -470,7 +470,7 @@
  {
   "id": "cam-main",
   "file": "cam-main.glb",
-  "bytes": 608124,
+  "bytes": 309316,
   "tris": 15000,
   "bounds": [
    -0.01348,
@@ -488,7 +488,7 @@
  {
   "id": "cam-360",
   "file": "cam-360.glb",
-  "bytes": 606224,
+  "bytes": 308352,
   "tris": 14998,
   "bounds": [
    -0.01348,
@@ -506,7 +506,7 @@
  {
   "id": "star-tracker",
   "file": "star-tracker.glb",
-  "bytes": 934268,
+  "bytes": 472416,
   "tris": 24999,
   "bounds": [
    -0.01348,
@@ -522,9 +522,27 @@
   "note": "the star tracker: IMX900M, Edmund #33-883 16 mm f/1.8, MC50A"
  },
  {
+  "id": "faulhaber-2610",
+  "file": "faulhaber-2610.glb",
+  "bytes": 57300,
+  "tris": 1858,
+  "bounds": [
+   -0.013,
+   -0.0087,
+   -0.014,
+   0.013,
+   0.0087,
+   0.014
+  ],
+  "up": "y",
+  "materials": 1,
+  "project": "BLEPS",
+  "note": "FAULHABER 2610T012B, the reaction wheels’ motor, from FAULHABER’s STEP, whole and not decimated"
+ },
+ {
   "id": "star-baffle",
   "file": "star-baffle.glb",
-  "bytes": 217344,
+  "bytes": 111812,
   "tris": 8362,
   "bounds": [
    -0.01864,
@@ -542,7 +560,7 @@
  {
   "id": "bleps-frame",
   "file": "bleps-frame.glb",
-  "bytes": 87764,
+  "bytes": 34092,
   "tris": 3600,
   "bounds": [
    -0.05,
@@ -560,7 +578,7 @@
  {
   "id": "bleps-deck",
   "file": "bleps-deck.glb",
-  "bytes": 36268,
+  "bytes": 19160,
   "tris": 764,
   "bounds": [
    -0.0435,
@@ -578,7 +596,7 @@
  {
   "id": "bleps-rear",
   "file": "bleps-rear.glb",
-  "bytes": 26836,
+  "bytes": 16368,
   "tris": 684,
   "bounds": [
    -0.10661,
@@ -596,7 +614,7 @@
  {
   "id": "bleps-side-px",
   "file": "bleps-side-px.glb",
-  "bytes": 88316,
+  "bytes": 37544,
   "tris": 3112,
   "bounds": [
    0.047,
@@ -614,7 +632,7 @@
  {
   "id": "bleps-side-nx",
   "file": "bleps-side-nx.glb",
-  "bytes": 88124,
+  "bytes": 37448,
   "tris": 3112,
   "bounds": [
    -0.151,
@@ -632,7 +650,7 @@
  {
   "id": "bleps-end-pz",
   "file": "bleps-end-pz.glb",
-  "bytes": 88220,
+  "bytes": 37496,
   "tris": 3112,
   "bounds": [
    -0.044,
@@ -650,7 +668,7 @@
  {
   "id": "bleps-end-nz",
   "file": "bleps-end-nz.glb",
-  "bytes": 88412,
+  "bytes": 37588,
   "tris": 3112,
   "bounds": [
    -0.044,

@@ -156,7 +156,7 @@ const NEW: Work[] = [
       { src: `${RAW}cubesat-imaging-sim/main/docs/media/space-over-the-bay.webp`, alt: 'A 1U above San Francisco Bay in the optical simulator, its 433 MHz tape antennas out and a lens’s field of view beyond the bus' },
       { src: `${SSI}Satellite-Avionics/feature/bleps-rotor-controller/project-janus/ADCS/rotor-controller/review/Reaction-Wheel-Controller-assembly.png`, alt: 'Finertia, the reaction wheel controller, on its Faulhaber 2610 motor, rendered from KiCad' },
     ],
-    boards: ['yapling', 'payload-carrier'],
+    boards: ['finertia', 'yapling', 'payload-carrier'],
     links: [
       ['Finertia', 'https://github.com/stanford-ssi/Satellite-Avionics/tree/feature/bleps-rotor-controller/project-janus/ADCS/rotor-controller'],
       ['optical simulator', 'https://rivercraft911.github.io/cubesat-imaging-sim/'],

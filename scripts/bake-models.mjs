@@ -82,6 +82,10 @@ const MODELS = [
   { id: 'cam-main', project: 'BLEPS', note: 'the main camera: IMX676C, CIL160 16 mm f/1.9, MC50A', step: CAM + 'Main Camera Assembly - CIL160.step', budget: { tris: 15e3 } },
   { id: 'cam-360', project: 'BLEPS', note: 'one of the 360 pair: IMX676C, CIL220 fisheye, MC50A', step: CAM + 'CIL220 camera with MC50A.step', budget: { tris: 15e3 } },
   { id: 'star-tracker', project: 'BLEPS', note: 'the star tracker: IMX900M, Edmund #33-883 16 mm f/1.8, MC50A', step: CAM + 'Star Tracker Assembly.step', budget: { tris: 25e3 } },
+  // the reaction wheels' motor, FAULHABER 2610T012B, from FAULHABER's own STEP (River keeps it beside Finertia). FAULHABER
+  // lets its models go only complete and unaltered, so this one is tessellated whole and never decimated (a budget it
+  // cannot reach); the rotor is the wheel, no flywheel on it.
+  { id: 'faulhaber-2610', project: 'BLEPS', note: 'FAULHABER 2610T012B, the reaction wheels’ motor, from FAULHABER’s STEP, whole and not decimated', step: SATS + 'Satellite-Avionics-rotor/project-janus/ADCS/rotor-controller/models/2610T_B.stp', budget: { tris: 1e7, bytes: 1e9 } },
   { id: 'star-baffle', project: 'BLEPS', note: 'the star tracker’s baffle: aluminium, four vanes and an entrance stop', step: DL + 'Star Tracker Baffle/Star Tracker Baffle.step' },
 ]
 const BUDGET = { board: { tris: 150e3, bytes: 4e6 }, mesh: { tris: 150e3, bytes: 3e6 } }
