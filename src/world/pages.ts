@@ -91,10 +91,11 @@ function article(w: Work) {
   const a = el('article', { id: `w-${w.slug}` })
   if (w.proof?.length) a.append(el('div', { class: 'proof' }, ...w.proof.map((m) => figure(m, true))))
   a.append(el('h2', { tabindex: '-1' }, w.title), el('p', { class: 'yr' }, w.years), el('p', { class: 'rem' }, tie(w.remarkable)))
+  // its code, first thing under its name: a repo's own link reads GitHub
+  if (w.links.length) a.append(el('ul', { class: 'links' }, ...w.links.map(([t, u]) => el('li', {}, el('a', out(u), t === 'source' && u.startsWith('https://github.com/') ? 'GitHub' : t)))))
   if (w.boards?.length) a.append(...w.boards.map(face))
   if (w.numbers.length) a.append(el('dl', {}, ...w.numbers.flatMap(([d, v]) => [el('dt', {}, d), el('dd', {}, tie(v))])))
   a.append(...w.body.map((b) => el('p', {}, tie(b))))
-  if (w.links.length) a.append(el('ul', { class: 'links' }, ...w.links.map(([t, u]) => el('li', {}, el('a', out(u), t)))))
   a.append(...w.media.map((m) => figure(m)))
   return a
 }
