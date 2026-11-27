@@ -220,9 +220,8 @@ const NEW: Work[] = [
       'Scripts generated the outline, placed the LEDs and routed the power, and a browser simulator runs the same effects with no hardware at all.',
     ],
     boards: ['heart'],
-    media: [],
+    media: [{ src: `${import.meta.env.BASE_URL}media/rava-heart/demo.mp4`, poster: `${import.meta.env.BASE_URL}media/rava-heart/demo.jpg`, video: true, size: [360, 398], alt: 'Two hearts in River’s hands, beating in sync' }],
     links: [['source', `${GH}rava-heart`], ['simulator', `${GH}rava-heart/tree/main/firmware/simulator`]],
-    todo: ['a short video of two hearts in sync (assets/heart-demo.gif is 9 MB; an mp4 would load fast)'],
   },
   {
     slug: 'ephemeris',
