@@ -13,7 +13,7 @@ import { fft, hann } from '../dsp/fft'
 import { Field } from '../dsp/terrain'
 import { place, sing } from './choir'
 import { VALLEY as DUR, SING } from './clock' // the choirs begin to sing at SING
-import { A0, GF, HF, KEYS as POOL, M, RIM, TAU_RASTER, V as VR, loud, sight, vortex as whirl } from './wrap'
+import { A0, GF, HF, M, RIM, TAU_RASTER, V as VR, join, loud, ride, sight, vortex as whirl } from './wrap'
 import { LOOK } from '../gpu/phosphor'
 import { Board, Say } from './say'
 import { TAU, cam, clamp, glide, hash, lock, mix, smooth, view, type Scene } from './scene'
@@ -252,13 +252,11 @@ let occlude = 1, landK = 1, lp = 0, hl = 0, hr = 0, hl2 = 0, hr2 = 0 // lp: the 
 
 // The flight: one continuous path, eye, target and lens gliding through these without stopping. Straight
 // down on the map the meander drew; a crane up and back as the valley rises; down over the firs to skim the
-// pool turning in its bend, and up and on downstream; low and fast down the river to the lip; over it and
-// round in an arc to face the falls, held there on the plot they have become; then up and over as it pours
-// down into the plunge pool below (wrap.ts).
+// pool turning in its bend, and up and on downstream; low and fast down the river to the lip, where the
+// whirlpool's ride (wrap.ts) carries it on, over and down into the shaft.
 const MAP_FOV = 1.1
 export const RUN = 7 // the run for the lip: from half a second on, the falls' own stretch
-// A key in the shaft's own units (wrap.ts): eye and target across, downstream and up from the drain, M metres to one.
-const deep = (t: number, ...k: number[]) => [t, SX + M * k[1], YP + M * k[2], SZ + M * k[0], SX + M * k[4], YP + M * k[5], SZ + M * k[3], k[6]]
+const JOIN = 7.7 // the lip, where the whirlpool's ride takes the camera over
 const on = (x: number, h: number, dz: number, tx: number, fov: number) => [x, riverY(x) + h, riverZ(x) + dz, tx, riverY(tx), riverZ(tx), fov]
 const KEYS: number[][] = [
   [0, 0, 0, 0, 0, 0, 0, 0], // the map, framed each frame to the screen
@@ -269,18 +267,10 @@ const KEYS: number[][] = [
   [5, ...on(SC - 4, 3.6, -2, SC + 5, 1.05)], // down over the firs, low over the pool
   [6.1, ...on(SC + 11, 7.5, 2.5, 42, 1)], // and up, on downstream
   [RUN, ...on(43, 6.5, 0, 57, 1)],
-  // low and fast to the lip, the mist the shaft breathes rising ahead; over it with the water and down through
-  // the mist, the curtain round us, the far side of it in the moon; falling with it, lower, the moonbow in the
-  // spray at its foot; low over the pool, looking up the well of falling water at the moon in its mouth; and up,
-  // to look down on the pool as it begins to turn (wrap.ts flies on, in the pool's units, as deep() writes them)
-  [7.7, 55.5, YL + 2.6, riverZ(55.5), LIP + 22, YL - 9, ZL, 1.05],
+  // low and fast to the lip, the mist the shaft breathes rising ahead; from the lip on the whirlpool's ride flies us
+  // (wrap.ts), carrying on from this run (the row past the lip only shapes the run's last stretch)
+  [JOIN, 55.5, YL + 2.6, riverZ(55.5), LIP + 22, YL - 9, ZL, 1.05],
   [8.25, LIP - 0.3, YL + 1.3, ZL, LIP + 12, YL - 20, ZL, 1.2],
-  deep(8.85, 0.03, -1.42, 2.2, 0.1, 0.7, 0.7, 1.25),
-  deep(9.55, 0.08, -1.2, 1.55, 0.15, 1.2, 1.0, 1.2),
-  deep(10.4, 0.15, -1.0, 0.95, 0.45, 1.2, 0.3, 1.15),
-  deep(11.3, 0.3, -0.72, 0.42, -0.25, 1.0, 0.5, 1.15),
-  deep(12.2, 0.45, -0.25, 0.22, 0.95, -0.91, 2.04, 1.3),
-  deep(13.2, 0.7, -0.4, 0.75, 0, 0.05, -0.1, 1.15),
 ]
 // Straight down on the stretch the meander drew, framed as it framed it.
 function framed(k: number[]) {
@@ -290,12 +280,19 @@ function framed(k: number[]) {
   k[1] = xc, k[2] = y / n + D, k[3] = zc + 0.05 * D, k[4] = xc, k[5] = y / n, k[6] = zc, k[7] = MAP_FOV
 }
 const eye = { x: 0, y: 0, z: 0 }, cur: number[] = [], fwd = { x: 1, y: 0, z: 0 }
+// The shaft's own units (wrap.ts): across, downstream and up from the drain, M metres to one; and back, into o at i.
+const toPool = (x: number, y: number, z: number, o: number[]) => ((o[0] = (z - SZ) / M), (o[1] = (x - SX) / M), (o[2] = (y - YP) / M))
+const fromPool = (x: number, y: number, z: number, o: number[], i: number) => ((o[i] = SX + M * y), (o[i + 1] = YP + M * z), (o[i + 2] = SZ + M * x))
 function crane(t: number) {
   framed(KEYS[0]), framed(KEYS[1])
   // off the map from rest without a lurch: across the first stretch, time is eased by w(s) = 3s² − 3s³ + s⁴,
   // which sets off with no acceleration and hands over to the next key at the same speed and acceleration
   const a = KEYS[1][0], b = KEYS[2][0], s = clamp((t - a) / (b - a))
-  glide(KEYS, t > a && t < b ? a + (b - a) * s * s * (3 - 3 * s + s * s) : t, cur)
+  if (t < JOIN) glide(KEYS, t > a && t < b ? a + (b - a) * s * s * (3 - 3 * s + s * s) : t, cur)
+  else {
+    const { eye: e, fwd: d, fov } = ride(t - DUR)
+    fromPool(e[0], e[1], e[2], cur, 0), fromPool(e[0] + d[0], e[1] + d[1], e[2] + d[2], cur, 3), (cur[6] = fov)
+  }
   eye.x = cur[0], eye.y = cur[1], eye.z = cur[2]
   cam.aim(cur[0], cur[1], cur[2], cur[3], cur[4], cur[5], cur[6])
   const L = Math.hypot(cur[3] - cur[0], cur[4] - cur[1], cur[5] - cur[2])
@@ -526,14 +523,13 @@ function whitewater(t: number, xc: number) {
     to(ink, false, p3.x, p3.y, p3.k, SPRAY_C, 0), to(ink, true, x1, y1, k1, SPRAY_C, on * smooth(0, 0.1, age) * (1 - age / life) * fog(p3.z)) // born and dying faint
   }
 }
-// The shaft. The river goes over its rim all the way round and falls into it; down there it is night, and
-// moonlit water (wrap.ts, drops.wgsl), placed in the pool's own units. What the pen draws of it is its rim,
+// The shaft. The river goes over its rim all the way round and falls into it; down there it is night, moonlit
+// water, and the pool the soundtrack's waterfall plot (wrap.ts, drops.wgsl), placed in the pool's own units. What the pen draws of it is its rim,
 // heaving with the spectrum going over it now, angle for log-frequency, and the moat's outer bank, until the
 // mist the shaft breathes takes them.
-const toPool = (x: number, y: number, z: number, o: number[]) => ((o[0] = (z - SZ) / M), (o[1] = (x - SX) / M), (o[2] = (y - YP) / M))
 const WE = [0, 0, 0], WT = [0, 0, 0], UP = [0, 0, 1]
-const fromPool = (k: number[]) => deep(k[0] + DUR, ...k.slice(1, 8))
-KEYS.push(...POOL.map(fromPool)) // on down into the pool: the whirlpool's own flight, so it goes on unbroken
+// the run's last moments, in the pool's units, for the ride to carry on from
+join(JOIN - DUR, [2, 1, 0].map((k) => (glide(KEYS, JOIN - k * 1e-3, cur), toPool(cur[0], cur[1], cur[2], WE), toPool(cur[3], cur[4], cur[5], WT), [...WE, ...WT, cur[6]])), 1e-3)
 type Stroke = { a: number; n: number; kind: number; x: number }
 const SV: number[] = [], rims: Stroke[] = []
 const RIMK = 0, BANK = 1
@@ -659,9 +655,14 @@ export const valley: Scene = {
     // its mouth as we run for the lip, its drops fall from then on, fewer while they are far off
     if (t > 1) {
       whirl(T, (f.at ?? 0) + t, f, lit, smooth(6.1, 7.3, t), mix(0.35, 1, smooth(7.5, 8.5, t)), plume, veil)
-      toPool(cur[0], cur[1], cur[2], WE), toPool(cur[3], cur[4], cur[5], WT)
-      WT[0] -= WE[0], WT[1] -= WE[1], WT[2] -= WE[2]
-      sight(WE, WT, UP, cur[6])
+      if (t < JOIN) {
+        toPool(cur[0], cur[1], cur[2], WE), toPool(cur[3], cur[4], cur[5], WT)
+        WT[0] -= WE[0], WT[1] -= WE[1], WT[2] -= WE[2]
+        sight(WE, WT, UP, cur[6])
+      } else {
+        const r = ride(T)
+        sight(r.eye, r.fwd, r.up, r.fov)
+      }
       f.look = lit > 0 ? { tau: mix(LOOK.tau, TAU_RASTER, smooth(7.5, 8.5, t)) } : undefined
     }
     // exposure: the ink is energy per length, so as the valley fills in it would burn brighter and

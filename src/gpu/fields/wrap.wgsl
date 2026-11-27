@@ -8,14 +8,17 @@
 // point), and the mist in it shows it as god rays. Under it all is the soundtrack: each angle round the rim is a
 // frequency (80 Hz to 8 kHz of log-frequency round half of it, mirrored on the other), and the water going over
 // there is as heavy as that band is loud; the foam the pool winds in is the spectrum it fell with; and the
-// moonbow in the spray, each colour at its own angle from the antisolar point, is as bright as its band. At the
-// bottom the drain opens, a throat of water turning down into the dark. Read out as text, the water's light is
-// glyphs: its foam the dense ones, winding in.
+// moonbow in the spray, each colour at its own angle from the antisolar point, is as bright as its band. And the pool
+// is the soundtrack's waterfall plot: the spectrum each parcel of it fell with is a dye in it, frequency its hue and
+// power its light, white water where the falls land, blossoming as it winds in, so rows of time wind in as rings and
+// the choir's partials are its spiral arms. At the bottom the drain opens, a throat of water turning down into the
+// dark. Read out as text, the water's light is glyphs: its foam the dense ones, winding in.
 //
 // p[0..3] camera; p[1].w how far the water has spun up, p[2].w the mist curling over the lip, p[3].w the drain's radius
 // p[4] R, 80 Hz's angle, the lanes' arc, gain     p[5] head row (ring), rows an e-fold in, rows printed, rows the falls take
 // p[6] the landing's foam, reference offset, depth H, core r_c      p[7] winding K, T (s), 80 Hz and 8 kHz's span on the rows
 // p[8] the rim's radius and height, the fall's seconds, the plume   p[9] toward the moon, its light
+// p[10] how far the pool has blossomed into the plot, how far the curtain's foot has
 // p[11] -, -, how far the text has spread (0..1.3), how dark it has all gone (0..1)
 
 const TAU = 6.2831853;
@@ -23,6 +26,9 @@ const DB = 56.0 * 0.33219281; // the rows' range, 56 dB, in doublings of power
 const ROWS = 4096.0;
 const LIG = 420.0; // ligaments round the rim (drops.wgsl)
 const AIR = vec3f(0.0008, 0.0016, 0.0032); // what light there is in the shaft besides the moon's: the sky through its mouth
+// The plot's tilt, as an audio analyser's display has one: 22 dB across the band (3.4 dB an octave), level at 400 Hz,
+// so the soundtrack's falling slope (the roar and the bass under it) does not drown the partials over it.
+const TILT = 0.4;
 
 // A row's level is dB over the floor, in 16 bits as two bytes (filtering is linear, so it filters them
 // apart and they add back exactly); power and back again, with the floor as zero.
@@ -111,19 +117,21 @@ fn lit(P: vec3f) -> f32 {
 }
 
 // The night over the shaft: the moon, its aureole in the air, a sky only just lighter than black, and stars.
-fn sky(r: vec3f) -> vec3f {
+// Mirrored in the water (direct = 0) it has no disk and no stars: the moon's light on the water is its glitter (field's
+// spec), and a star's image on ripples would be a sub-pixel glint, twinkling.
+fn sky(r: vec3f, direct: f32) -> vec3f {
   let L = moon();
   let m = dot(r, L);
   let s = length(cross(r, L)); // the sine of the angle from the moon
   var c = mix(vec3f(0.006, 0.010, 0.018), vec3f(0.0015, 0.0028, 0.0065), sqrt(max(r.z, 0.0)));
   c += moonlight() * (0.012 * pow(max(m, 0.0), 24.0) + 0.06 * exp(-s / 0.02) * step(0.0, m));
   let disk = smoothstep(0.0072, 0.0062, s) * step(0.0, m);
-  c += vec3f(1.0, 0.96, 0.88) * 26.0 * disk * (0.75 + 0.25 * sqrt(max(1.0 - s * s / 0.0000518, 0.0))); // limb-darkened
+  c += vec3f(1.0, 0.96, 0.88) * 26.0 * direct * disk * (0.75 + 0.25 * sqrt(max(1.0 - s * s / 0.0000518, 0.0))); // limb-darkened
   let g = vec2f(atan2(r.x, r.y), asin(clamp(r.z, -1.0, 1.0))) * 70.0;
   let cell = floor(g);
   let h = hash(cell);
   let o = vec2f(hash(cell + 7.7), hash(cell + 3.1));
-  c += vec3f(0.85, 0.9, 1.0) * 1.5 * pow(h, 40.0) * smoothstep(0.18, 0.02, length(g - cell - o)) * step(0.0, r.z);
+  c += vec3f(0.85, 0.9, 1.0) * 1.5 * direct * pow(h, 40.0) * smoothstep(0.18, 0.02, length(g - cell - o)) * step(0.0, r.z);
   return c;
 }
 
@@ -153,8 +161,8 @@ fn rc(z: f32) -> f32 { return u.p[8].x - (u.p[8].x - u.p[4].x) * sqrt(clamp(1.0 
 // One layer of the curtain's jets, s ligaments to a jet: at ligament coordinate l, f through the fall, gone over
 // at tb. Each jet keeps its place round the rim as it falls, its flow swelling and thinning; whole at the lip,
 // where they are one sheet, they part as it falls, and lower down each pinches into beads (Rayleigh–Plateau).
-// How much of the point it covers, how full its flow is, and where across the jet the point is (−1..1).
-fn jets(l: f32, s: f32, f: f32, tb: f32, heavy: f32, fp: f32, seed: f32) -> vec3f {
+// How much of the point it covers, how full its flow is, where across the jet the point is (−1..1), and its width in px.
+fn jets(l: f32, s: f32, f: f32, tb: f32, heavy: f32, fp: f32, seed: f32) -> vec4f {
   let x = l / s;
   let cell = floor(x);
   let n = LIG / s;
@@ -167,7 +175,7 @@ fn jets(l: f32, s: f32, f: f32, tb: f32, heavy: f32, fp: f32, seed: f32) -> vec3
   let c = 0.5 + (h0 - 0.5) * max(1.0 - 2.0 * w, 0.0);
   let d = x - cell - c;
   let aa = 0.6 * fp / s + 0.02;
-  return vec3f(smoothstep(w + aa, w - aa, abs(d)), slow * (0.25 + 1.5 * h0 * h0), clamp(d / max(w, 1e-3), -1.0, 1.0));
+  return vec4f(smoothstep(w + aa, w - aa, abs(d)), slow * (0.25 + 1.5 * h0 * h0), clamp(d / max(w, 1e-3), -1.0, 1.0), 2.0 * w * s / max(fp, 1e-4)); // and how many pixels wide the rope is
 }
 
 // The curtain where a ray crosses it at C: its light, and how much of what is behind it it hides. fp is a pixel's
@@ -192,11 +200,15 @@ fn curtain(C: vec3f, rd: vec3f, fp: f32) -> vec4f {
   let side = vec3f(n.y, -n.x, 0.0);
   let nj = normalize(mix(vec3f(0.0, 0.0, 1.0), n * core + side * j.z, smoothstep(0.0, 0.1, f))); // the rope's own normal; at the lip it curls over
   let sun = lit(C);
-  let glint = pow(max(dot(reflect(rd, nj), L), 0.0), 80.0) * (1.5 + 3.0 * (1.0 - smoothstep(0.0, 0.25, f)));
+  // the moon's glint off the rope, where the rope is wide enough to show it: on a rope narrower than a few pixels its
+  // normal turns across a pixel, and the glint would twinkle; there it is its mean
+  let glint = mix(0.012, pow(max(dot(reflect(rd, nj), L), 0.0), 80.0), smoothstep(1.5, 4.0, j.w)) * (1.5 + 3.0 * (1.0 - smoothstep(0.0, 0.25, f)));
   // over the lip the sheet is glass, and its flow lines catch the moon: the ink's streamlines, in the water's own light
   let lines = pow(1.0 - abs(2.0 * noise(vec2f(l * 3.0, tb * 0.7), vec2f(LIG * 3.0, 65536.0)) - 1.0), 5.0);
   let lip = mix(lines, 0.03, smoothstep(0.1, 0.4, fp * 3.0)) * (1.0 - smoothstep(0.05, 0.45, f)) * 1.2;
-  let col = moonlight() * sun * (white * 0.3 * (0.4 + 0.6 * abs(dot(n, L))) + glint * (0.3 + 0.7 * streak) + lip) + white * AIR * 2.0;
+  // at its foot the white water takes its band's colour: the plot it is about to become
+  let dyed = mix(vec3f(1.0), hue(lane(th)) * 1.4, u.p[10].y * smoothstep(0.5, 1.0, f) * (0.35 + 0.4 * min(heavy, 1.0)));
+  let col = moonlight() * sun * (white * 0.3 * (0.4 + 0.6 * abs(dot(n, L))) * dyed + glint * (0.3 + 0.7 * streak) + lip) + white * AIR * 2.0 * dyed;
   return vec4f(col * cov, cov * (0.08 + 0.9 * min(white, 1.0)));
 }
 
@@ -205,7 +217,7 @@ fn mirrored(P: vec3f, r: vec3f) -> vec3f {
   let HF = u.p[8].y;
   let t1 = shaft(P, r, u.p[8].x);
   let z1 = P.z + r.z * t1;
-  if (z1 > HF) { return sky(r); }
+  if (z1 > HF) { return sky(r, 0.0); }
   let f = sqrt(clamp(1.0 - z1 / HF, 0.0, 1.0));
   let Q = P + r * shaft(P, r, mix(u.p[8].x, u.p[4].x, f)); // where the curtain hangs at that height
   let c = moonlight() * lit(Q) * 0.05 * smoothstep(0.0, 0.5, f) + AIR; // the curtain's mean light: the ripples blur the rest
@@ -221,9 +233,11 @@ fn mist(P: vec3f) -> f32 {
   let r = length(P.xy);
   let z = max(P.z, 0.0);
   let n = noise3(vec3f(P.xy * 2.5, z * 1.8 - u.p[7].y * 0.5));
-  let foot = 1.0 * exp(-z / 0.5) * exp(-pow((r - R) / 0.35, 2.0));
+  let dr = (r - R) / 0.35;
+  let foot = exp(-z / 0.5 - dr * dr);
   let haze = 0.05 * exp(-z / 1.5);
-  let curl = u.p[2].w * 1.2 * exp(-pow((r - RIM + 0.15) / 0.3, 2.0) - pow((P.z - HF) / 0.3, 2.0)); // over the lip, where we go over
+  let cr = vec2f(r - RIM + 0.15, P.z - HF) / 0.3;
+  let curl = u.p[2].w * 1.2 * exp(-dot(cr, cr)); // over the lip, where we go over
   let rise = max(P.z - HF + 0.3, 0.0);
   let plume = u.p[8].w * 0.06 * smoothstep(HF - 0.5, HF, P.z) * exp(-rise / 0.8) * smoothstep(RIM * (1.0 + 0.5 * rise), RIM * (0.3 + 0.5 * rise), r + 0.35 * (n - 0.5));
   return (foot + select(haze, 0.0, P.z > HF) + plume + curl) * (0.2 + 1.6 * n * n) * step(-u.p[6].z * u.p[6].w * u.p[6].w / (r * r + u.p[6].w * u.p[6].w), P.z);
@@ -298,6 +312,15 @@ fn field(q: vec2f) -> vec3f {
     }
     t = clamp(t + dt, 0.0, 60.0);
   }
+  // and Newton's own steps onto it, so the hit is exact to well under a pixel: what is left of the march's last
+  // stride would jitter from pixel to pixel, and every derivative below (the footprint, the normal) with it
+  for (var i = 0; i < 3; i++) {
+    let p = ro + rd * t;
+    let s2 = dot(p.xy, p.xy) + k;
+    let g = p.z + H * k / s2;
+    let dg = rd.z - 2.0 * H * k * dot(p.xy, rd.xy) / (s2 * s2);
+    t -= select(0.0, clamp(g / dg, -0.02, 0.02), abs(dg) > 1e-3 && abs(g) < 0.03);
+  }
   var P = ro + rd * t;
   let d = P.xy;
   let r2 = max(dot(d, d), 1e-12);
@@ -328,18 +351,21 @@ fn field(q: vec2f) -> vec3f {
   let fx = min(max(abs(fa.x), abs(fa.y)) / u.p[4].z * u.p[7].w * size.x, 64.0);
   let fy = min(max(abs(fr.x), abs(fr.y)), 256.0);
 
-  // The rows' power over that footprint, taps dithered per pixel so a few of them read as grain.
-  let ny = i32(clamp(ceil(fy * 0.5), 1.0, 3.0));
-  let nx = i32(clamp(ceil(fx * 0.5), 1.0, 3.0));
+  // The rows' power over that footprint, a tap every three bins or so (each filtered over two), evenly spread. Fewer,
+  // or dithered, and where a pixel spans dozens of bins (down the funnel) or a partial's edge falls in it, one pixel
+  // catches it and the next misses it: the spiral's arms would glitter as it turns.
+  let ny = i32(clamp(ceil(fy / 3.0), 1.0, 6.0));
+  let nx = i32(clamp(ceil(fx / 3.0), 1.0, 8.0));
   var pw = 0.0;
   for (var j = 0; j < ny; j++) {
-    let v = (row + 0.5 + ((f32(j) + e) / f32(ny) - 0.5) * fy) / size.y;
+    let v = (row + 0.5 + ((f32(j) + 0.5) / f32(ny) - 0.5) * fy) / size.y;
     for (var i = 0; i < nx; i++) {
-      pw += power(at(vec2f(u.p[7].z + b * u.p[7].w + ((f32(i) + e) / f32(nx) - 0.5) * fx / size.x, v)));
+      pw += power(at(vec2f(u.p[7].z + b * u.p[7].w + ((f32(i) + 0.5) / f32(nx) - 0.5) * fx / size.x, v)));
     }
   }
   pw /= f32(nx * ny);
-  let lv = select(0.0, level(pw), pool) * smoothstep(-oldest, 60.0 - oldest, rows); // older than the rows hold: clear water
+  let lv0 = select(0.0, level(pw), pool) * smoothstep(-oldest, 60.0 - oldest, rows); // older than the rows hold: clear water
+  let lv = clamp(lv0 + TILT * (b - 0.35) * step(1e-4, lv0), 0.0, 1.0);
 
   // Foam in the water's own coordinates (the angle it landed at, the row it landed with), so it rides the spiral
   // in and winds up with it: lace where the spectrum it fell with is loud, white water churned where the falls
@@ -352,24 +378,29 @@ fn field(q: vec2f) -> vec3f {
   let fil = 1.0 - abs(2.0 * noise(vec2f(w * 512.0 + 30.0 * warp, ring / 90.0), vec2f(512.0, ROWS / 90.0)) - 1.0);
   let fil2 = 1.0 - abs(2.0 * noise(vec2f(w * 1400.0 + 70.0 * warp, ring / 36.0), vec2f(1400.0, ROWS / 36.0)) - 1.0);
   let clump = noise(vec2f(w * 40.0 + 3.0 * warp, ring / 150.0), vec2f(40.0, ROWS / 150.0));
-  let f1 = 1.0 - smoothstep(1.5, 5.0, fine.x + fine.y / 30.0); // each let go where finer than a pixel
-  let f2 = 1.0 - smoothstep(0.6, 2.0, fine.x + fine.y / 12.0);
-  let dens = clamp(1.6 * hot(lv) + 0.9 * clump - 0.35, 0.0, 1.0) * exp(-0.2 * age) * (0.4 + 0.6 * wet);
+  // How many cells of a lattice (n of them round the pool, one every rr rows) a pixel spans: each texture is let go,
+  // to its mean, before its lines get finer than a pixel and would alias, crawling and twinkling as the water turns.
+  // The marbling's wander stretches the filaments' lattices too, by as much as it turns across the pixel.
+  let cpx = vec2f(fine.x / 3402.0, fine.y); // the lanes span half the pool
+  let wf = fwidth(warp);
+  let f1 = 1.0 - smoothstep(0.1, 0.35, max(cpx.x * 512.0 + 30.0 * wf, cpx.y / 90.0));
+  let f2 = 1.0 - smoothstep(0.15, 0.5, max(cpx.x * 1400.0 + 70.0 * wf, cpx.y / 36.0));
+  let dens = clamp(1.6 * hot(lv) + 0.9 * clump - 0.35, 0.0, 1.0) * exp(-(0.2 + 0.8 * u.p[10].x) * age) * (0.4 + 0.6 * wet); // thinning, once it blossoms, so the plot shows through its lace
   let threads = dens * mix(0.3, 0.06 + 1.1 * pow(fil, 6.0), f1) * mix(0.8, 0.4 + 0.9 * fil2 * fil2, f2);
   let boil = noise(vec2f(w * 160.0 + 8.0 * warp, ring / 12.0 - T * 3.0), vec2f(160.0, ROWS / 12.0));
   var froths = 0.6; // bubbles, where the falls land and they are big enough to see
-  let big = 1.0 - smoothstep(0.7, 2.5, fine.x * 0.26 + fine.y / 3.0);
+  let big = 1.0 - smoothstep(0.25, 0.7, max(cpx.x * 900.0 + 40.0 * wf, cpx.y / 3.0));
   if (pool && rho > R - 0.35 && big > 0.0) {
     froths = mix(0.6, smoothstep(0.35, 0.0, bubbles(vec2f(w * 900.0 + 40.0 * warp, ring / 3.0 - T * 4.0), vec2f(900.0, ROWS / 3.0))), big);
   }
   let plunge = smoothstep(R - 0.3, R + 0.02, rho + 0.1 * fil) * smoothstep(0.35, 0.75, boil + 0.3 * fil - 0.6 * smoothstep(R, R - 0.25, rho)) * froths * u.p[6].x * 0.6;
   let foam = clamp(max(threads, plunge), 0.0, 1.0);
-  let ripple = noise(vec2f(w * 1536.0, ring / 6.0 - T * 3.0), vec2f(1536.0, ROWS / 6.0)) * (1.0 - smoothstep(1.0, 6.0, fine.x + fine.y));
+  let ripple = noise(vec2f(w * 1536.0, ring / 6.0 - T * 3.0), vec2f(1536.0, ROWS / 6.0)) * (1.0 - smoothstep(0.15, 0.5, max(cpx.x * 1536.0, cpx.y / 6.0)));
 
   // The surface's normal from the vortex, roughened by the ripples and the foam.
   let gh = 2.0 * H * k / ((r2 + k) * (r2 + k)) * d;
   let n0 = normalize(vec3f(-gh, 1.0));
-  let bump = 0.0014 * (ripple + 1.5 * foam);
+  let bump = 0.0014 * (ripple + 0.6 * foam);
   let bx = dpdx(bump);
   let by = dpdy(bump);
   let s1 = cross(dPy, n0);
@@ -387,24 +418,39 @@ fn field(q: vec2f) -> vec3f {
   }
   let cosi = clamp(dot(-rd, n), 0.0, 1.0);
   let fres = 0.02 + 0.98 * pow(1.0 - cosi, 5.0);
-  let h = normalize(L - rd);
+  let h = normalize(L - rd + vec3f(0.0, 0.0, 1e-5));
   // the glitter: the moon on each facet of the ripples that happens to face it, so a lobe as wide as the ripples
-  // are steep, broken into glints that ride the water and flicker as it moves; their mean where they are finer
-  // than a pixel
-  let a2 = pow(0.13 + 0.05 * wet, 2.0);
+  // are steep, broken into glints that ride the water and flicker as it moves. Each glint is shown only where it
+  // spans a few pixels, its mean where it is finer; and the lobe is widened by how far the normal turns across the
+  // pixel (Kaplanyan and Hoffmann's specular antialiasing), so no lone pixel catches the moon and twinkles.
+  let dnx = dpdx(n);
+  let dny = dpdy(n);
+  let a2 = min(pow(0.13 + 0.05 * wet, 2.0) + min(0.5 * (dot(dnx, dnx) + dot(dny, dny)), 0.18), 1.0);
   let nh = max(dot(n, h), 0.0);
-  let D = a2 / (3.14159 * pow(nh * nh * (a2 - 1.0) + 1.0, 2.0));
-  let glints = mix(0.8, 40.0 * pow(smoothstep(0.7, 0.97, noise(vec2f(w * 2400.0, ring / 1.5 - T * 9.0), vec2f(2400.0, ROWS / 1.5))), 3.0), 1.0 - smoothstep(0.5, 2.0, fine.x * 0.7 + fine.y));
-  let spec = moonlight() * 3.0 * sun * D * glints * (0.02 + 0.98 * pow(1.0 - max(dot(h, -rd), 0.0), 5.0)) * max(dot(n, L), 0.0) / (4.0 * max(cosi, 0.08));
-  let fizz = exp(-pow((rho - R) / 0.22, 2.0)) * (0.5 + boil) + 0.3 * plunge; // the bubbles under the water
+  let dd = nh * nh * (a2 - 1.0) + 1.0;
+  let D = a2 / (3.14159 * dd * dd);
+  let cells = max(cpx.x * 2400.0, cpx.y / 1.5); // a pixel's width in the glints' cells
+  let glints = mix(0.8, 12.0 * pow(smoothstep(0.6, 0.97, noise(vec2f(w * 2400.0, ring / 1.5 - T * 9.0), vec2f(2400.0, ROWS / 1.5))), 2.0), 1.0 - smoothstep(0.08, 0.3, cells));
+  let spec = min(moonlight() * 3.0 * sun * D * glints * (0.02 + 0.98 * pow(1.0 - max(dot(h, -rd), 0.0), 5.0)) * max(dot(n, L), 0.0) / (4.0 * max(cosi, 0.08)), vec3f(3.0));
+  let dz = (rho - R) / 0.22;
+  let fizz = exp(-dz * dz) * (0.5 + boil) + 0.3 * plunge; // the bubbles under the water
   let body = vec3f(0.0, 0.0012, 0.0018) * (0.3 + sun) + vec3f(0.18, 0.5, 0.46) * 0.03 * fizz * (0.2 + 0.8 * sun);
-  let froth = (moonlight() * sun * (0.14 + 0.26 * max(dot(n, L), 0.0)) + AIR * 3.0) * (1.0 + 0.3 * plunge);
-  var c = mix((body * (1.0 - fres) + mirrored(P, reflect(rd, n)) * fres + spec * (1.0 - foam)), froth, foam);
+  // The plot, in the water: the spectrum each parcel fell with is a dye in it, frequency its hue and power its light,
+  // the loudest burning through to white, held most in its foam, which takes the colour it carries. Where the falls
+  // land it is white water; the colour blossoms as it winds in, and the funnel drawing the water together makes it glow
+  // brighter down it, until deep in the eye, where a pixel spans more rows and bins than its taps can tell apart, it
+  // gives way to the throat's own dark rather than glittering.
+  let bloom = u.p[10].x * smoothstep(0.02, 0.45, age) * (1.0 - smoothstep(1.0, 2.5, max(fx / 24.0, fy / 18.0)));
+  let l3 = hot(lv);
+  let dye = (hue(b) * (0.004 + 0.5 * l3) + vec3f(1.0, 0.96, 0.9) * 0.6 * pow(max(lv - 0.8, 0.0) / 0.2, 2.0)) * (1.0 + 1.5 * depth / max(H, 1e-3)) * bloom;
+  let tint = mix(vec3f(1.0), hue(b) * 1.4, bloom * (0.6 + 0.4 * min(l3, 1.0)));
+  let froth = (moonlight() * sun * (0.14 + 0.26 * max(dot(n, L), 0.0)) + AIR * 3.0) * (1.0 + 0.3 * plunge) * tint;
+  var c = mix(((body + dye) * (1.0 - fres) + mirrored(P, reflect(rd, n)) * fres + spec * (1.0 - foam)), froth + dye, foam);
   var text_ = 1.0; // what is read out as text: the water's light, not the curtain's
 
   // Behind: the rock, or the sky through the mouth.
   let W = ro + rd * tw;
-  c = select(select(select(rock(W), sky(rd), ttop <= tw || !mouth), vec3f(0.0), land), c, pool); // the land is the beam's
+  c = select(select(select(rock(W), sky(rd, 1.0), ttop <= tw || !mouth), vec3f(0.0), land), c, pool); // the land is the beam's
   var tEnd = select(min(tw, ttop), t, pool);
   // The curtain in front of it, if the ray goes out through it: where, found by halving.
   let hit = ro + rd * tEnd;
