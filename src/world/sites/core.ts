@@ -114,22 +114,18 @@ function row() {
 // (Never straight down: the camera's up is the planet's, and looking past a page would roll it.)
 const TOP = 1.004, TILT = 0.004
 const WAY = [[0, TOP, 0.22, 1.4], [0.9, 0.84, 0.16, 1.42], [1.5, 0.72, 0.2, 1.3], [3, WF + 0.03, 0.55, 0.56]]
-const END = 3, REST = WAY[3]
-// and where it goes to look at each part: [height, distance, elevation] (the search's: at the wall, across from the eye)
-const VIEWS: Record<string, number[]> = { spiral: [1, 0.11, 1.25], wheels: [WF + 0.1, 0.24, 0.45], sieve: [WF + 0.01, 0.1, 0.35], hunt: [WF - 0.12, 0.3, 0.3] }
+const END = 3
+// Its parts, where they are in the hall (the planet's frame) and how large the camera should take each to be: it comes
+// to 4.5 of these from the part clicked (planet.ts). The wheels' and the wall's are a share of them, so it stays inside.
+const PARTS: [id: string, x: number, y: number, z: number, r: number][] = [['spiral', 0, 1, 0, 0.045], ['wheels', 0, WF + 0.1, 0, 0.075], ['sieve', 0.07, WF + 0.01, 0.1, 0.035], ['hunt', 0, WF, 0.43, 0.07]]
 const g = [0, 0, 0], c3 = [0, 0, 0]
-let h = TOP, yaw = 0, done = false, freed = -9, had = '', lev = 0, was = false, ghost = 0, side = 0
+let h = TOP, lev = 0, was = false, ghost = 0, side = 0
 export const where = (o: number[]) => ((o[0] = 0), (o[1] = h), (o[2] = h * TILT), o)
-export function steer(since: number, picked: string, o: Steer) {
-  const v = VIEWS[picked], s = HELD >= 0 ? HELD : since
+// The way in, and then the camera is the visitor's (while they hold it, or a part, the way in waits: planet.ts).
+export function steer(since: number, _picked: string, o: Steer) {
+  const s = HELD >= 0 ? HELD : since
   o.at[0] = o.at[1] = o.at[2] = 0
-  if (v) {
-    if (picked === 'hunt') (o.at[0] = -0.42 * Math.sin(yaw)), (o.at[2] = 0.42 * Math.cos(yaw))
-    return (o.d = v[1]), (o.pitch = v[2]), (o.yaw = yaw), true
-  }
-  if (!done) return glide(WAY, s, g), (o.d = g[1]), (o.pitch = g[2]), (o.yaw = 0.05 * s), true
-  // a part let go of: back out to where the whole of it is seen, and then the camera is the visitor's
-  return ctx.t - freed < 1.6 && ((o.d = REST[2]), (o.pitch = REST[3]), (o.yaw = yaw), true)
+  return s < END && (glide(WAY, s, g), (o.d = g[1]), (o.pitch = g[2]), (o.yaw = 0.05 * s), true)
 }
 export const about: Record<string, About> = {
   spiral: { name: 'Sacks’ spiral', does: 'Every whole number on one winding line, n at radius √n, so the squares lie along one ray. A bead of light at each prime below 1024: gold if it is 1 more than a multiple of 4 (a sum of two squares), blue if it is 3 more.' },
@@ -156,22 +152,10 @@ export function core(k: number) {
   const f = ctx.f, E = ctx.E, dt = ctx.dt, r = len(E), here = ctx.focus === k
   const s = here && ctx.since >= 0 ? (HELD >= 0 ? HELD : ctx.since) : -1
   if (s < 0) {
-    if (r >= 1) (h = TOP), (yaw = 0), (done = false), (had = '') // away, or on the way here: the well's mouth
+    if (r >= 1) h = TOP // away, or on the way here: the well's mouth
   } else {
-    const v = VIEWS[ctx.picked]
-    if (v || s >= END) done = true
-    if (had && !v) freed = ctx.t
-    had = v ? ctx.picked : ''
-    const goal = v ? v[0] : done ? REST[1] : glide(WAY, s, g)[0]
-    h = done ? h + (goal - h) * (1 - Math.exp(-4 * dt)) : goal
-    // the bearing the camera is on, kept (while it looks at the axis) so looking at a part does not turn it
-    const turn = Math.atan2(E[0], h * TILT - E[2]) - yaw
-    if (had !== 'hunt' && ctx.t - freed > 1.6) yaw += Math.atan2(Math.sin(turn), Math.cos(turn))
-    part('spiral', ((c3[0] = 0), (c3[1] = 1), (c3[2] = 0), c3), 0.045)
-    part('wheels', ((c3[1] = WF + 0.1), c3), 0.1)
-    // (the level on the eye's side of the axis, the wall across from it)
-    part('sieve', ((c3[0] = 0.16 * Math.sin(yaw)), (c3[1] = WF), (c3[2] = -0.16 * Math.cos(yaw)), c3), 0.12)
-    part('hunt', ((c3[0] = -0.44 * Math.sin(yaw)), (c3[1] = WF - 0.1), (c3[2] = 0.44 * Math.cos(yaw)), c3), 0.16)
+    h = glide(WAY, Math.min(s, END), g)[0]
+    for (const [id, x, y, z, R] of PARTS) part(id, ((c3[0] = x), (c3[1] = y), (c3[2] = z), c3), R)
   }
   // This field: under the ground, and over the well's mouth when it is what we have come to. A flight away goes
   // straight out through the rock: the hollow stays in sight as it does, and fades over half a second in the open.
