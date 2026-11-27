@@ -102,6 +102,7 @@ export class Hall {
     }
     this.l = (x[0] - x[1] + x[2] - x[3] + x[4] - x[5] + x[6] - x[7]) * 0.35
     this.r = (x[0] + x[1] - x[2] - x[3] + x[4] + x[5] - x[6] - x[7]) * 0.35
+    if (!(Math.abs(this.l + this.r) < 1e6)) return void (this.clear(), (this.l = this.r = 0)) // gone non-finite: an empty hall
     // the Hadamard mix, in place (a fast Walsh–Hadamard transform), scaled to stay lossless
     for (let h = 1; h < N; h *= 2)
       for (let i = 0; i < N; i += 2 * h)

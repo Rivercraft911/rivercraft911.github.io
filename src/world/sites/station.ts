@@ -64,6 +64,11 @@ function step(u: number, h: number) {
   const [wx, wy, wz] = w, L0 = J[0] * wx + J[1] * wy + J[2] * wz, L1 = J[3] * wx + J[4] * wy + J[5] * wz, L2 = J[6] * wx + J[7] * wy + J[8] * wz
   const g0 = m1 * b[2] - m2 * b[1] - (wy * L2 - wz * L1), g1 = m2 * b[0] - m0 * b[2] - (wz * L0 - wx * L2), g2 = m0 * b[1] - m1 * b[0] - (wx * L1 - wy * L0)
   for (let i = 0; i < 3; i++) w[i] += h * (Ji[3 * i] * g0 + Ji[3 * i + 1] * g1 + Ji[3 * i + 2] * g2) // I ẇ = τ − w × I w
+  // B-dot only ever takes spin away (dE/dt = −k |w × b|²), but an Euler step, w × I w being across w, always adds some,
+  // and in the time-lapse's long steps it grew without end until the bus, its coils and its voice were NaN (and the
+  // planet fell silent): what a step adds is handed back
+  const E = wx * L0 + wy * L1 + wz * L2, E1 = w[0] * (J[0] * w[0] + J[1] * w[1] + J[2] * w[2]) + w[1] * (J[3] * w[0] + J[4] * w[1] + J[5] * w[2]) + w[2] * (J[6] * w[0] + J[7] * w[1] + J[8] * w[2])
+  if (E1 > E) for (let i = 0; i < 3; i++) w[i] *= Math.sqrt(E / E1)
   const [s, x, y, z] = q, k = h / 2
   q[0] -= k * (x * w[0] + y * w[1] + z * w[2]), q[1] += k * (s * w[0] + y * w[2] - z * w[1])
   q[2] += k * (s * w[1] + z * w[0] - x * w[2]), q[3] += k * (s * w[2] + x * w[1] - y * w[0])

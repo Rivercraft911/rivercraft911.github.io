@@ -85,7 +85,7 @@ function tune(t: number, level: number) {
   x += w0, near = clamp(sum)
   // the nearest way round the circle from where it is: voice() glides it there over a second or so
   const want = -Math.atan2(y, x) / (2 * Math.PI)
-  goal = want - Math.round(want - key)
+  if (want === want) goal = want - Math.round(want - key) // (a place somewhere not a number moves nothing)
   const bloom = clamp(0.35 + 0.4 * near + 0.35 * noise(0.019 * t + 11))
   for (let i = 0; i < 2; i++) {
     const P = pads[i]
@@ -259,6 +259,7 @@ function thunder(t: number, o: Stereo) {
   if (env < 1e-5) return
   tb += 0.012 * (Math.random() - 0.5 - tl - 0.7 * tb), tl += 0.012 * tb // a resonance near 90 Hz, broad
   tr += 0.004 * (tl - tr)
+  if (!(Math.abs(tl + tr) < 1e3)) tl = tb = tr = 0 // (a state gone non-finite begins again)
   o.s[2] += THUNDER * env * (tl - 0.5 * tr)
 }
 
@@ -272,6 +273,7 @@ function wind(o: Stereo) {
     const f = c ? 1.13 * pitch : pitch
     ;(wb[c] += f * (Math.random() - 0.5 - wl[c] - 0.5 * wb[c])), (wl[c] += f * wb[c]), (wd[c] += 0.5 * f * (wb[c] - wd[c]))
   }
+  if (!(Math.abs(wd[0] + wd[1]) < 1e3)) wl.fill(0), wb.fill(0), wd.fill(0) // (a state gone non-finite begins again)
   o.l += blow * wd[0], o.r += blow * wd[1]
 }
 
@@ -301,7 +303,8 @@ function voice(t: number, o: Stereo) {
     const tau = t - S.d2 / CS, dt = tau - S.tau
     S.tau = tau
     // what it says, listened to: a peak well over its recent mean is something struck, answered on the next eighth
-    const x = S.speak(tau, dt > 0 && dt < 1e-3 ? dt : sr), ax = Math.abs(x)
+    let x = S.speak(tau, dt > 0 && dt < 1e-3 ? dt : sr), ax = Math.abs(x)
+    if (!(ax < 1e3)) x = ax = 0 // a place whose signal has gone non-finite falls silent, not the planet with it
     ;(s.pk = ax > s.pk ? ax : s.pk * 0.9985), (s.sl += (s.pk - s.sl) * 1e-4)
     if (s.pk > 2 * s.sl + 2e-3 && t > s.quiet) {
       s.quiet = t + 0.3
@@ -330,7 +333,7 @@ function voice(t: number, o: Stereo) {
   bells.sample(bo)
   ;(o.s[0] += lv * (1 - inside) * bo.l), (o.s[1] += lv * (1 - inside) * bo.r)
   if (inside > 1e-3) {
-    const v = 0.7 * inside * core(t, dt0)
+    const v = 0.7 * inside * (core(t, dt0) || 0)
     ;(o.s[0] += 0.5 * v), (o.s[1] += 0.5 * v), (o.s[2] += 0.5 * v)
   }
   thunder(t, o)
@@ -365,6 +368,7 @@ export function sound(level = 1): Voice {
     if (P.where && S.flip > 0) P.where(w, t)
     else site(P.lat, P.lon, w), (w[0] *= 1.01 * S.flip), (w[1] *= 1.01 * S.flip), (w[2] *= 1.01 * S.flip)
     S.dT = Math.hypot(w[0] - E[0], w[1] - E[1], w[2] - E[2])
+    if (S.dT !== S.dT) S.dT = 1e3 // (where it is not a number: far off)
     S.gT = (PLACE * out * (clear(w) ? 1 : 0.25) * (S.k === ctx.focus ? 1 : 0.6)) / (1 + (S.dT / S.reach) ** 4)
     S.rank = S.gT * (holds(S) ? 1.4 : 1)
   }

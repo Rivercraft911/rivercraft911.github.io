@@ -61,8 +61,9 @@ export class Bed {
 
   clear() {
     this.hall.clear()
-    this.lo[0] = this.lo[1] = 0
+    this.lo[0] = this.lo[1] = this.x[0] = this.x[1] = this.y[0] = this.y[1] = this.cl[0] = this.cl[1] = this.env = 0
     this.ch[0].fill(0), this.ch[1].fill(0)
+    ;(this.wet = room.wet), (this.gain = room.gain)
   }
 
   // The ensemble's late copy of side i, d ms back.
@@ -119,6 +120,7 @@ export class Audio {
   private o = stereo()
   private bed = new Bed(48000)
   private peak = 0
+  private threw = false
 
   async start() {
     const ctx = (this.ctx = new AudioContext({ latencyHint: 'interactive' }))
@@ -129,6 +131,12 @@ export class Audio {
       processorOptions: { voices: VOICES - BED },
     })
     this.bed = new Bed(ctx.sampleRate)
+    // a context the browser has suspended or interrupted (a hidden tab, the output device changing) is woken by the next
+    // gesture or return to the page, and plays on from now, not from what queued up while it slept
+    const wake = () => ctx.state !== 'running' && ctx.resume().then(() => (this.t = NaN), () => {})
+    for (const e of ['pointerdown', 'keydown']) addEventListener(e, wake)
+    document.addEventListener('visibilitychange', () => document.hidden || wake())
+    ctx.addEventListener('statechange', wake)
     const lp = new BiquadFilterNode(ctx, { type: 'lowpass', frequency: 16_000 })
     this.gain = new GainNode(ctx, { gain: GAIN })
     this.node.connect(lp, 0).connect(this.gain).connect(ctx.destination)
@@ -151,10 +159,11 @@ export class Audio {
     this.gain?.gain.setTargetAtTime(m ? 0 : GAIN, this.ctx!.currentTime, 0.05)
   }
 
-  // Puts spatial voice i at (x, y, z) around the listener (−z is ahead), gliding to avoid zipper noise.
+  // Puts spatial voice i at (x, y, z) around the listener (−z is ahead), gliding to avoid zipper noise. (Not to a place
+  // that is not a number: the param would throw, and the frame with it.)
   place(i: number, x: number, y: number, z: number) {
     const p = this.pan[i], t = this.ctx?.currentTime ?? 0
-    if (!p) return
+    if (!p || !Number.isFinite(x + y + z)) return
     p.positionX.setTargetAtTime(x, t, 0.03)
     p.positionY.setTargetAtTime(y, t, 0.03)
     p.positionZ.setTargetAtTime(z, t, 0.03)
@@ -162,8 +171,11 @@ export class Audio {
 
   // Renders the voice from where we left off up to `now + AHEAD` in scene time.
   // Without an audio device (a headless ?auto run) it still renders, so what is heard can be seen.
+  // A sample that is not a finite number would poison the graph's filters and panners for good, and the speakers with
+  // them: it is dropped and the bed and the limiter start afresh. A voice that throws is silenced for the frame, never
+  // the frame loop.
   feed(now: number, voice?: Voice) {
-    if (Math.abs(this.t - now) > 0.3) {
+    if (!(Math.abs(this.t - now) <= 0.3)) {
       this.node?.port.postMessage(null)
       this.bed.clear()
       this.t = now
@@ -171,20 +183,29 @@ export class Audio {
     const sr = (heard.sr = this.ctx?.sampleRate ?? 48000), n = Math.min(this.buf.length / C, Math.floor((now + AHEAD - this.t) * sr))
     if (n <= 0) return
     const o = this.o, b = this.buf, h = heard.buf, mask = h.length - 1
-    for (let i = 0; i < n; i++) {
-      o.l = o.r = 0
-      o.s.fill(0)
-      voice?.(this.t + i / sr, o)
-      this.bed.mix(o)
-      // last, a limiter that only the loudest moments ever reach: both sides held under 1 dB below full scale
-      // together, at once, let go over a third of a second
-      const p = Math.max(Math.abs(o.l), Math.abs(o.r))
-      this.peak = p > this.peak ? p : this.peak + (p - this.peak) * (3 / sr)
-      if (this.peak > CEIL) (o.l *= CEIL / this.peak), (o.r *= CEIL / this.peak)
-      const j = i * C
-      let m = (b[j] = o.l) + (b[j + 1] = o.r)
-      for (let v = BED; v < VOICES; v++) m += b[j + 2 + v - BED] = o.s[v]
-      h[heard.n++ & mask] = m
+    let i = 0
+    try {
+      for (; i < n; i++) {
+        o.l = o.r = 0
+        o.s.fill(0)
+        voice?.(this.t + i / sr, o)
+        this.bed.mix(o)
+        // last, a limiter that only the loudest moments ever reach: both sides held under 1 dB below full scale
+        // together, at once, let go over a third of a second
+        const p = Math.max(Math.abs(o.l), Math.abs(o.r))
+        this.peak = p > this.peak ? p : this.peak + (p - this.peak) * (3 / sr)
+        if (this.peak > CEIL) (o.l *= CEIL / this.peak), (o.r *= CEIL / this.peak)
+        let m = o.l + o.r
+        for (let v = BED; v < VOICES; v++) m += o.s[v]
+        if (!(Math.abs(m) < 1e4)) (o.l = o.r = m = this.peak = 0), o.s.fill(0), this.bed.clear()
+        const j = i * C
+        ;(b[j] = o.l), (b[j + 1] = o.r)
+        for (let v = BED; v < VOICES; v++) b[j + 2 + v - BED] = o.s[v]
+        h[heard.n++ & mask] = m
+      }
+    } catch (e) {
+      if (!this.threw) (this.threw = true), console.error(e) // (once: it would be every frame)
+      b.fill(0, i * C, n * C), this.bed.clear()
     }
     this.t += n / sr
     heard.end = this.t

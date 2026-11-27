@@ -162,8 +162,14 @@ export class Shepard {
         r += sv[s + 3] * v1
       }
     }
+    if (!(Math.abs(l + r + m) < 1e6)) return this.heal() // a state gone non-finite: begin again, silent this sample
     o.l += l
     o.r += r
     o.m += m
+  }
+
+  private heal() {
+    for (let i = 0; i < this.ph.length; i++) this.ph[i] = this.rand()
+    this.sph.fill(0), this.ic.fill(0), (this.left = 0)
   }
 }

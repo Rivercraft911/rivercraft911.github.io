@@ -74,6 +74,7 @@ export class Plucks {
       l += this.gl[i] * y
       r += this.gr[i] * y
     }
+    if (!(Math.abs(l + r) < 1e6)) (l = r = 0), this.amp.fill(0), this.ph.fill(0), this.dl.fill(0), this.dr.fill(0), (this.lpl = this.lpr = 0) // gone non-finite: silence, and begin again
     // the echo: left feeds right and right left, each repeat through a one-pole lowpass near 2.5 kHz
     const { dl, dr } = this, n = dl.length, w = this.w, el = dl[w], er = dr[w]
     this.lpl += 0.28 * (er - this.lpl)
