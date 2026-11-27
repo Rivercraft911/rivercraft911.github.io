@@ -16,7 +16,7 @@ import { Path } from '../beam/path'
 import { GX, GY } from '../beam/scope'
 import { Say } from './say'
 import { LEVELS } from './valley' // the fan's members a side: as many as the meander's sheaf has rivers
-import { TAU, clamp, lock, smooth, view, type Scene } from './scene'
+import { TAU, clamp, lock, mix, smooth, view, type Scene } from './scene'
 
 export const DUR = 3.6
 const DEGAUSS = 0.45
@@ -27,9 +27,16 @@ export const CLOSED = 2.405 // J₀'s first zero
 export const SEAT = { r: 0.38, cy: -0.05 } // the wave's height and its axis, in screen units
 const SHARE = [0, 1, 0, -1] // each pass's share of β: the sine, the copy modulated up, the sine, the copy down
 
-// When the copy steps up the harmonics (at the first pass to begin after each), β's swell, and the fan.
-const STEPS = [[1.55, 6], [1.75, 9], [1.95, NC]]
-const carrier = (t: number) => STEPS.reduce((n, [at, c]) => (t >= at ? c : n), CYC)
+// When the copy steps up the harmonics, β's swell, and the fan. Each step is a quick crossfade (BLEND seconds),
+// the copy growing its new cycles out of the old rather than jumping to them; carrier() is where it has got to.
+const STEPS = [[1.55, 6], [1.75, 9], [1.95, NC]], BLEND = 0.12
+const carrier = (t: number) => STEPS.reduce((n, [at, c]) => mix(n, c, smooth(at, at + BLEND, t)), CYC)
+// The copy at u: the carrier it steps from crossfading into the one it steps to.
+function copy(u: number, t: number, b: number) {
+  let n = CYC, was = CYC, m = 1
+  for (const [at, c] of STEPS) if (t >= at) (was = n), (n = c), (m = smooth(at, at + BLEND, t))
+  return m < 1 ? mix(wave(u, was, b), wave(u, n, b), m) : wave(u, n, b)
+}
 export const beta = (t: number) => (t < 2.1 ? 0 : CLOSED * lock([[0, 0], [2.1, 1]], t, 7, 0.55))
 // the second copy is modulated up with the first, then swings through the bare carrier to down, and the fan
 // fills in between them
@@ -48,9 +55,9 @@ export function J0(x: number) {
 // A member of the fan at u ∈ [0, 1] across the screen: the carrier's n cycles, its phase taken by β sin.
 export const wave = (u: number, n: number, b: number) => Math.cos(TAU * n * u + b * Math.sin(TAU * CYC * u))
 
-// The degauss coil's decaying 60 Hz swing: the spot spirals in and the speakers thunk.
+// The degauss coil's decaying 60 Hz swing: the spot spirals in, all the way, and the speakers thunk.
 function degauss(t: number, o: { x: number; y: number }) {
-  const e = 0.75 * Math.exp(-t / 0.16) * (1 - Math.exp(-t / 0.008))
+  const e = 0.75 * Math.exp(-t / 0.16) * (1 - Math.exp(-t / 0.008)) * smooth(DEGAUSS, DEGAUSS - 0.15, t)
   ;(o.x = e * Math.cos(TAU * 60 * t)), (o.y = SEAT.cy + e * Math.sin(TAU * 60 * t))
 }
 
@@ -60,7 +67,7 @@ export function signal(t: number, o: { x: number; y: number; z: number }) {
   o.z = 0
   if (t < DEGAUSS) return degauss(t, o)
   const A = view.a * 0.9, P = PR * t, p = Math.floor(P), f = P - p, u = p & 1 ? 1 - f : f, k = SHARE[p & 3]
-  const y = k ? wave(u, carrier(p / PR), (k > 0 ? 1 : mirror(t)) * beta(t)) : Math.cos(TAU * CYC * u), q = Math.sin(TAU * CYC * PR * t)
+  const y = k ? copy(u, t, (k > 0 ? 1 : mirror(t)) * beta(t)) : Math.cos(TAU * CYC * u), q = Math.sin(TAU * CYC * PR * t)
   const a = swing(t), r = SEAT.r * bloom(t), ca = Math.cos(a), sa = Math.sin(a)
   ;(o.x = r * q * ca + A * (2 * u - 1) * sa), (o.y = SEAT.cy + r * y), (o.z = Math.sin(2 * a) * (0.5 + 0.5 * ((2 * u - 1) * ca - q * sa)))
 }
@@ -108,16 +115,16 @@ export const hook: Scene = {
       : t < STEPS[0][0] ? [['f', 440, 0], ['\\alpha', (swing(t) * 360) / TAU, 0]]
       : [['n', n / CYC, 0], ['f', (n * 440) / CYC, 0], ['\\beta', b, 3], ['J_0(\\beta)', J0(b), 3]])
 
-    // each step up the harmonics flares, as the lace of a harmonic landing did
-    const fresh = STEPS.reduce((m, [at]) => (t >= at ? Math.min(m, t - at) : m), Infinity)
+    // each step up the harmonics glows while the copy grows into it: a swell, not a flash
+    const glow = 0.9 * (1 + STEPS.reduce((g, [at]) => { const m = smooth(at, at + BLEND, t); return g + 1.2 * m * (1 - m) }, 0))
     f.ch.push({
       w: 1,
       fn: (tt, s) => {
         signal(tt, sv)
-        ;(s.x = sv.x), (s.y = sv.y), (s.z = (tt < DEGAUSS ? 1 : 1 - 0.55 * sv.z) * (0.9 + 1.4 * Math.exp(-fresh / 0.06)))
+        ;(s.x = sv.x), (s.y = sv.y), (s.z = (tt < DEGAUSS ? 1 : 1 - 0.55 * sv.z) * glow)
       },
     })
-    if (t > FAN) f.ch.push({ w: 0.6, path: fan(p.clear(), t) })
+    if (t > FAN) f.ch.push({ w: 0.6 * smooth(FAN, FAN + 0.3, t), path: fan(p.clear(), t) }) // its share of the beam comes as it does, so the sine dims as it fills, not at once
     return (tt, o) => sing(tt, o)
   },
 }

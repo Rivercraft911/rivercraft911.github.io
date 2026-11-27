@@ -13,13 +13,12 @@ import { GREEN } from '../beam/beam'
 import { Path } from '../beam/path'
 import { GX, GY, Scope, tune } from '../beam/scope'
 import { CLOSED, CYC, DUR as HOOK, FANNED, J0, NC, PR, SEAT, say, wave } from './hook'
-import { LEVELS, M1, M2, MEANDER as END, PHI, RIVER_EQ, SPRING, W1, W2, contour, glow, map, reach, riverY } from './valley'
+import { CI, LEVELS, M1, M2, MEANDER as END, PHI, RIVER_EQ, SPRING, W1, W2, WIDE, contour, glow, map, reach, riverY, room } from './valley'
 import { TAU, cam, clamp, lock, mix, smooth, view, type Scene } from './scene'
 
 const WATER = [0.5, 0.78, 1] as const, INK = [0.78, 0.88, 1] as const
 const REACH = 90 // metres of river drawn, at most
 const SA = CYC * M1 // what the speakers trace of each: as much as the sweep was
-const CEIL = 0.72 // the equation's room
 const STOP = 2.6 // the second bend joins
 const DRY = 3.75 // the hero comes up to the valley's brightness from here; the contours stay, and the valley takes them on
 
@@ -29,9 +28,10 @@ const DRY = 3.75 // the hero comes up to the valley's brightness from here; the 
 let seat = 0, ox = 0, oy = 0, kh = 0, v = 0, now = 0, set = 0, ring = -9
 const q = { x: 0, y: 0, z: 0 }
 // dx metres downstream of the spring and dz across it, on the screen (−z is up on the map): on a level
-// sheet until the sheaf settles (set) onto the land, which steps down with the river.
-function put(dx: number, dz: number) {
-  cam.project(SPRING + dx, mix(riverY(SPRING), riverY(SPRING + dx), set), dz, q)
+// sheet until the sheaf settles (set) onto the land, which steps down with the river, each line to its own
+// contour's height h above it, where the valley carries it on.
+function put(dx: number, dz: number, h = 0) {
+  cam.project(SPRING + dx, mix(riverY(SPRING), riverY(SPRING + dx) + h, set), dz, q)
   q.x = mix(ox + kh * dx, q.x, seat), q.y = mix(oy - kh * dz, q.y, seat)
 }
 
@@ -39,18 +39,20 @@ function put(dx: number, dz: number) {
 // integrated a step ds at a time as the valley integrates its own, a vertex every `every` steps. fold < 1 is
 // on the way from the wave it was, the scope's member with index b0 and n carrier cycles across; level > 0
 // leans a line onto its contour as the sheaf settles. The hero (level 0) carries the current's glow. Each
-// vertex as far as the sweep reached goes to the speakers' stroke, if one is given.
+// vertex as far as the sweep reached goes to the speakers' stroke, if one is given. Unfolded, it is only as
+// long as the sweep it was, and it runs on past the sweep's end as it folds.
 const AMP = (SEAT.r * CYC * M1) / (2 * view.a * 0.9) // the wave's height, in metres of the hook's frame
 function strand(p: Path, a: number, b: number, z0: number, fold: number, i0: number, n: number, b0: number, ds: number, every: number, side = 0, level = 0, rec?: number[]) {
   let x = 0, z = z0, pen = false
+  const end = SA + (REACH - SA) * clamp(fold), h = level ? (level - 0.5) * CI : 0
   if (rec) rec.length = 0
-  for (let k = 0, s = 0; s < REACH; k++, s += ds) {
+  for (let k = 0, s = 0; s < end + 1e-6; k++, s += ds) {
     const S = Math.sin(TAU * (s / M1 - v))
     if (k % every === 0) {
       const zz = level && set > 0 ? mix(z, contour(side, level - 1, SPRING + x), set) : z, u = s / SA
-      put(mix(s, x, fold), mix(-AMP * (b0 || n !== CYC ? wave(u, n, b0) : S), zz, fold))
+      put(mix(s, x, fold), mix(-AMP * (b0 || n !== CYC ? wave(u, n, b0) : S), zz, fold), h)
       if (q.x > view.a + 0.05 && (!rec || s > SA)) break
-      const i = i0 * (1 - smooth(CEIL - 0.12, CEIL, q.y)) * (level ? 1 + 3 * Math.exp(-(((level - ring) / 2) ** 2)) : glow(reach(SPRING + x), now))
+      const i = i0 * room(q.y) * (level ? 1 + 3 * Math.exp(-(((level - ring) / 2) ** 2)) : glow(reach(SPRING + x), now))
       const seen = i > 0.01 && q.y > -1.05 && q.x > -view.a - 0.05 && q.x < view.a + 0.05
       if (rec && s <= SA + 1e-6) seen ? rec.push(q.x, q.y) : rec.push(NaN, NaN) // what is not drawn is not traced
       if (!seen) pen = false
@@ -108,7 +110,7 @@ export const meander: Scene = {
     const ink = tint(GREEN, WATER, wet)
     sheaf.color(ink[0], ink[1], ink[2])
     strand(sheaf, w, w2, 0, fold(0.08), mix(1.5, 1, smooth(DRY, END, t)), CYC, 0, 0.02, 5, 0, 0, rec(0)) // as bright as the valley will draw it, by the end
-    f.ch.push({ w: 1, path: sheaf })
+    f.ch.push({ w: 1, path: sheaf, gain: WIDE }) // exposed as the valley's first moments are, which carry it on
 
     // the speakers' picture: each stroke forth or back in turn, as the sweep's passes were
     sc.clear()

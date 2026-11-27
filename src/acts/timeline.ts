@@ -38,11 +38,17 @@ export class Timeline {
     }
   }
 
-  // Builds scene i in its own time, weighting its beam share and its voice by k.
+  // Builds scene i in its own time, weighting its beam share and its voice by k. A display list's light does not
+  // follow its share of the beam (it is drawn whole, however many samples it gets), so its gain fades with k too:
+  // across the fade the two pictures cross-dissolve instead of piling up and then one vanishing.
   private scene(i: number, t: number, f: Frame, k: number): Voice | undefined {
     const t0 = (f.at = this.starts[i]), n = f.ch.length
     const v = this.scenes[i].build(t - t0, f)
-    for (let j = n; j < f.ch.length; j++) (f.ch[j].w *= k), (f.ch[j].off = -t0)
+    for (let j = n; j < f.ch.length; j++) {
+      const c = f.ch[j]
+      ;(c.w *= k), (c.off = -t0)
+      if (k < 1 && 'path' in c) c.gain = (c.gain ?? 1) * k
+    }
     if (!v) return undefined
     if (k >= 1) return (t, o) => v(t - t0, o)
     return (t, o) => {

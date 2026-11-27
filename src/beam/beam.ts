@@ -55,7 +55,9 @@ export class Beam {
     }
   }
 
-  // Traces the whole path once, a sample every len/n of arc, always landing on its vertices.
+  // Traces the whole path once, a sample every len/n of arc, always landing on its vertices. The beam writes at
+  // a constant speed, so a stroke's light is its length: one shorter than a step gets its own sample but only
+  // its own length's worth of light, or every short stroke would be a bright dot that flickers as the step does.
   private trace(p: Path, n: number, gain: number) {
     const v = p.v
     if (!v.length || p.len <= 0) return
@@ -65,8 +67,8 @@ export class Beam {
       const x = v[i], y = v[i + 1], z = v[i + 2] * zk, r = v[i + 3], g = v[i + 4], b = v[i + 5]
       if (!v[i + 7]) this.put(x, y, 0, r, g, b)
       else {
-        const m = Math.ceil(Math.hypot(x - px, y - py) / step)
-        for (let j = 1; j <= m; j++) this.put(px + ((x - px) * j) / m, py + ((y - py) * j) / m, z, r, g, b)
+        const l = Math.hypot(x - px, y - py), m = Math.ceil(l / step), zl = (z * l) / (m * step)
+        for (let j = 1; j <= m; j++) this.put(px + ((x - px) * j) / m, py + ((y - py) * j) / m, zl, r, g, b)
       }
       for (let j = Math.round(v[i + 6] / step); j > 0; j--) this.put(x, y, z, r, g, b)
       px = x, py = y

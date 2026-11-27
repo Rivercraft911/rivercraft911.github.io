@@ -111,7 +111,12 @@ for (let i = 0; i < 420; i++) {
 // The line the meander drew opens into the river, a wave racing downstream: when it reaches x, and how
 // far open it is there.
 const opens = (x: number) => 0.25 + 0.03 * (x - X0)
-const open = (x: number, t: number) => clamp(lock([[0, 0], [opens(x), 1]], t, 7, 0.55), 0, 1.25)
+// lock([[0, 0], [t0, 1]], t, wn, ζ) without building its keys, for the loops that run it per vertex
+function settle(t: number, t0: number, wn: number, zeta: number) {
+  const tau = t - t0, a = zeta * wn, wd = wn * Math.sqrt(1 - zeta * zeta)
+  return tau <= 0 ? 0 : 1 - Math.exp(-a * tau) * (Math.cos(wd * tau) + (a / wd) * Math.sin(wd * tau))
+}
+const open = (x: number, t: number) => clamp(settle(t, opens(x), 7, 0.55), 0, 1.25)
 
 // The water: a steady flow field and its streamlines. The current runs down the channel fastest in the
 // middle; every stone sheds an eddy, every bend keeps a pool turning on its inside bank, and curl noise
@@ -229,7 +234,7 @@ const FIRS = L('x(y) = 0.3 H (1 - y / H)^{0.9}\\, tri(\\pi n y / H),\; N = \\num
 const PEAKS = L('h(z) = 20 \\log_{10} |S(e^{i \\omega})|', INK, 5)
 const SPRAY = L('(x, y) = (x_0 + v_x \\tau,\; y_0 + v_y \\tau - 3.5 \\tau^2)', WHITE, 2)
 const EYE = L('eye = (\\num{0}{-00.0}, \\num{1}{-00.0}, \\num{2}{-00.0})', WHITE, 4.2)
-const board = new Board([RIVER, OPEN, FLOWS, LAND, WALL, WAVES, SPRAY, FIRS, EYE, PEAKS])
+const board = new Board([RIVER, OPEN, FLOWS, LAND, SPRAY, WALL, WAVES, FIRS, EYE, PEAKS]) // in the order they arrive
 const say = new Say()
 export const RIVER_EQ = '\\theta(s) = \\omega_1 \\sin(2\\pi s / M_1) + \\omega_2 \\sin(2\\pi s / M_2 + \\phi)'
 let ceil = 1 // nothing of the land is drawn above this: the board's room
@@ -237,10 +242,11 @@ let grown = 0 // firs standing, counted as they are drawn
 
 // ── each frame ──────────────────────────────────────────────────────────────────────────────────────
 const SCAN = 1.2, SCAN_DUR = 3.2
-const EXPOSE = 1000 // the drawn length, in screen units, the valley is exposed for // rows rise in a wave rolling downstream
+const EXPOSE = 210 // the light drawn on the screen (length in screen units times intensity) the valley is exposed for
+export const WIDE = 1.3 // how far the exposure is opened for the meander's lines, and the valley while they last
 const HB = 1024, horizon = new Float32Array(HB)
-const p3 = { x: 0, y: 0, z: 0 }, q3 = { x: 0, y: 0, z: 0 }
-const sx = new Float32Array(NC), sy = new Float32Array(NC), sz = new Float32Array(NC), ok = new Uint8Array(NC)
+const p3 = { x: 0, y: 0, z: 0, k: 1 }, q3 = { x: 0, y: 0, z: 0, k: 1 }
+const sx = new Float32Array(NC), sy = new Float32Array(NC), sz = new Float32Array(NC), sk = new Float32Array(NC), ok = new Uint8Array(NC)
 const ink = new Path(), line = new Path()
 let occlude = 1, landK = 1, lp = 0, hl = 0, hr = 0, hl2 = 0, hr2 = 0 // lp: the roar's low-pass state; hl, hr: the scope's, twice
 
@@ -257,7 +263,9 @@ const on = (x: number, h: number, dz: number, tx: number, fov: number) => [x, ri
 const KEYS: number[][] = [
   [0, 0, 0, 0, 0, 0, 0, 0], // the map, framed each frame to the screen
   [1.2, 0, 0, 0, 0, 0, 0, 0], // held while the line opens into a river
-  [3.6, X0 - 5, riverY(0) + 15, riverZ(0) - 9, 22, riverY(22), riverZ(22), 1],
+  // the crane: up, back and round, at its highest before it is furthest back, so it never stops in the air
+  [2.4, X0 + 4, riverY(0) + 16.5, riverZ(0) - 4, 11, riverY(11), riverZ(11), 1.05],
+  [3.45, X0 - 5, riverY(0) + 13.5, riverZ(0) - 9, 22, riverY(22), riverZ(22), 1],
   [5, ...on(SC - 4, 3.6, -2, SC + 5, 1.05)], // down over the firs, low over the pool
   [6.1, ...on(SC + 11, 7.5, 2.5, 42, 1)], // and up, on downstream
   [RUN, ...on(43, 6.5, 0, 57, 1)],
@@ -281,14 +289,17 @@ function framed(k: number[]) {
   const xc = (X0 + XM) / 2, zc = (lo + hi) / 2, D = (XM - X0) / 2 / Math.tan(MAP_FOV / 2) / (0.9 * view.a)
   k[1] = xc, k[2] = y / n + D, k[3] = zc + 0.05 * D, k[4] = xc, k[5] = y / n, k[6] = zc, k[7] = MAP_FOV
 }
-const eye = { x: 0, y: 0, z: 0 }, cur: number[] = [], fwd = { x: 1, y: 0 }
+const eye = { x: 0, y: 0, z: 0 }, cur: number[] = [], fwd = { x: 1, y: 0, z: 0 }
 function crane(t: number) {
   framed(KEYS[0]), framed(KEYS[1])
-  glide(KEYS, t, cur)
+  // off the map from rest without a lurch: across the first stretch, time is eased by w(s) = 3s² − 3s³ + s⁴,
+  // which sets off with no acceleration and hands over to the next key at the same speed and acceleration
+  const a = KEYS[1][0], b = KEYS[2][0], s = clamp((t - a) / (b - a))
+  glide(KEYS, t > a && t < b ? a + (b - a) * s * s * (3 - 3 * s + s * s) : t, cur)
   eye.x = cur[0], eye.y = cur[1], eye.z = cur[2]
   cam.aim(cur[0], cur[1], cur[2], cur[3], cur[4], cur[5], cur[6])
   const L = Math.hypot(cur[3] - cur[0], cur[4] - cur[1], cur[5] - cur[2])
-  fwd.x = (cur[3] - cur[0]) / L, fwd.y = (cur[4] - cur[1]) / L
+  fwd.x = (cur[3] - cur[0]) / L, fwd.y = (cur[4] - cur[1]) / L, fwd.z = (cur[5] - cur[2]) / L
   // a floating horizon only means something while we look across the land, downstream
   occlude = smooth(0.4, 0.75, fwd.x) * smooth(-0.9, -0.7, fwd.y)
 }
@@ -298,13 +309,15 @@ function crane(t: number) {
 export const MEANDER = 4.2 // how long the meander runs before us: its current's phase carries on from there
 export const glow = (u: number, t: number) => 0.65 + 0.35 * Math.cos(TAU * (6 * u - 2.5 * t))
 export const SPRING = X0, map = () => crane(0)
+export const room = (y: number) => 1 - smooth(0.6, 0.72, y) // what the meander's lines leave the equation above them
 export const reach = (x: number) => (x - X0) / (XM - X0) // 0 at the spring, 1 where the meander's three bends end
 
 // The land on the map: contour lines every CI metres above the water, LEVELS to a bank. Each is where a
 // walk straight out from the river first stands that high, so they nest and never cross; the lowest is
 // the bank itself. contour() is the z of level l on a side (±1) at x, NaN where the land never gets there.
 export const LEVELS = 14
-const CI = 0.35, CDX = 0.2, CN = Math.ceil((XM + 8 - X0) / CDX) + 1, CZ = new Float32Array(2 * LEVELS * CN).fill(NaN)
+export const CI = 0.35
+const CDX = 0.2, CN = Math.ceil((XM + 8 - X0) / CDX) + 1, CZ = new Float32Array(2 * LEVELS * CN).fill(NaN)
 for (let i = 0; i < CN; i++)
   for (const side of [-1, 1]) {
     const x = X0 + i * CDX, o = ((side + 1) / 2) * LEVELS * CN + i
@@ -320,48 +333,94 @@ export function contour(side: number, l: number, x: number) {
 }
 
 const col = (x: number) => Math.max(0, Math.min(HB - 1, Math.round(((x / view.a) * 0.45 + 0.5) * (HB - 1))))
-const visible = (x: number, y: number) => y < ceil && (occlude < 0.5 || y > horizon[col(x)] - 0.002)
+// How much of a point shows: nothing above the board; behind the land in front, less and less as the floating
+// horizon comes on, so lines hide as we come to look across the land, not all at once.
+const shade = (x: number, y: number) => (y >= ceil ? 0 : y > horizon[col(x)] - 0.002 ? 1 : 1 - occlude)
+const visible = (x: number, y: number) => shade(x, y) > 0.5
 function raise(x0: number, y0: number, x1: number, y1: number) {
-  let a = col(x0), b = col(x1)
-  if (a > b) [a, b, x0, y0, x1, y1] = [b, a, x1, y1, x0, y0]
+  if (x0 > x1) [x0, y0, x1, y1] = [x1, y1, x0, y0]
+  const a = col(x0), b = col(x1), s = (y1 - y0) / (x1 - x0 || 1)
   for (let c = a; c <= b; c++) {
-    const y = b > a ? y0 + ((y1 - y0) * (c - a)) / (b - a) : Math.max(y0, y1)
+    const y = b > a ? y0 + s * clamp(((c / (HB - 1) - 0.5) / 0.45) * view.a - x0, 0, x1 - x0) : Math.max(y0, y1) // exact, even where an end is off the screen
     if (y > horizon[c]) horizon[c] = y
   }
 }
 const fog = (z: number) => Math.min(1, 0.25 + 0.9 * z)
 
+// The pen. Every stroke the valley draws goes through to(): clipped to the screen, so the beam spends no time
+// off it and the exposure, which reads the drawn length, holds steady as strokes swing out past the lens; and
+// what comes within NEAR metres of the lens fades out on its way, each segment as faint as its nearer end, so
+// nothing sweeps in huge from off the screen and pops as it passes.
+const NEAR = 3
+let ax = 0, ay = 0, ak = 0, inked = false, u0 = 0, u1 = 1 // the pen: where it is, its fade, whether the path is there too
+// Projects a world point into o, with how far it is from fading into the lens, o.k.
+function look(x: number, y: number, z: number, o = p3) {
+  if (!cam.project(x, y, z, o)) return false
+  const d = (x - eye.x) * fwd.x + (y - eye.y) * fwd.y + (z - eye.z) * fwd.z
+  o.k = d >= NEAR ? 1 : smooth(NEAR / 4, NEAR, d)
+  return true
+}
+// One edge of the screen, Liang–Barsky: q the stroke's run toward it, r the room before it.
+function edge(q: number, r: number) {
+  if (!q) return r >= 0
+  const u = r / q
+  if (q < 0) u > u0 && (u0 = u)
+  else u < u1 && (u1 = u)
+  return u0 <= u1
+}
+// A stroke from the pen to (x, y), whose fade is k, in colour c at intensity i; or a move there, if the pen is up.
+function to(p: Path, down: boolean, x: number, y: number, k: number, c: readonly number[], i: number) {
+  const x0 = ax, y0 = ay, X = view.a + 0.02, Y = 1.02
+  i *= ak < k ? ak : k
+  ;(ax = x), (ay = y), (ak = k)
+  if (!down || i < 0.003) return void (inked = false)
+  p.color(c[0], c[1], c[2], i)
+  if (x0 > -X && x0 < X && y0 > -Y && y0 < Y && x > -X && x < X && y > -Y && y < Y) { // all on the screen, as most are
+    if (!inked) p.moveTo(x0, y0)
+    return void (p.lineTo(x, y), (inked = true))
+  }
+  const dx = x - x0, dy = y - y0
+  ;(u0 = 0), (u1 = 1)
+  if (!edge(-dx, x0 + X) || !edge(dx, X - x0) || !edge(-dy, y0 + Y) || !edge(dy, Y - y0)) return void (inked = false)
+  if (!inked || u0 > 0) p.moveTo(x0 + u0 * dx, y0 + u0 * dy)
+  p.lineTo(x0 + u1 * dx, y0 + u1 * dy)
+  inked = u1 >= 1
+}
+
 // Draws one world-space segment if both ends clear the horizon.
 function seg(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, c: readonly number[], i: number) {
-  if (!cam.project(x0, y0, z0, p3) || !cam.project(x1, y1, z1, q3)) return
-  if (!visible(p3.x, p3.y) || !visible(q3.x, q3.y)) return
-  ink.color(c[0], c[1], c[2], i * fog(p3.z) * landK).moveTo(p3.x, p3.y).lineTo(q3.x, q3.y)
+  if (!look(x0, y0, z0, p3) || !look(x1, y1, z1, q3)) return
+  const a = shade(p3.x, p3.y), b = shade(q3.x, q3.y)
+  if (!a || !b) return
+  to(ink, false, p3.x, p3.y, p3.k * a, c, 0), to(ink, true, q3.x, q3.y, q3.k * b, c, i * fog(p3.z) * landK)
 }
 
 function items_(t: number, upto: number, next: { i: number }) {
   for (; next.i < items.length && items[next.i].x < upto; next.i++) {
     const it = items[next.i]
     if (t < it.t0) continue
-    const k = clamp(lock([[0, 0], [it.t0, 1]], t, 7, 0.45), 0, 1.3)
+    const k = clamp(settle(t, it.t0, 7, 0.45), 0, 1.3)
     let pen = false
     for (let v = 0; v < it.n; v++) {
       const o = 3 * (it.a + v), wv = it.kind === FLOW ? wave(VX[o], VX[o + 2], t) : 0, y = it.kind === FLOW ? VX[o + 1] + wv : it.base + (VX[o + 1] - it.base) * k
       let px = VX[o], pz = VX[o + 2] + 1.5 * wv
       if (it.kind === FLOW) pz = riverZ(px) + (pz - riverZ(px)) * Math.min(1, open(px, t))
-      if (!cam.project(px, y, pz, p3) || !visible(p3.x, p3.y)) {
+      const sh = look(px, y, pz) ? shade(p3.x, p3.y) : 0
+      if (!sh) {
         pen = false
         continue
       }
       let g = it.kind === HATCH ? 0.5 : 1
       if (it.kind === FLOW) {
         const head = (t * 0.55 + rnd(it.a)) % 1, u = (v / (it.n - 1) - head + 1) % 1
-        g = (0.04 + 0.5 * Math.exp(-u * 9) * k) * (1 + 3 * Math.exp(-(t - it.t0) / 0.4)) // bright at the head, trailing back upstream; flaring as it opens
+        // bright at the head, trailing back upstream, rising from nothing where the head is, so as it passes a vertex
+        // nothing steps; flaring as it opens, from nothing too
+        g = (0.04 + 0.5 * Math.exp(-u * 9) * smooth(0, 0.08, u) * k) * (1 + 3 * Math.exp(-(t - it.t0) / 0.4)) * smooth(it.t0, it.t0 + 0.15, t)
       }
-      ink.color(it.c[0], it.c[1], it.c[2], fog(p3.z) * g * landK)
       if (it.kind === TREE && it.n > 2 && !v && k >= 1) grown++
-      if (!v && (it.kind === TREE || it.kind === FIR2) && it.n > 2) heard(next.i, k * fog(p3.z), p3.z)
+      if (!v && (it.kind === TREE || it.kind === FIR2) && it.n > 2) heard(next.i, k * fog(p3.z) * p3.k, p3.z)
       if (!v && it.kind === PEAK) far = next.i
-      pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
+      to(ink, pen, p3.x, p3.y, p3.k * sh, it.c, fog(p3.z) * g * landK)
       pen = true
     }
   }
@@ -401,7 +460,7 @@ function section(o: number, w: number) {
 }
 // A world-space polyline of items' vertices, every `every`-th, as it is drawn.
 function traced(it: Item, w: number, every: number, t: number) {
-  const k = clamp(lock([[0, 0], [it.t0, 1]], t, 7, 0.45), 0, 1.3)
+  const k = clamp(settle(t, it.t0, 7, 0.45), 0, 1.3)
   let pen = false
   sc.weight = w
   for (let v = 0; v < it.n; v += Math.min(every, Math.max(1, it.n - 1 - v))) {
@@ -440,30 +499,31 @@ const CYCLES = tune(NOTES)
 
 // White water: at each cascade a foam lip curling across the river, and spray thrown downstream on
 // ballistic arcs, each droplet a parabola; around each stone, ripple rings running outward.
-const G = 7
+const G = 7, FOAM = [0.85, 0.95, 1], SPRAY_C = [0.9, 0.97, 1]
 function whitewater(t: number, xc: number) {
   const y0 = riverY(xc - 0.3), zc = riverZ(xc), w = wide(xc), on = smooth(opens(xc), opens(xc) + 1.5, t) * landK
   for (let k = 0; k < 7; k++) {
     let pen = false
     for (let j = 0; j <= 24; j++) {
       const u = j / 24 - 0.5, curl = 0.08 * Math.sin(TAU * (u * 3 + t * 1.3 + k * 0.4))
-      if (!cam.project(xc + 0.1 * k + curl, y0 - 0.06 * k + wave(xc, zc + u * 2 * w, t), zc + u * 2 * w * 0.98, p3) || !visible(p3.x, p3.y)) {
+      const sh = look(xc + 0.1 * k + curl, y0 - 0.06 * k + wave(xc, zc + u * 2 * w, t), zc + u * 2 * w * 0.98) ? shade(p3.x, p3.y) : 0
+      if (!sh) {
         pen = false
         continue
       }
-      ink.color(0.85, 0.95, 1, on * (1 - k / 8) * fog(p3.z))
-      pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
+      to(ink, pen, p3.x, p3.y, p3.k * sh, FOAM, on * (1 - k / 8) * fog(p3.z))
       pen = true
     }
   }
   for (let d = 0; d < 90; d++) {
     const life = 0.9 + 0.5 * rnd(d * 3 + xc), age = ((t + life * rnd(d * 7 + xc)) % life)
     const vx = 1.2 + 1.5 * rnd(d + xc), vy = 1 + 2.2 * rnd(d * 5 + xc), vz = (rnd(d * 11 + xc) * 2 - 1) * 1.2, z0 = zc + (rnd(d * 13 + xc) * 2 - 1) * w
-    const at = (a: number) => cam.project(xc + vx * a, y0 + vy * a - 0.5 * G * a * a, z0 + vz * a, p3)
-    if (!at(age) || !visible(p3.x, p3.y)) continue
-    const x1 = p3.x, y1 = p3.y
+    const at = (a: number) => look(xc + vx * a, y0 + vy * a - 0.5 * G * a * a, z0 + vz * a)
+    const sh = at(age) ? shade(p3.x, p3.y) : 0
+    if (!sh) continue
+    const x1 = p3.x, y1 = p3.y, k1 = p3.k * sh
     if (!at(Math.max(0, age - 0.05))) continue
-    ink.color(0.9, 0.97, 1, on * (1 - age / life) * fog(p3.z)).moveTo(p3.x, p3.y).lineTo(x1, y1)
+    to(ink, false, p3.x, p3.y, p3.k, SPRAY_C, 0), to(ink, true, x1, y1, k1, SPRAY_C, on * smooth(0, 0.1, age) * (1 - age / life) * fog(p3.z)) // born and dying faint
   }
 }
 // The shaft. The river goes over its rim all the way round and falls into it; down there it is night, and
@@ -554,20 +614,20 @@ export const valley: Scene = {
       // the cross-section, risen from the river's level, drawn where it clears the horizon
       const o = i * NC, base = riverY(x)
       for (let j = 0; j < NC; j++) {
-        ok[j] = cam.project(x, base + (RH[o + j] - base) * rise, RZp[o + j], p3) ? 1 : 0
-        sx[j] = p3.x, sy[j] = p3.y, sz[j] = p3.z
+        ok[j] = look(x, base + (RH[o + j] - base) * rise, RZp[o + j]) ? 1 : 0
+        sx[j] = p3.x, sy[j] = p3.y, sz[j] = p3.z, sk[j] = p3.k
       }
       const index = (i % 8 === 0 ? 1 : 0.6) * Math.min(1, rise * 2.5) * land
       let pen = false
       for (let j = 0; j < NC; j++) {
         const water = RK[o + j] === 1
-        if (!ok[j] || !visible(sx[j], sy[j]) || (water && i % 3) || RK[o + j] > 1) {
+        const sh = ok[j] ? shade(sx[j], sy[j]) : 0
+        if (!sh || (water && i % 3) || RK[o + j] > 1) {
           pen = false
           continue
         }
         const c = water ? WATER : INK
-        ink.color(c[0], c[1], c[2], index * fog(sz[j]) * (water ? 0.25 : 1))
-        pen ? ink.lineTo(sx[j], sy[j]) : ink.moveTo(sx[j], sy[j])
+        to(ink, pen, sx[j], sy[j], sk[j] * sh, c, index * fog(sz[j]) * (water ? 0.25 : 1))
         pen = true
       }
       if (t >= SCAN && rise < 1.2) heroRow = i
@@ -582,15 +642,14 @@ export const valley: Scene = {
       for (const side of [-1, 1])
         for (let l = 0; l < LEVELS; l++) {
           let pen = false, kept = 0
-          ink.color(INK[0], INK[1], INK[2], cl)
           if (l % 4 === 2) (sc.weight = 5 * cl), (kept = 1)
           for (let x = X0; x < XM + 8; x += 0.4) {
             const z = contour(side, l, x)
-            if (z !== z || !cam.project(x, riverY(x) + (l + 0.5) * CI, z, p3)) {
+            if (z !== z || !look(x, riverY(x) + (l + 0.5) * CI, z)) {
               pen = false
               continue
             }
-            pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
+            to(ink, pen, p3.x, p3.y, p3.k, INK, cl * room(p3.y))
             if (kept) pen ? sc.lineTo(p3.x, p3.y) : sc.moveTo(p3.x, p3.y)
             pen = true
           }
@@ -606,8 +665,16 @@ export const valley: Scene = {
       f.look = lit > 0 ? { tau: mix(LOOK.tau, TAU_RASTER, smooth(7.5, 8.5, t)) } : undefined
     }
     // exposure: the ink is energy per length, so as the valley fills in it would burn brighter and
-    // brighter; past a reference length, stop down, as an eye or a camera would
-    const stop = Math.min(1, (EXPOSE / Math.max(1, ink.len)) ** 0.7)
+    // brighter; past a reference light, stop down, as an eye or a camera would (opened WIDE while the
+    // meander's lines are all there is). It reads the light drawn, not the length, so a stroke fading out
+    // eases it rather than jolting it when it goes.
+    let light = 0
+    for (let i = STRIDE, v = ink.v; i < v.length; i += STRIDE)
+      if (v[i + 7]) {
+        const dx = v[i] - v[i - STRIDE], dy = v[i + 1] - v[i + 1 - STRIDE]
+        light += v[i + 2] * Math.sqrt(dx * dx + dy * dy)
+      }
+    const stop = Math.min(mix(WIDE, 1, smooth(2.6, 4, t)), (EXPOSE / Math.max(1e-3, light)) ** 0.7)
     for (let i = 2; i < ink.v.length; i += STRIDE) ink.v[i] *= stop
     f.ch.push({ w: 1, path: ink })
 
@@ -618,23 +685,22 @@ export const valley: Scene = {
       let pen = false
       for (let x = X0; x < LIP; x += 0.1) {
         const k = 1 - smooth(opens(x) - 0.2, opens(x) + 0.6, t)
-        if (k <= 0 || !cam.project(x, riverY(x), riverZ(x), p3)) {
+        if (k <= 0 || !look(x, riverY(x), riverZ(x))) {
           pen = false
           continue
         }
-        line.color(WATER[0], WATER[1], WATER[2], glow((x - X0) / (XM - X0), t + MEANDER) * k)
-        pen ? line.lineTo(p3.x, p3.y) : line.moveTo(p3.x, p3.y)
+        to(line, pen, p3.x, p3.y, p3.k, WATER, glow((x - X0) / (XM - X0), t + MEANDER) * k * room(p3.y))
         pen = true
       }
-      f.ch.push({ w: fade, path: line })
+      f.ch.push({ w: fade, path: line, gain: WIDE })
     }
     // the equations: the meander's carries on a moment, then the board of everything takes over
     if (t < 0.6) say.say(f, t, RIVER_EQ, WATER, [['\\omega_1', W1, 2], ['\\omega_2', W2, 2], ['M_1', M1, 0], ['M_2', M2, 0]], 1 - smooth(0, 0.6, t))
-    const hero = t < SCAN ? 0 : t < 3 ? 1 : t < 4.8 ? 2 : 3 // what is new: the river, the land, the firs
-    RIVER.vals[0] = W1, RIVER.vals[1] = W2, RIVER.hot = +(hero === 0)
+    const hero = (a: number, b: number) => smooth(a - 0.3, a, t) * (1 - smooth(b - 0.3, b, t)) // what is new, from a to b: the river, the land, the firs
+    RIVER.vals[0] = W1, RIVER.vals[1] = W2, RIVER.hot = hero(-1, SCAN)
     OPEN.vals[0] = clamp(X0 + (t - 0.25) / 0.03, X0, LIP), OPEN.hot = 1 - smooth(2, 3.5, t)
-    LAND.vals[0] = rowX(Math.max(0, heroRow)), LAND.hot = +(hero === 1)
-    FIRS.vals[0] = grown, FIRS.hot = +(hero === 2)
+    LAND.vals[0] = rowX(Math.max(0, heroRow)), LAND.hot = hero(SCAN, 3)
+    FIRS.vals[0] = grown, FIRS.hot = hero(3, 4.8)
     WAVES.vals[0] = (7 * t) % TAU, WAVES.vals[1] = (5.3 * t) % TAU, WAVES.hot = FLOWS.hot = 0.4
     EYE.vals[0] = eye.x, EYE.vals[1] = eye.y, EYE.vals[2] = eye.z, EYE.hot = 0.3
     // running for the lip the board goes, and from the lip on nothing is written: only the water
