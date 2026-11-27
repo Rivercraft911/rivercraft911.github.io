@@ -32,11 +32,6 @@ export type Project = {
 const GH = 'https://github.com/Rivercraft911/'
 const RAW = 'https://raw.githubusercontent.com/Rivercraft911/'
 const ORBIT = 1 / (92.9 * 60) // a ~93-minute low Earth orbit. TODO River: SAMWISE's real period
-const harmonics = (f0: number, n: number, odd = false) => {
-  const f: number[] = [], p: number[] = []
-  for (let k = 1; k <= n; k += odd ? 2 : 1) f.push(f0 * k), p.push(-20 * Math.log10(k)) // a square wave's 1/k
-  return { k: 'lines' as const, f, p }
-}
 const primes = (n: number) => {
   const s = new Uint8Array(n), out: number[] = []
   for (let i = 2; i < n; i++) {
@@ -54,26 +49,28 @@ export const PROJECTS: Project[] = [
   {
     slug: 'yapling-observatory',
     title: 'Yapling Observatory',
-    remarkable: '5 coupled models of one CubeSat: orbit, radio, pointing, power and thermal',
+    remarkable: 'A CubeSat mission in five coupled models: orbit, radio, pointing, power, heat; 495 tests',
     freq: 1 / (365.2422 * 86400),
     span: 0.6,
     signature: 'Its J2 model turns a sun-synchronous orbit plane once a year: 31.7 nHz.',
     sig: [{ k: 'lines', f: [1 / (365.2422 * 86400)], p: [-14] }],
     years: '2026',
     numbers: [
-      ['orbit', 'RK4 and symplectic, J2, ground tracks'],
-      ['radio', 'antenna patterns, QPSK and 8PSK MODCODs, LoRa beacons'],
-      ['GNC', 'reaction wheels, magnetorquers, momentum unloading'],
-      ['power', 'solar, battery charge, voltage and current'],
-      ['thermal', 'coupled bus, battery and panel temperatures'],
+      ['orbit', 'RK4 and velocity Verlet under J2 (EGM2008’s C₂₀), sun-synchronous planes, ground tracks'],
+      ['field', 'IGRF-14 to degree 13, for magnetorquers and B-dot'],
+      ['radio', 'DVB-S2 QPSK and 8PSK frames by ETSI EN 302 307-1, a 433 MHz LoRa beacon, antenna patterns'],
+      ['pointing', 'reaction wheels and magnetorquers, momentum unloading'],
+      ['power and heat', 'a measured NCR18650GA cell model; bus, battery and panels trading heat'],
+      ['checks', '495 Python tests; every model names its source and what it leaves out'],
     ],
     body: [
-      'A CubeSat mission simulator for studying radio links, pointing, power and temperature over a single pass or a whole mission.',
+      'A CubeSat mission simulator for studying radio links, pointing, power and temperature over a single pass or a whole mission, with the radio planned for Stanford SSI’s next satellite in it: DVB-S2 frames down, a 433 MHz LoRa beacon.',
       'Orbits integrate under J2 and draw their ground tracks; links are budgeted through antenna patterns and real MODCODs; wheels and magnetorquers point the bus and dump its momentum; the panels charge the battery while bus, battery and panels trade heat. Runs play live, replay, and write pass reports.',
     ],
     media: [{ src: `${RAW}yapling-observatory/main/docs/random-screenshot.png`, alt: 'Yapling Observatory running a simulated mission in the browser' }],
     links: [['source', `${GH}yapling-observatory`]],
     log: [[103, 45], [104, 103]],
+    todo: ['Is Yapling Observatory BLEPS’s mission simulator, named for its Yapling radio board? (It models the same 433 MHz MiniF27 module.) If so, it can say so.'],
   },
   {
     slug: 'samwise',
@@ -106,70 +103,6 @@ export const PROJECTS: Project[] = [
     ],
     log: [[0, 1], [1, 9], [14, 7], [17, 1], [65, 7], [66, 3], [68, 9], [69, 34]],
     todo: ['SAMWISE orbit period, launch status and your role in its ADCS', 'a photo of flight hardware, if public'],
-  },
-  {
-    slug: 'magtorqreflect',
-    title: 'magTorqReflect',
-    remarkable: 'Driver and bench for a ±30 Am² magnetorquer: 0.12 W idle, 9.36 W flat out',
-    freq: 2 * ORBIT,
-    span: 0.5,
-    signature: 'The dipole field it pushes on peaks over both poles, so its strength swings twice an orbit.',
-    sig: [{ k: 'lines', f: [2 * ORBIT], p: [-11] }],
-    years: '2025',
-    numbers: [
-      ['device', 'AAC Hyperion MTQ800.15'],
-      ['dipole', '±30 Am²'],
-      ['power', '0.12 W idle, 9.36 W at 30 Am²'],
-      ['link', '115 200 Bd serial, CRC-8 poly 0xEB'],
-    ],
-    body: [
-      'A Python driver for the AAC Hyperion MTQ800.15 magnetorquer. It speaks the Hyperion protocol, $ host node command length data : CRC, over serial, and carries a test suite for connection, telemetry and dipole control.',
-      'An interactive power profile walks the dipole up and logs the draw: linear to about 15 Am², a boost region above 20 Am², 9.36 W at the 30 Am² limit.',
-    ],
-    media: [{ src: `${RAW}magtorqReflect/main/data/mtq_power_profile.png`, alt: 'Measured power against commanded dipole moment for the MTQ800.15' }],
-    links: [['source', `${GH}magtorqReflect`]],
-    log: [[34, 5], [35, 1]],
-    todo: ['Is this Reflect Orbital work you want named as such?'],
-  },
-  {
-    slug: 'strobeglasses',
-    title: 'strobeGlasses',
-    remarkable: 'Open-source strobe glasses, MK1, to take on the expensive ones',
-    freq: 10,
-    span: 1.4,
-    signature: 'Shutters flicking open and shut make a square wave: a 10 Hz line and its odd harmonics.',
-    sig: [harmonics(10, 15, true)],
-    years: '2025',
-    numbers: [['revision', 'MK1, KiCad']],
-    body: ['Open source strobe glasses to compete with the expensive evil ones.'],
-    media: [],
-    links: [['source', `${GH}strobeGlasses`]],
-    demo: 'scope',
-    log: [[39, 3], [40, 1], [47, 1]],
-    todo: ['strobe rate and duty (10 Hz square is a guess)', 'photos, status, a better one-liner with a number'],
-  },
-  {
-    slug: 'pigeon-vision',
-    title: 'Pigeon Vision',
-    remarkable: 'IREC rocket video: two 200° fisheye cameras at 30.0 frames/s, stitched to 360°',
-    freq: 30,
-    span: 1.4,
-    signature: 'Two cameras at 30.0 frames/s: a 30 Hz frame line and its harmonics.',
-    sig: [harmonics(30, 12)],
-    years: '2026',
-    numbers: [
-      ['cameras', '2 × IMX900, 200° fisheye'],
-      ['encoder', 'CM5, 8 Mb/s MPEG-TS'],
-      ['on air', '2.4 h, 5 725 408 frames, none failed'],
-    ],
-    body: [
-      'The video payload for an IREC rocket. A CM5 encodes two 200-degree fisheye cameras into an 8 Mb/s MPEG transport stream and clocks it over SPI into the transmitter; on the ground the two views are stitched into one 360° sphere.',
-      'On the bench, through esp-dvbs2 from one S3 to another: sixteen back-to-back 540 s runs, 2.4 hours on air, 5 725 408 frames decoded with none failed and both cameras at 30.0 frames/s.',
-    ],
-    media: [{ src: `${RAW}esp-dvbs2/main/examples/live-video/bench.jpg`, alt: 'The live-video bench: transmitting S3 by the cameras, coax and attenuator, receiving S3 and its W5500' }],
-    links: [['live video on esp-dvbs2', `${GH}esp-dvbs2#live-video-one-s3-to-another`]],
-    log: [],
-    todo: ['flight or launch footage', 'the AntSDR downlink: frequency and mode (would move this station to RF)', 'is the Pigeon Vision repo public?'],
   },
   {
     slug: 'infiniterecon',
@@ -335,7 +268,7 @@ export const PROJECTS: Project[] = [
     ],
     body: [
       'One S3 frames, codes, modulates and pulse-shapes DVB-S2 and sends it out of its own Wi-Fi radio. A second S3 pulls it back in through its own radio and demodulates and decodes every frame on the chip. No PC, no external DAC or ADC, no FPGA.',
-      'The radio hides a test engine that plays samples from RAM into its I/Q DAC: a fresh 16 380-sample bank every 196.75 µs at 80 MS/s. Every possible output of the shaping filter is computed once into a table, so making samples is copying rows, and the heavy loops run on the S3’s 128-bit vector unit. It started as a goal of 9.68 Mb/s for live video and kept going.',
+      'The radio hides a test engine that plays samples from RAM into its I/Q DAC: a fresh 16 380-sample bank every 196.75 µs at 80 MS/s, which at 240 MHz is 47 220 cycles to make 15 740 new samples: three cycles a sample. So every possible output of the shaping filter is computed once into a table, making samples is copying rows, and the heavy loops run on the S3’s 128-bit vector unit. It started as a goal of 9.68 Mb/s for live video and kept going.',
     ],
     media: [
       { src: `${RAW}esp-dvbs2/main/docs/img/rf-40mhz.png`, alt: '40 MHz QPSK spectrum and spectrogram transmitted by an ESP32-S3, captured by a B200' },

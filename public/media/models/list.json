@@ -268,5 +268,23 @@
   "materials": 2,
   "project": "Pigeon Vision",
   "note": "camera section: 6 in tube and two camera cradles, as assembled"
+ },
+ {
+  "id": "finertia",
+  "file": "finertia.glb",
+  "bytes": 3434856,
+  "tris": 111647,
+  "bounds": [
+   -0.013,
+   -0.00327,
+   -0.013,
+   0.013,
+   0.00581,
+   0.013
+  ],
+  "up": "y",
+  "materials": 12,
+  "project": "BLEPS",
+  "note": "Finertia, BLEPS’s reaction wheel controller, 26 × 26 mm (its Faulhaber 2610 motor left out)"
  }
 ]

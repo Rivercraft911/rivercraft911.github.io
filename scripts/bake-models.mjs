@@ -12,6 +12,7 @@ import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 
 const GH = '/Users/river/Documents/github/', IREC = '/Users/river/Documents/stanford/SSI/IREC/', DL = '/Users/river/Downloads/'
+const SATS = '/Users/river/Documents/stanford/SSI/SATS/'
 const PV = IREC + 'Pigeon_Vision/PigeonVision/hardware/'
 // Mask and silk, by stackup layer type, where the KiCad file names no colour and the board isn't green.
 const ink = (silk, mask) => ({ 'Top Silk Screen': silk, 'Bottom Silk Screen': silk, 'Top Solder Mask': mask, 'Bottom Solder Mask': mask })
@@ -19,8 +20,8 @@ const BLACK = ink('White', 'Black'), WHITE = ink('#101010FF', '#F6F6F1F4') // th
 // Mesh materials, [r, g, b, metallic, roughness], linear.
 const ACRYLIC = [0.8, 0.8, 0.78, 0, 0.25], SMOKED = [0.02, 0.02, 0.022, 0, 0.25], PLA = [0.75, 0.74, 0.7, 0, 0.6]
 const PETG = [0.035, 0.037, 0.04, 0, 0.6], PETG2 = [0.05, 0.052, 0.056, 0, 0.55]
-// A model is a `pcb`; a `step`, with `keep` the nodes kept and their materials; or `parts`, [file, material, place],
-// place { yup: an Onshape STL exported y up, scale }.
+// A model is a `pcb`, with `skip` the parts' 3D models left out; a `step`, with `keep` the nodes kept and their
+// materials; or `parts`, [file, material, place], place { yup: an Onshape STL exported y up, scale }.
 const YUP = { scale: 0.001, yup: true }
 const MODELS = [
   { id: 'peep', project: 'PEEP', note: 'IR-triggered keystroke injector, 12.06 × 8 mm, STM32F042', pcb: GH + 'PEEP/PCB/peep/peep.kicad_pcb', stackup: BLACK },
@@ -41,6 +42,9 @@ const MODELS = [
   { id: 'r01-polygon', project: 'R-01', note: 'polygon mirror mount and spinner', parts: [[DL + 'LaserPolygon123/LaserPolygon.obj']] },
   { id: 'r01-laser-plate', project: 'R-01', note: 'laser mounting plate', parts: [[DL + 'LaserAssemblyFRFR.stl', PLA, YUP]] },
   { id: 'pigeon-tube', project: 'Pigeon Vision', note: 'camera section: 6 in tube and two camera cradles, as assembled', step: IREC + '3dModels/pigeon-camera-section/output/pigeon_camera_section.step' },
+  // Faulhaber lets its motor model go only whole and unaltered, and the bake decimates, so the motor stays out.
+  { id: 'finertia', project: 'BLEPS', note: 'Finertia, BLEPS’s reaction wheel controller, 26 × 26 mm (its Faulhaber 2610 motor left out)',
+    pcb: SATS + 'Satellite-Avionics-rotor/project-janus/ADCS/rotor-controller/Rotor.kicad_pcb', skip: /2610T/ },
 ]
 const BUDGET = { board: { tris: 150e3, bytes: 4e6 }, mesh: { tris: 150e3, bytes: 3e6 } }
 
@@ -77,7 +81,11 @@ const glb = (f, opts, out) => execFileSync(KICAD, ['pcb', 'export', 'glb', '-f',
 function pcb(m, tmp, out) {
   const f = join(tmp, 'board.kicad_pcb'), pro = m.pcb.replace(/\.kicad_pcb$/, '.kicad_pro'), missing = []
   const paint = (s, t) => (m.stackup?.[t] ? `(type "${t}") (color "${m.stackup[t]}")` : s)
-  const find = (s, p) => { const g = model(p, m.pcb, tmp); return g ? `(model "${g}"` : (missing.push(basename(p)), s) }
+  const find = (s, p) => {
+    if (m.skip?.test(p)) return `${s} (hide yes)`
+    const g = model(p, m.pcb, tmp)
+    return g ? `(model "${g}"` : (missing.push(basename(p)), s)
+  }
   writeFileSync(f, readFileSync(m.pcb, 'utf8').replace(/\(type "([^"]+)"\)(?:\s*\(color "[^"]*"\))?/g, paint).replace(/\(model "([^"]+)"(?!\s*\(hide yes\))/g, find))
   if (existsSync(pro)) copyFileSync(pro, f.replace(/pcb$/, 'pro')) // its text variables
   glb(f, ['--subst-models', '--no-dnp', '--include-tracks', '--include-pads', '--include-zones', '--include-silkscreen', '--include-soldermask'], out)
