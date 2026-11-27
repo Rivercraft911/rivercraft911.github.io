@@ -8,7 +8,7 @@ struct Marvel { x: vec4f, y: vec4f, z: vec4f } // its right (and the tangent of 
 @group(1) @binding(2) var cosmosSmp: sampler;
 @group(1) @binding(3) var<uniform> MARVEL: array<Marvel, 8>;
 
-const COSMOS = 0.12; // stored as 1 − e^(−light / COSMOS) (universe.wgsl)
+const COSMOS = 0.3; // stored as 1 − e^(−light / COSMOS) (universe.wgsl)
 fn cosmosLight(s: vec3f) -> vec3f { return -COSMOS * log(1.0 - min(s, vec3f(0.999))); }
 
 fn cosmos(rd: vec3f) -> vec3f {

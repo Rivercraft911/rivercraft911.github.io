@@ -1,15 +1,15 @@
 // The cosmos behind River's planet: deep space too rich to march every frame, so it is baked once, a few tiles a frame,
 // while the opening plays (universe.wgsl), and only read after (fields/cosmos.wgsl: any field may call cosmos(rd)).
 // The whole sky is a cube; each marvel in it, a fractal the size of a nebula or a galaxy, is its own patch of sky at
-// three times the cube's sharpness, laid over it with its own transmittance. Everything is baked coarse first, so a deep
+// four times the cube's sharpness, laid over it with its own transmittance. Everything is baked coarse first, so a deep
 // link that lands straight on the planet has a sky at once, and sharp a few seconds later.
 //
 // 8 bits a channel, sRGB, so the hardware filters it in linear light, its steps below the display's own wherever the
-// cosmos is dim. The cube is 6 × 1024² with three mips, 34 MB; each marvel 1536² with three, 12.5 MB.
+// cosmos is dim. The cube is 6 × 1024² with three mips, 34 MB; each marvel 2048² with three, 22 MB.
 import universe from './universe.wgsl?raw'
 
 const FORMAT: GPUTextureFormat = 'rgba8unorm-srgb'
-const N = 1024, M = 1536, LEVELS = 4, PREVIEW = 2
+const N = 1024, M = 2048, LEVELS = 4, PREVIEW = 2
 const TILE = 64
 const BUDGET = 2400 // µs of GPU time a frame (an M4 Pro's), by the costs below
 const LAG = 8 // ms: the GPU busier than this with the frames before, and the bake waits
@@ -18,9 +18,9 @@ const SKY = 0.075 // µs a sample of the sky
 // (longitude, latitude), how wide it is, and its turn about its own middle, in degrees; drawn in this order, so the
 // nearest last. `cost`: µs a sample, as measured, so each frame's share of the bake costs about the same.
 export const MARVELS = [
-  { at: [205, -24], width: 34, turn: 20, cost: 0.086 }, // Indra's pearls, a nebula of soap-film bubbles
-  { at: [95, -30], width: 24, turn: -35, cost: 0.038 }, // a galaxy with a Mandelbulb at its heart
-  { at: [300, -12], width: 28, turn: 0, cost: 0.038 }, // a Kleinian cathedral, its tracery dust against glowing gas
+  { at: [103, -17], width: 40, turn: 20, cost: 0.086 }, // Indra's pearls, a nebula of soap-film bubbles
+  { at: [172, -7], width: 32, turn: -25, cost: 0.05 }, // a galaxy with a Mandelbulb at its heart
+  { at: [248, -30], width: 46, turn: 0, cost: 0.038 }, // a Kleinian cathedral, its tracery dust against glowing gas
 ]
 
 // One texture's layer at one level: where it is drawn, its samples a texel, what it is (0 the sky, 1 a marvel), what a

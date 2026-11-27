@@ -9,7 +9,7 @@ struct Marvel { x: vec4f, y: vec4f, z: vec4f }
 @group(0) @binding(2) var smp: sampler;
 @group(0) @binding(3) var finer: texture_2d<f32>;
 
-const COSMOS = 0.12; // the scale it is stored at (fields/cosmos.wgsl)
+const COSMOS = 0.3; // the scale it is stored at (fields/cosmos.wgsl)
 const TAU = 6.2831853;
 
 @vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
@@ -190,6 +190,9 @@ fn indra(v: vec3f) -> vec4f {
   var t = max(hit.x, 0.0);
   var L = vec3f(0.0);
   var prev = pearls(r.o + r.d * t).x;
+  // a cloud, not a ball: it thins out raggedly toward the crescent's rim, as the ray passes nearer it
+  let pc = r.o - r.d * dot(r.o, r.d);
+  let edge = smoothstep(1.06, 0.5, length(pc) + 0.4 * (fbm(pc * 2.5 + 7.0, 4) - 0.5));
   var dt = 0.0;
   for (var i = 0; i < 200 && t < hit.y; i++) {
     let p = r.o + r.d * t;
@@ -205,18 +208,22 @@ fn indra(v: vec3f) -> vec4f {
     }
     dt = max(max(ad - 2.0 * w, 0.6 * w), 0.7 * foot);
     // the gas, a film too, far thicker, its colours drifting across the whole cloud
-    let gas = (exp(-ad / 0.02) * 2.5 + exp(-ad / 0.12) * 0.12 + exp(-ad / max(0.0015, foot)) * 4.0) * 30.0 * inside;
+    let gas = ((exp(-ad / 0.02) * 2.5 + exp(-ad / 0.12) * 0.12 + exp(-ad / max(0.0015, foot)) * 4.0) * inside + 0.07) * 30.0; // (and a little everywhere: no pearl, nor the crescent's hollow, is a hole)
     L += (film(700.0 + 500.0 * fbm(p * 2.5 + 3.0, 4), 1.0) * 9.0 + vec3f(0.04, 0.05, 0.1)) * gas * dt;
     prev = k.x;
     t += dt;
   }
-  return vec4f(L * 0.004, 0.0);
+  let y = dot(L, vec3f(0.3, 0.5, 0.2));
+  return vec4f(max(mix(vec3f(y), L, 1.35), vec3f(0.0)) * 0.008 * edge, 0.0); // its films' colours, a little deeper
 }
 
-// · A spiral galaxy whose heart is a Mandelbulb (White, Nylander: z ↦ zⁿ + c in spherical coordinates, n = 8): its old
-// stars gold on the bulb's skin, its cracks hot, its rims blue; round it the disc, two arms of young blue stars with
-// hydrogen glowing pink among them and dust along their inner edges, seen 60° from face on, so the near arm's dust lies
-// across the heart.
+// · A spiral galaxy whose heart is a Mandelbulb (White, Nylander: z ↦ zⁿ + c in spherical coordinates, n = 8), as a
+// galaxy's bulge is: light, not a surface. Its old stars crowd where the orbit lingers near the set, so the bulb's
+// folds glow, white-gold deep in and amber where the orbit ran out, its inside a dimmer haze, and its creases hold
+// dust that reddens and dims what lies behind them; it fades out into the bulge's glow, and that into the disc: two
+// arms of young blue stars with hydrogen glowing pink among them and dust along their inner edges, seen 50° from face
+// on, so the near arm's dust lies across the heart.
+const BULB = 0.55; // the bulb's size, in the disc's units (its scale length is 2.2)
 fn bulbDE(c: vec3f) -> vec2f {
   var z = c;
   var dr = 1.0;
@@ -233,64 +240,63 @@ fn bulbDE(c: vec3f) -> vec2f {
   }
   return vec2f(0.5 * log(r) * r / dr, trap);
 }
-fn bulbGalaxy(v: vec3f) -> vec4f {
-  let D = 4.8 / MARVEL[1].x.w;
-  let r = look(v, D, 1.05, 0.35);
-  // the heart, sphere-traced, its own glow gathered on the way past
-  var tb = 1e9;
-  var glow = 0.0;
-  let hb = ball(r.o, r.d, 1.25);
-  if (hb.y > 0.0) {
-    var t = hb.x;
-    for (var i = 0; i < 200; i++) {
-      let d = bulbDE(r.o + r.d * t).x;
-      glow += exp(-d * 40.0);
-      if (d < 0.5 * px * t) { tb = t; break; }
-      t += d;
-      if (t > hb.y) { break; }
-    }
-  }
-  var heart = vec3f(0.0);
-  if (tb < 1e8) {
-    let P = r.o + r.d * tb;
-    let e = 0.5 * px * tb;
-    let k = vec2f(1.0, -1.0);
-    let nrm = normalize(k.xyy * bulbDE(P + k.xyy * e).x + k.yyx * bulbDE(P + k.yyx * e).x + k.yxy * bulbDE(P + k.yxy * e).x + k.xxx * bulbDE(P + k.xxx * e).x);
-    let trap = bulbDE(P).y;
-    // how open the surface is: a probe out along the normal
-    let ao = sat(bulbDE(P + nrm * 0.04).x / 0.04);
-    let ao2 = sat(bulbDE(P + nrm * 0.15).x / 0.15);
-    let key = normalize(vec3f(-0.5, -0.45, 0.75));
-    let dif = max(dot(nrm, key), 0.0);
-    let rim = pow(1.0 - abs(dot(nrm, r.d)), 3.0);
-    // paler where the orbit ran farthest out
-    let skin = mix(vec3f(1.0, 0.68, 0.36), vec3f(1.0, 0.93, 0.82), smoothstep(0.2, 0.9, trap));
-    heart = skin * (0.45 + 0.9 * dif) * ao * ao2 + vec3f(1.6, 0.4, 0.08) * (1.0 - ao) * ao2 * 0.4 + vec3f(0.45, 0.65, 1.3) * rim * ao2;
-  }
-  // the disc, z = 0, scale length 2.2, as far as the heart that hides the rest
-  let tz = vec2f((-0.5 - r.o.z) / r.d.z, (0.5 - r.o.z) / r.d.z);
-  let t0 = max(min(tz.x, tz.y), 0.0);
-  let t1 = min(max(tz.x, tz.y), tb);
-  var L = vec3f(0.0);
-  var T = vec3f(1.0);
-  let n = 72;
-  let dt = (t1 - t0) / f32(n);
-  for (var i = 0; i < n && t1 > t0; i++) {
-    let p = r.o + r.d * (t0 + (f32(i) + 0.5) * dt);
+struct Glow { L: vec3f, T: vec3f }
+// The disc's light and dust along r from a to b, in n steps.
+fn starlight(r: Ray, a: f32, b: f32, n: i32) -> Glow {
+  var g = Glow(vec3f(0.0), vec3f(1.0));
+  let dt = (b - a) / f32(n);
+  for (var i = 0; i < n && b > a; i++) {
+    let p = r.o + r.d * (a + (f32(i) + 0.5) * dt);
     let R = length(p.xy);
     let ph = atan2(p.y, p.x) - log(max(R, 0.2)) / 0.42; // pitch 23°
     let cl = fbm(p * vec3f(5.0, 5.0, 9.0), 4);
     let arm = pow(0.5 + 0.5 * cos(2.0 * ph + 0.7 * cl), 6.0) * smoothstep(1.0, 1.8, R);
     let lane = pow(0.5 + 0.5 * cos(2.0 * ph + 0.55 + 0.7 * cl), 14.0) * smoothstep(1.0, 1.6, R);
     let disc = exp(-R / 2.2) * exp(-abs(p.z) / 0.07) * smoothstep(4.7, 3.2, R);
-    let j = (vec3f(1.0, 0.82, 0.65) * 0.15 + vec3f(0.55, 0.72, 1.0) * arm * (1.0 + 6.0 * cl * cl) + vec3f(1.0, 0.22, 0.45) * arm * pow(cl, 6.0) * 25.0) * disc
-          + vec3f(1.0, 0.8, 0.62) * exp(-length(p * vec3f(1.0, 1.0, 1.6)) / 0.5) * 1.5;
+    let j = (vec3f(1.0, 0.82, 0.65) * 0.09 + vec3f(0.55, 0.72, 1.0) * arm * (1.0 + 6.0 * cl * cl) * 1.8 + vec3f(1.0, 0.22, 0.45) * arm * pow(cl, 6.0) * 45.0) * disc
+          + vec3f(1.0, 0.86, 0.66) * exp(-length(p * vec3f(1.0, 1.0, 1.6)) / 0.4) * 1.0; // the bulge
     let od = 60.0 * disc * (0.15 + 2.5 * lane) * smoothstep(0.35, 0.65, cl) * dt;
-    L += T * j * dt;
-    T *= exp(-od * vec3f(0.7, 1.0, 1.4));
+    g.L += g.T * j * dt;
+    g.T *= exp(-od * vec3f(0.7, 1.0, 1.4));
   }
-  let c = L * 0.25 + T * heart * 0.3 + glow * vec3f(1.0, 0.78, 0.55) * 0.003 * T;
-  return vec4f(c, select(1.0 - T.g, 1.0, tb < 1e8));
+  return g;
+}
+// The heart along r from a to b: light gathered as the ray passes near the bulb's folds and through it.
+fn heart(r: Ray, a: f32, b: f32) -> Glow {
+  var g = Glow(vec3f(0.0), vec3f(1.0));
+  var t = a;
+  for (var i = 0; i < 96 && t < b; i++) {
+    let p = r.o + r.d * t;
+    let e = bulbDE(p / BULB);
+    let d = e.x * BULB;
+    let inside = d <= 0.0;
+    let prof = exp(-dot(p, p) / (0.64 * BULB * BULB)); // a bulge's light falls off from its middle: no edge to it
+    let fold = prof * select(exp(-d / 0.012) + 0.3 * exp(-d / 0.08), 0.25 + 2.0 * exp(-dot(p, p) / (0.09 * BULB * BULB)), inside); // the stars, thickest on the set's folds and in its heart
+    let hot = mix(vec3f(1.0, 0.96, 0.9), vec3f(1.0, 0.8, 0.52), smoothstep(0.1, 0.7, e.y) * smoothstep(0.0, 0.03, d));
+    let dust = prof * select(5.0 * exp(-d / 0.02) * smoothstep(0.5, 0.15, e.y), 5.0, inside); // in its creases, and through it
+    let dt = select(clamp(0.6 * d, 0.003, 0.05), 0.01, inside);
+    g.L += g.T * hot * fold * dt;
+    g.T *= exp(-dust * dt * vec3f(0.75, 1.0, 1.35));
+    t += dt;
+  }
+  return g;
+}
+fn bulbGalaxy(v: vec3f) -> vec4f {
+  let D = 4.4 / MARVEL[1].x.w;
+  let r = look(v, D, 0.9, 0.35);
+  // the disc, z = 0, in front of the heart and behind it, and the heart between
+  let tz = vec2f((-0.5 - r.o.z) / r.d.z, (0.5 - r.o.z) / r.d.z);
+  let t0 = max(min(tz.x, tz.y), 0.0);
+  let t1 = max(tz.x, tz.y);
+  let hb = ball(r.o, r.d, 1.3 * BULB);
+  let tm = select(t1, clamp(0.5 * (hb.x + hb.y), t0, t1), hb.y > 0.0);
+  let nf = clamp(i32(72.0 * (tm - t0) / max(t1 - t0, 1e-6)), 1, 71);
+  let front = starlight(r, t0, tm, nf);
+  let back = starlight(r, tm, t1, 72 - nf);
+  var mid = Glow(vec3f(0.0), vec3f(1.0));
+  if (hb.y > 0.0) { mid = heart(r, max(hb.x, 0.0), hb.y); }
+  let L = front.L * 0.75 + front.T * (mid.L * 2.6 + mid.T * back.L * 0.75);
+  return vec4f(L, 1.0 - front.T.g * mid.T.g * back.T.g);
 }
 
 // · A Kleinian cathedral (Knighty's pseudo-Kleinian): space folded by a box and inverted in a sphere until nothing
@@ -318,8 +324,8 @@ fn backlight(p: vec3f) -> vec3f {
   let core = exp(-r * r / 2.6);
   let cloud = smoothstep(0.25, 0.75, n) * exp(-r * r / 4.0) * smoothstep(2.9, 2.1, r);
   // oxygen's teal nearer the hot heart, hydrogen's red farther out, sulphur's deeper red in the thickest
-  let gas = mix(vec3f(0.15, 0.85, 0.8), vec3f(1.0, 0.2, 0.3), smoothstep(0.6, 1.6, r + 0.8 * (m - 0.5)));
-  return vec3f(0.55, 0.75, 1.0) * core * (0.5 + n) * 1.5 + gas * cloud * 2.5 + vec3f(0.8, 0.1, 0.05) * cloud * smoothstep(0.55, 0.8, n) * 2.0;
+  let gas = mix(vec3f(0.1, 0.9, 0.75), vec3f(1.0, 0.12, 0.18), smoothstep(0.8, 1.8, r + 0.8 * (m - 0.5)));
+  return vec3f(0.6, 0.85, 1.0) * core * core * (0.5 + n) * 3.0 + gas * cloud * 3.5 + vec3f(0.8, 0.05, 0.03) * cloud * smoothstep(0.55, 0.8, n) * 3.0;
 }
 fn kleinianNebula(v: vec3f) -> vec4f {
   let D = 3.0 / MARVEL[2].x.w;
@@ -329,30 +335,31 @@ fn kleinianNebula(v: vec3f) -> vec4f {
   let tz = vec2f((0.62 - r.o.z) / r.d.z, (-3.0 - r.o.z) / r.d.z);
   let pm = r.o - r.d * r.o.z / r.d.z;
   let window = smoothstep(2.9, 2.0, length(pm.xy) + 0.8 * fbm(pm * 1.5, 3));
-  let rim = backlight(pm - vec3f(0.0, 0.0, 1.5)) * 0.35;
+  let rim = backlight(pm - vec3f(0.0, 0.0, 1.5)) * 0.45;
   var t = tz.x;
   var L = vec3f(0.0);
-  var T = 1.0;
-  for (var i = 0; i < 128 && T > 0.004 && window > 0.0; i++) {
+  var T = vec3f(1.0);
+  for (var i = 0; i < 128 && T.g > 0.004 && window > 0.0; i++) {
     let p = r.o + r.d * t;
     if (p.z < -0.62) { break; }
     let d = cathedral(p);
-    let w = max(0.004, px * t); // its sheets have no thickness of their own: as thick as a texel sees, and opaque
+    let w = max(0.004, px * t); // its sheets have no thickness of their own: as thick as a texel sees
     let dt = clamp(d - w, 0.7 * w, 0.06);
     let sheet = exp(-d / w) / w * window;
-    // dark, but for the light from behind that the dust scatters back toward us: its silver lining
+    // dark, but for the light from behind that the dust scatters back toward us: its silver lining. Dust, not stone:
+    // it dims what is behind it and reddens it, blue first, and a little gets through
     L += T * rim * sheet * dt;
-    T *= exp(-2.0 * sheet * dt);
+    T *= exp(-1.1 * sheet * dt * vec3f(0.7, 1.0, 1.4));
     t += dt;
   }
   // and the gas, seen through what the tracery lets by
   let tg = max(t, (-0.62 - r.o.z) / r.d.z);
   let dg = (tz.y - tg) / 12.0;
-  for (var i = 0; i < 12 && T > 0.004; i++) {
+  for (var i = 0; i < 12 && T.g > 0.004; i++) {
     let p = r.o + r.d * (tg + (f32(i) + 0.5) * dg);
     L += T * backlight(p) * exp(-(p.z + 1.6) * (p.z + 1.6) / 0.8) * dg;
   }
-  return vec4f(L * 0.04, 0.0);
+  return vec4f(L * 0.12, 0.0);
 }
 
 fn marvel(k: i32, v: vec3f) -> vec4f {
