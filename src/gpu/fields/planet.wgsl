@@ -715,22 +715,18 @@ fn relief(ro: vec3f, rd: vec3f, t0: f32, t1: f32) -> f32 {
 }
 
 // ---- the well ------------------------------------------------------------------------------------------------------
-// At the pole, in the storm's eye, a well through the crust, and under it the planet is hollow: Primorial's world
-// (sites/core.ts), a ball of dark air with the primes standing in it.
-//   Across the well, Sacks' spiral: every integer on one winding line, n at radius √n; a bead of light at each prime.
-//   Down the middle, the light of what is under it.
-//   Round the ball, the search itself: 2^p − 1 for exponents past the record, trial factored.
-// What stands in the hall and what is on its wall are a glow here (hall, vault): the scene inside has them in full
-// (core.wgsl, which takes those two names over). Rock is seen through from outside the hollow, never from in it, so
-// an eye that leaves through the crust sees what it is leaving all the way out.
+// At the pole, in the storm's eye, a well through the crust, and under it the planet is hollow and dark: Primorial's
+// world (sites/core.ts). Across the well, the prime galaxy: Sacks' spiral, every integer on one winding line, n at
+// radius √n, a star at each prime. Far under it, a lamp. What stands round the lamp is the scene's (core.wgsl, which
+// takes `hollow` over); here it is the lamp alone. Rock is seen through from under the ground, so an eye that leaves
+// through the crust sees what it is leaving all the way out.
 const WA = 0.045;               // the well's radius
-const WF = 0.485;               // the hall's middle, over the planet's: the level the integers lie on
-const WC = 0.5;                 // the hall's radius
-const WN = 0.981;               // the well's foot, in the hall's crown
-const WS = 0.996;               // Sacks' spiral, just under the water
-const AU = vec3f(1.0, 0.72, 0.22);   // a prime that is 1 mod 4, a sum of two squares
-const AZ = vec3f(0.2, 0.62, 1.0);    // one that is 3 mod 4, and never is
-const WHITE = vec3f(1.0, 0.9, 0.7);
+const WY = 0.45;                // the floor of what stands in the hollow, over the planet's middle
+const WN = 0.981;               // the well's foot
+const WS = 0.996;               // the galaxy, just under the water
+const AU = vec3f(1.0, 0.68, 0.28);   // the lamp's gold
+const AZ = vec3f(0.45, 0.72, 1.0);
+const WHITE = vec3f(1.0, 0.94, 0.84);
 const PRIMES = array<u32, 18>(2u, 3u, 5u, 7u, 11u, 13u, 17u, 19u, 23u, 29u, 31u, 37u, 41u, 43u, 47u, 53u, 59u, 61u);
 var<private> deep = 0.0;        // how far along its ray within() found its light
 
@@ -744,19 +740,11 @@ fn trial(n: u32) -> bool {
 }
 // A level of the hollow as the eye has it on coming in: x to the right, y away.
 fn plan(P: vec3f) -> vec2f { return vec2f(-P.x, P.z); }
-// How much of its light the hall's air lets through t of it.
-fn murk(t: f32) -> f32 { return exp(-1.4 * t); }
-// A shaft of light, upright, radius R about the axis at A (plan): how much of it the ray from o along d (plan, any one
-// scale) passes through, and where along the ray it passes nearest.
-fn shaft(o: vec2f, d: vec2f, A: vec2f, R: f32) -> vec2f {
-  let ts = dot(A - o, d) / max(dot(d, d), 1e-12);
-  let v = o + d * ts - A;
-  let k = max(1.0 - dot(v, v) / (R * R), 0.0);
-  return vec2f(k * sqrt(k), ts);
-}
 
-// Sacks' spiral: n at radius √n and √n turns round, so the squares lie along one ray; a bead on the winding at every
-// prime, out to `rim` turns. x in its own units, w a pixel's width in them. Light, and how much it hides.
+// Sacks' spiral: n at radius √n and √n turns round, so the squares lie along one ray; a star on the winding at every
+// prime, out to `rim` turns, a hard disc. Gold is p ≡ 1 (mod 4), blue p ≡ 3; a twin (p ± 2 prime too) is white, one
+// of a binary; and the primes of Euler's n² + n + 41, which is prime for every n from 0 to 39, are the brightest,
+// so that curve is a lane of them. x in its own units, w a pixel's width in them. Light, and how much it hides.
 fn winds(x: vec2f, w: f32, rim: f32) -> vec4f {
   let r = length(x);
   if (r > rim) { return vec4f(0.0); }
@@ -765,79 +753,74 @@ fn winds(x: vec2f, w: f32, rim: f32) -> vec4f {
   var c = vec4f(0.0);
   for (var d = 0.0; d < 2.0; d += 1.0) {
     let n = floor(s * s) + d;
-    if (!trial(u32(n))) { continue; }
+    let m = u32(n);
+    if (!trial(m)) { continue; }
     let q = sqrt(n);
-    let k = sat((0.46 - length(vec2f(q - r, (q - s) * TAU * r))) / max(2.0 * w, 1e-3) + 0.5);
-    c = max(c, vec4f(select(select(AZ, AU, u32(n) % 4u == 1u), WHITE, n == 2.0) * 5.0, 1.0) * k);
+    let e = sqrt(max(4.0 * n - 163.0, 0.0));
+    let euler = n >= 41.0 && abs(e - round(e)) < 1e-3 * e; // n = k² + k + 41
+    let twin = trial(m + 2u) || (m > 2u && trial(m - 2u));
+    let k = sat((select(0.3, 0.46, euler) - length(vec2f(q - r, (q - s) * TAU * r))) / max(w, 1e-3) + 0.5);
+    c = max(c, vec4f(select(select(select(AZ, AU, m % 4u == 1u) * 3.0, WHITE * 4.0, twin), WHITE * 9.0, euler), 1.0) * k);
   }
-  // the winding itself, a thread; and from far the beads' mean: a prime to every ln n integers, each integer π of the plane
-  let th = max(0.05, 0.7 * w);
-  c += (1.0 - c.a) * vec4f(WHITE * 0.02 / th * exp(-pow((r - s) / th, 2.0)), 0.0);
-  return mix(vec4f(2.5 * (AU + AZ), 1.0) * 0.2116 / log(max(r * r, 3.0)), c, exp(-1.5 * w));
+  // from far, their mean: a prime to every ln n integers, each integer π of the plane
+  return mix(vec4f(4.0 * WHITE, 1.0) * 0.09 / log(max(r * r, 3.0)), c, exp(-1.5 * w));
 }
-// Across the well it is wound 32 turns, to 1024, turning once in under three minutes; from too far to tell those
-// beads apart, 8 turns, to 64, the same spiral four times the size. x in the finer's units.
+// Across the well it is wound 64 turns, to 4096, turning once in under three minutes; from too far to tell those
+// stars apart, 16 turns, to 256, the same spiral four times the size. x in the finer's units.
 fn sacks(x0: vec2f, w: f32) -> vec4f {
   let turn = 0.006 * TAU * u.p[5].w;
   let x = vec2f(x0.x * cos(turn) + x0.y * sin(turn), x0.y * cos(turn) - x0.x * sin(turn));
-  let far = smoothstep(0.45, 0.9, w);
+  let far = smoothstep(0.35, 0.7, w);
   var c = vec4f(0.0);
-  if (far < 1.0) { c = (1.0 - far) * winds(x, w, 32.0); }
-  if (far > 0.0) { c += far * winds(0.25 * x, 0.25 * w, 8.0); }
+  if (far < 1.0) { c = (1.0 - far) * winds(x, w, 64.0); }
+  if (far > 0.0) { c += far * winds(0.25 * x, 0.25 * w, 16.0); }
   return c;
 }
 
-// What the hall's air holds between ro and t along rd, as light (t0: how far the ray had come to ro): here, only the
-// shaft down its middle, under the well.
-fn hall(ro: vec3f, rd: vec3f, t0: f32, t: f32) -> vec3f {
-  let s = shaft(ro.xz, rd.xz, vec2f(0.0), WA);
-  let y = ro.y + rd.y * s.y;
-  if (s.y <= 0.0 || s.y >= t) { return vec3f(0.0); }
-  return vec3f(1.0, 0.8, 0.5) * 0.12 * s.x * smoothstep(WF - 0.3, WF, y) * smoothstep(0.0, 0.15, s.y) * min(1.0 / max(length(rd.xz), 1e-3), 2.0) * murk(t0 + s.y);
+// What is in the hollow along rd from ro (t0: how far the ray had come to ro): its light, and how much of what is
+// behind it hides. Here, the lamp alone, a point of gold far down.
+fn hollow(ro: vec3f, rd: vec3f, t0: f32) -> vec4f {
+  let c = vec3f(0.0, WY + 0.032, 0.0) - ro;
+  let tm = dot(c, rd);
+  deep = max(tm, 0.0);
+  let px = max(t0 + tm, 1e-3) * cone();
+  return vec4f(AU * 3.0, 1.0) * sat((0.02 - sqrt(max(dot(c, c) - tm * tm, 0.0))) / px + 0.5) * step(0.0, tm);
 }
-// The hall's wall at P: candidates not yet tried, thinly.
-fn vault(P: vec3f, t: f32) -> vec3f { return vec3f(0.1, 0.12, 0.34) * 0.12 * murk(t); }
 
-// What a ray sees of the hollow, from ro (in the well's mouth, or anywhere under the ground) along rd, t0 after it
-// left the eye. The hollow is the hall's ball and the well's cylinder; the ray's light is where it leaves them, and
-// what the air holds on the way.
+// What a ray sees under the ground, from ro (in the well's mouth, or anywhere under it) along rd, t0 after it left
+// the eye: the well's own wall, the sky up it, the galaxy across it, and the hollow.
 fn within(ro: vec3f, rd: vec3f, t0: f32) -> vec3f {
   let up = rd.y > 0.0;
   let iy = 1.0 / select(rd.y, select(-1e-6, 1e-6, up), abs(rd.y) < 1e-6);
-  let oc = ro - vec3f(0.0, WF, 0.0);
-  let sb = dot(oc, rd);
-  let sh = sb * sb - dot(oc, oc) + WC * WC;
-  let far = -sb + sqrt(max(sh, 0.0));
-  let inH = sh > 0.0 && far > 0.0;
   let ca = max(dot(rd.xz, rd.xz), 1e-9);
   let cb = dot(ro.xz, rd.xz);
   let ch = cb * cb - ca * (dot(ro.xz, ro.xz) - WA * WA);
-  let ya = (WN - 0.004 - ro.y) * iy; // the well's foot, and its mouth
+  let ya = (WN - ro.y) * iy; // the well's foot, and its mouth
   let yb = (1.0 - ro.y) * iy;
   let c1 = (-cb + sqrt(max(ch, 0.0))) / ca;
   let out = max(ya, yb);
   let n1 = min(c1, out);
   let inN = ch > 0.0 && n1 > max(max((-cb - sqrt(max(ch, 0.0))) / ca, min(ya, yb)), 0.0);
-  var kind = 0; // 1 the hall's wall, 3 the well's, 4 the sky up it; 0 rock
-  var t = 0.0;
-  let PH = ro + rd * far;
-  if (!up && inN && c1 < out) { kind = 3; t = n1; }
-  else if (inH && !(up && dot(PH.xz, PH.xz) < WA * WA)) { kind = 1; t = far; }
-  else if (up && inN) { kind = select(4, 3, c1 < out); t = n1; }
-  deep = t;
+  // the well's wall: rock, lit from under; the waterline
+  let f = sat((1.0 - ro.y - rd.y * n1) / (1.0 - WN));
+  let wall = vec3f(1.0, 0.6, 0.22) * (0.02 + 0.25 * f * f) + WHITE * 0.5 * exp(-f * 60.0);
   var c = vec3f(0.0);
-  let P = ro + rd * t;
-  if (kind == 1) { c = vault(P, t0 + t); }
-  if (kind == 3) { let f = sat((1.0 - P.y) / (1.0 - WN)); c = vec3f(1.0, 0.6, 0.22) * (0.03 + 0.4 * f * f) + WHITE * 0.5 * exp(-f * 60.0); } // rock, lit from under; the waterline
-  if (kind == 4) { c = vec3f(0.2, 0.34, 0.6) * sat(0.3 + 4.0 * u.p[5].y); } // day, from down a well
-  if (inH && (kind == 1 || up)) { c += hall(ro, rd, t0, far); }
-  // the spiral, a level the ray crosses once
+  var t = n1;
+  if (!up && inN && c1 < out) { c = wall; deep = n1; }
+  else {
+    let h = hollow(ro, rd, t0);
+    t = select(1e9, n1, up && inN);
+    c = h.rgb;
+    if (up && inN) { c += (1.0 - h.a) * select(vec3f(0.2, 0.34, 0.6) * sat(0.3 + 4.0 * u.p[5].y), wall, c1 < out); } // (day, from down a well)
+  }
+  // the galaxy, a level the ray crosses once
   let ts = (WS - ro.y) * iy;
   if (ts > 0.0 && ts < t) {
-    let x = plan(ro + rd * ts) * (32.0 / WA);
-    var S = sacks(x, (t0 + ts) * cone() / max(abs(rd.y), 0.15) * 32.0 / WA);
+    let x = plan(ro + rd * ts) * (64.0 / WA);
+    var S = sacks(x, (t0 + ts) * cone() / max(abs(rd.y), 0.15) * 64.0 / WA);
     // and from far, the light that comes up the well, and the dark of how deep it is
-    S += (1.0 - S.a) * vec4f(AU * 0.5 * smoothstep(0.6, 2.5, t0 + ts), 0.9 * smoothstep(0.1, 0.4, t0 + ts)) * sat(6.0 - dot(x, x) / 171.0) * step(rd.y, 0.0);
+    S += (1.0 - S.a) * vec4f(AU * 0.5 * smoothstep(0.6, 2.5, t0 + ts), 0.9 * smoothstep(0.1, 0.4, t0 + ts)) * sat(6.0 - dot(x, x) / 683.0) * step(rd.y, 0.0);
+    S *= smoothstep(0.003, 0.02, t0 + ts); // (an eye going through it goes between its stars, not into one)
     if (S.a > 0.5) { deep = ts; }
     c = S.rgb + (1.0 - S.a) * c;
   }
