@@ -2,7 +2,7 @@
 // and its camera, the sun, where a point lands on the screen with the planet in the way, and River's hardware, stood
 // or flown.
 // Units are planet radii; world space is the planet's own frame, the eye somewhere in it.
-import { project, seen } from '../acts/reality'
+import { seen } from '../acts/reality'
 import type { Frame } from '../acts/scene'
 import type { Model, Placed } from '../gpu/mesh'
 
@@ -74,8 +74,18 @@ export function clear(w: ArrayLike<number>) {
   const t = -b - Math.sqrt(h)
   return t < 0 || t > L
 }
-// Where world point w lands on the screen (in `seen`), if the eye can see it.
-export const look = (w: ArrayLike<number>) => clear(w) && project(ctx.p, w[0] - ctx.E[0], w[1] - ctx.E[1], w[2] - ctx.E[2])
+// Where world point w lands on the screen (in `seen`), if the eye can see it. (reality's project() will not look
+// nearer than 0.02, a scene's metres but 20 km here: River's hardware, a millimetre a 1.8e-4 of a radius, is seen
+// from far closer, so the world projects for itself, as near as 1e-7.)
+export function look(w: ArrayLike<number>) {
+  if (!clear(w)) return false
+  const p = ctx.p, x = w[0] - ctx.E[0], y = w[1] - ctx.E[1], z = w[2] - ctx.E[2], d = x * p[12] + y * p[13] + z * p[14]
+  if (d < 1e-7) return false
+  seen.x = ((x * p[4] + y * p[5] + z * p[6]) * p[3]) / d
+  seen.y = ((x * p[8] + y * p[9] + z * p[10]) * p[3]) / d
+  seen.d = d
+  return true
+}
 export { seen }
 // Model `id` (if it has loaded) at world point c, its own x, y, z axes laid along the unit vectors ax, ay, az,
 // `size` radii across its widest, centred: one more solid this frame, its lamps (if it has any) lit `lit` of colour

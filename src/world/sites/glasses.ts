@@ -1,91 +1,184 @@
-// strobeGlasses: River's open strobe glasses, MK1, on a stand facing south (places.ts stands the frame and the board);
-// beyond their two LCD valves, level with them, a wheel of five blades turning on a post.
+// strobeGlasses: River's open strobe glasses, MK1, on a stand facing south, doing what they are for: a ball is lobbed at
+// them, again and again, rising over the horizon (on a planet this small, half a metre off at their height), peaking
+// level with the lenses, bouncing once in front of them and flying on past the right temple, out of sight behind.
 //
-// The glasses' firmware, at its fastest and darkest, runs 20 frames a second at 80 % dark, so each valve is clear for
-// 10 ms in every 50. The wheel turns at about 4 rev/s. Through a valve it is only where it was while the valve was last
-// clear: five blades repeat every fifth of a turn, so through the lenses it turns at f′ = f − f_s/5, and as the
-// wheel's speed drifts through 4 rev/s it creeps forward, stands still and walks backwards, while round the glasses it
-// is plainly turning. Here time runs 25× slow, so a valve blinks under once a second (and never faster: nothing
-// flickers), and the drift that takes the real wheel 24 s comes round in 24 here.
-import { TAU } from '../../acts/scene'
-import { box, make, prism, tube } from '../make'
-import { ctx, frame, site, solid, type V } from '../ctx'
-import { PLACES } from '../places'
+// The glasses run their fastest and darkest, 20 frames a second at 80 % dark, so each valve is clear for 10 ms in every
+// 50. Arriving, the camera goes behind the right lens: through it the ball is only where it was while the valve was last
+// clear, a run of still pictures, and under it and past the rim, where the lens does not reach, it flies on smoothly.
+// Here time runs ten times slow, so a valve opens twice a second on the screen (never more: a lens large on the screen
+// must not flicker faster than 3 Hz) and a lob takes the half second or so it would. After a while River's board comes
+// off the right temple; clicked, it comes up to the camera and turns over.
+import { TAU, clamp, glide, mix, smooth } from '../../acts/scene'
+import { Plucks } from '../../dsp/pluck'
+import { ball, box, make, tube, type Mat } from '../make'
+import { ctx, frame, part, site, solid, turn, type V } from '../ctx'
+import { PLACES, type About, type Steer } from '../places'
 
-const SLOW = 25
-const FS = 20, CLEAR = 0.2, BLADES = 5, F0 = FS / BLADES, DF = 0.3, DRIFT = 24 // the strobe; the wheel: rev/s, its swing, the swing's period (s)
+const SLOW = 10
+const FS = 20, CLEAR = 0.2 // the strobe: frames a second, and the share of each a valve is clear
 const GS = 0.13, GM = GS / 150.3 // the glasses, radii across, and radii to a millimetre of them
-export const LIFT = 76 * GM // how high the stand holds them: their windows level with the wheel's hub
-// the wheel's angle at real time τ, its swing at period d (real seconds)
-const angle = (t: number, d = DRIFT) => TAU * (F0 * t - ((DF * d) / TAU) * Math.cos((TAU * t) / d))
+export const LIFT = 76 * GM // how high the stand holds them
+const EYE = LIFT / GM + 23.1 - 4 // the lenses' middle, mm up
 const valve = (t: number) => t * FS - Math.floor(t * FS) < CLEAR // is a valve clear at real time τ?
 
 // ---- what is not in the CAD, in millimetres: each LCD valve, clear and dark, a little larger than the frame's window
-// it sits behind; the wheel, five white blades on a black hub; its post ----------------------------------------------
+// it sits behind; the glasses' stand; the ball, a tennis ball (67 mm) with its seam -------------------------------------
 const W = 30, H = 34
-make('valve-clear', () => box({ col: [0.32, 0.34, 0.3, 0.22], metal: 0, rough: 0.05 }, [-W / 2, -H / 2, -0.6], [W / 2, H / 2, 0.6]))
+make('valve-clear', () => box({ col: [0.04, 0.045, 0.04, 0.55], metal: 0, rough: 0.05 }, [-W / 2, -H / 2, -0.6], [W / 2, H / 2, 0.6]))
 make('valve-dark', () => box({ col: [0.004, 0.005, 0.006, 0.985], metal: 0, rough: 0.05 }, [-W / 2, -H / 2, -0.6], [W / 2, H / 2, 0.6]))
-const R = 85
-make('strobe-wheel', () => {
-  const white = { col: [0.86, 0.85, 0.8, 1], metal: 0, rough: 0.55 }
-  tube({ col: [0.02, 0.02, 0.022, 1], metal: 0.6, rough: 0.35 }, [0, 0, -3], [0, 0, 1], 11, 11, 6, 32, true)
-  for (let k = 0; k < BLADES; k++) {
-    const a = (k * TAU) / BLADES, c = Math.cos(a), s = Math.sin(a), at = (r: number, w: number): [number, number] => [r * c - w * s, r * s + w * c]
-    prism(white, [at(9, -5), at(R, -13), at(R, 13), at(9, 5)], -1.2, 1.2)
-  }
-})
 make('glasses-stand', () => {
-  const dark = { col: [0.03, 0.03, 0.035, 1], metal: 0.8, rough: 0.4 }
+  const dark: Mat = { col: [0.03, 0.03, 0.035, 1], metal: 0.8, rough: 0.4 }
   tube(dark, [0, 0, 0], [0, 1, 0], 4, 3, 81, 24, true)
   box(dark, [-7, 79, -5], [7, 81, 5])
   tube(dark, [0, 0, 0], [0, 1, 0], 16, 15, 2.5, 32, true)
 })
-make('strobe-post', () => {
-  const dark = { col: [0.03, 0.03, 0.035, 1], metal: 0.8, rough: 0.4 }
-  tube(dark, [0, 0, 0], [0, 1, 0], 5, 4, 95, 24, true)
-  tube(dark, [0, 95, 0], [0, 0, 1], 3, 3, 9, 16, true)
-  box(dark, [-18, 0, -10], [18, 3, 10])
+const R = 33.5
+make('tennis-ball', () => {
+  ball({ col: [0.55, 0.78, 0.03, 1], metal: 0, rough: 0.95 }, [0, 0, 0], R, 32)
+  // the seam: (a cos θ + b cos 3θ, a sin θ − b sin 3θ, 2√(ab) sin 2θ) lies on the unit sphere when a + b = 1
+  const white: Mat = { col: [0.85, 0.85, 0.8, 1], metal: 0, rough: 0.9 }, a = 0.69, b = 0.31, n = 96, at = (t: number) => [a * Math.cos(t) + b * Math.cos(3 * t), a * Math.sin(t) - b * Math.sin(3 * t), 2 * Math.sqrt(a * b) * Math.sin(2 * t)].map((x) => x * (R + 0.3))
+  for (let i = 0; i < n; i++) {
+    const p = at((i / n) * TAU), q = at(((i + 1) / n) * TAU), d = q.map((x, j) => x - p[j]), l = Math.hypot(...d)
+    tube(white, p as [number, number, number], d.map((x) => x / l) as [number, number, number], 1.4, 1.4, l, 6)
+  }
 })
 
-const n: V = [0, 0, 0], e: V = [0, 0, 0], N: V = [0, 0, 0], g: V = [0, 0, 0], c: V = [0, 0, 0], ax: V = [0, 0, 0], ay: V = [0, 0, 0], az: V = [0, 0, 0]
-// a point of the glasses' place: x east, y up, z north, mm from the frame's foot
+// ---- the lob, in the place's own millimetres (x east, y up from the ground, z north), under the place's own g: it rises
+// over the horizon, peaks at the lenses' height 450 mm out (seen through the right lens from behind it), drifting west so
+// it passes the right temple, bounces at e = 0.75 (a tennis ball's) where the ground is (the planet curving away under
+// it), and goes on north, out of sight. -------------------------------------------------------------------------------
+const G0 = 9810, VZ = 1200, ZA = -486, YA = EYE + 10, XA = -35, VX = -81 / (450 / VZ), E_ = 0.75, RP = 1 / GM // mm/s², mm/s, its peak, mm/s, restitution, the planet's radius
+const PERIOD = 0.8, T0 = 0.3, LIFE = 1.2, PHASE = 0.22 // s between lobs; it peaks T0 after it clears the horizon, and is out of every view
+// LIFE after; and the lobs' phase, so one is coming down past the glasses as the arrival's fly-past goes by (planet time −10.3 s)
+const floor = (t: number) => {
+  const x = XA + VX * t, z = ZA + VZ * t
+  return R - (x * x + z * z) / (2 * RP) // the ball's middle when it touches the ground then
+}
+// each arc: when it starts, its height and its upward speed then
+const arcs: [t: number, y: number, vy: number][] = [[0, YA, 0]]
+for (let k = 0; k < 3; k++) {
+  // when it comes down to the ground again: the later root, by bisection
+  const [t0, y0, vy] = arcs[k], h = (dt: number) => y0 + vy * dt - (G0 * dt * dt) / 2 - floor(t0 + dt)
+  let lo = vy / G0, hi = lo + 2
+  for (let i = 0; i < 50; i++) h((lo + hi) / 2) > 0 ? (lo = (lo + hi) / 2) : (hi = (lo + hi) / 2)
+  arcs.push([t0 + lo, floor(t0 + lo), E_ * (G0 * lo - vy)])
+}
+// where a lob is, t seconds after its peak (before it, too): [x, y, z]
+function lob(t: number, o: V) {
+  let k = arcs.length - 1
+  while (k > 0 && t < arcs[k][0]) k--
+  const [t0, y0, vy] = arcs[k], dt = t - t0
+  return (o[0] = XA + VX * t), (o[1] = y0 + vy * dt - (G0 * dt * dt) / 2), (o[2] = ZA + VZ * t), o
+}
+
+// ---- the parts, and coming apart --------------------------------------------------------------------------------------
+export const about: Record<string, About> = {
+  'strobe-frame': { name: 'MK1 frame', does: 'A printed frame (PETG or resin) with a swept brow cover held by two screws from above. Each LCD valve slides down into its rim; a narrow plate along the top edge catches the glass at its four corners.' },
+  'strobe-board': { name: 'strobeGlasses MK1 board', does: '41.2 × 15.25 mm, two layers, on the right temple over a 40 mAh cell: an ATtiny402 at 5 MHz cuts each dark window into balanced pairs, +3.3 V then −3.3 V for 5 ms each, so the liquid crystal never sits on DC; USB-C charging; one button for the presets.', board: 'strobe.webp' },
+}
+about['strobe-valve-l'] = about['strobe-valve-r'] = { name: 'LCD light valve', does: 'Adafruit 3627: a liquid-crystal shutter, 1.83 mm glass, dark while driven and clear when its leads are shorted. Here it runs 20 frames a second, 80 % dark: clear 10 ms in every 50.' }
+// the board on the right temple's outer face (mm, the glasses' own frame: x east, y up, z north), and where it goes apart
+const BOARD = [-75.8, EYE + 1.5, 15], APART = 16 // s at rest before they come apart
+let apart = 0, lift = 0, vlift = 0, spin = 0
+// What the world's music hears from here (sound.ts): n, how many times the lenses have opened so far; f, 100 Hz, the
+// valves' drive (±3.3 V pairs, 5 ms a half)
+export const events = { n: 0, f: 100 }
+let frames = NaN
+
+const n: V = [0, 0, 0], e: V = [0, 0, 0], N: V = [0, 0, 0], c: V = [0, 0, 0], ax: V = [0, 0, 0], ay: V = [0, 0, 0], az: V = [0, 0, 0]
+const xyz: V = [0, 0, 0]
+// a point of the glasses' place, mm from the frame's foot (x east, y up, z north)
 const at = (x: number, y: number, z: number, o: V) => {
   for (let i = 0; i < 3; i++) o[i] = n[i] * (1.0005 + y * GM) + (e[i] * x + N[i] * z) * GM
   return o
 }
-
-export function draw(k: number) {
-  const P = PLACES[k]
-  site(P.lat, P.lon, n)
-  if (n[0] * ctx.E[0] + n[1] * ctx.E[1] + n[2] * ctx.E[2] < 0.5) return
-  frame(n, e, N)
-  const tau = ctx.t / SLOW, clear = valve(tau)
-  // the valves, in the frame's windows (x ±31 mm, 4 mm under its middle, 36 mm in front of it); the stand under its bridge
-  const y = LIFT / GM + 23.1 - 4
-  for (let j = 0; j < 3; j++) (ax[j] = -e[j]), (az[j] = N[j])
-  for (const x of [-31, 31]) solid(clear ? 'valve-clear' : 'valve-dark', at(x, y, -36, c), ax, n, az, H * GM)
-  solid('glasses-stand', at(0, 40.5, -30, c), ax, n, az, 81 * GM)
-  // the wheel, a hand's breadth south of them, facing them, turning on its post; the drift brought round to 24 s here
-  const th = angle(tau, DRIFT / SLOW)
-  for (let j = 0; j < 3; j++) (ax[j] = Math.cos(th) * e[j] + Math.sin(th) * n[j]), (ay[j] = -Math.sin(th) * e[j] + Math.cos(th) * n[j]), (az[j] = -N[j])
-  solid('strobe-wheel', at(0, y, -135, c), ax, ay, az, 2 * R * GM)
-  for (let j = 0; j < 3; j++) (ax[j] = e[j]), (az[j] = -N[j])
-  solid('strobe-post', at(0, (y + 3) / 2, -131, g), ax, n, az, (y + 3) * GM)
+// the board's middle as it is now: on the temple, apart (out to the west and up), or clicked (up to the camera)
+const B: V = [0, 0, 0], B1: V = [0, 0, 0]
+function board(o: V) {
+  const a = smooth(0, 1, apart)
+  at(BOARD[0] - 40 * a, BOARD[1] + 16 * a, BOARD[2], B)
+  at(BOARD[0] - 70, BOARD[1] + 45, BOARD[2] - 40, B1)
+  for (let i = 0; i < 3; i++) o[i] = mix(B[i], B1[i], lift)
+  return o
 }
 
-// What it sounds like, in real time, under the picture's slowing: the wheel as a photodiode behind a valve sees it,
-// the five blades passing, let through for 10 ms in every 50, so what is heard is the strobe's own beat, 5(f − 4) Hz,
-// swelling a low note and letting it go, slowing, stopping and turning over as the wheel's picture does; and each
-// time a valve opens in the picture, a soft click.
-let open = 0, mean = 0, purr = 0, ph = 0, was = false, click = 0
+export function draw(k: number) {
+  const P = PLACES[k], dt = ctx.dt
+  site(P.lat, P.lon, n)
+  frame(n, e, N)
+  // coming apart, after a while at rest here (and together again away); clicked, the board comes up to the camera
+  const here = ctx.focus === k
+  apart = clamp(apart + (here && ctx.since > APART ? dt : -dt) / 2.5)
+  const want = here && ctx.picked === 'strobe-board' ? 1 : 0, w = 3.2
+  vlift += (w * w * (want - lift) - 2 * w * vlift) * dt
+  lift = clamp(lift + vlift * dt, 0, 1)
+  if (want) spin += 0.4 * dt
+  else spin += (TAU * Math.round(spin / TAU) - spin) * (1 - Math.exp(-2.5 * dt))
+  // each frame of the strobe opens the lenses once (a jump in the clock is one more, not a burst)
+  const tau = ctx.t / SLOW, now = Math.floor(tau * FS)
+  if (now > frames) events.n++
+  frames = now
+  if (n[0] * ctx.E[0] + n[1] * ctx.E[1] + n[2] * ctx.E[2] < 0.5) return
+  const clear = valve(tau), a = smooth(0, 1, apart)
+  // the frame, and the stand under its bridge
+  for (let j = 0; j < 3; j++) (ax[j] = -e[j]), (az[j] = N[j])
+  solid('strobe-frame', at(0, LIFT / GM + 23.09, 0, c), ax, n, az, GS)
+  if (here) part('strobe-frame', at(0, EYE + 12, -10, c), 40 * GM)
+  solid('glasses-stand', at(0, 40.5, -30, c), ax, n, az, 81 * GM)
+  // the valves, in the frame's windows (x ±31 mm, 4 mm under its middle, 36 mm in front of it)
+  for (const x of [-31, 31]) {
+    solid(clear ? 'valve-clear' : 'valve-dark', at(x, EYE, -36, c), ax, n, az, H * GM)
+    if (here) part(x < 0 ? 'strobe-valve-r' : 'strobe-valve-l', c, 16 * GM)
+  }
+  // the board: its long side along the temple (north), its parts outward (west), on edge
+  for (let j = 0; j < 3; j++) (ax[j] = N[j]), (ay[j] = -e[j]), (az[j] = n[j])
+  turn(ay, ax, spin, ay), turn(az, ax, spin, az)
+  if (ctx.models['strobe-board']) {
+    const m = ctx.models['strobe-board'], ext = Math.max(m.hi[0] - m.lo[0], m.hi[1] - m.lo[1], m.hi[2] - m.lo[2]), s = 1000 * GM
+    board(B)
+    for (let i = 0; i < 3; i++) c[i] = B[i] + (s * (ax[i] * (m.lo[0] + m.hi[0]) + ay[i] * (m.lo[1] + m.hi[1]) + az[i] * (m.lo[2] + m.hi[2]))) / 2
+    solid('strobe-board', c, ax, ay, az, s * ext)
+    if (here && (a > 0.5 || lift > 0.05)) part('strobe-board', B, 24 * GM)
+  }
+  // the lobs in flight, spinning (topspin, 6 turns a second) as they go
+  for (let i = 0; i < 3; i++) (ax[i] = -e[i]), (ay[i] = n[i]), (az[i] = N[i])
+  for (let j = Math.floor((tau - PHASE) / PERIOD); tau - PHASE - j * PERIOD < LIFE; j--) {
+    const q = tau - PHASE - j * PERIOD - T0
+    lob(q, xyz)
+    turn(ay, ax, -TAU * 6 * q, ay), turn(az, ax, -TAU * 6 * q, az)
+    solid('tennis-ball', at(xyz[0], xyz[1], xyz[2], c), ax, ay, az, 2 * R * GM)
+    for (let i = 0; i < 3; i++) (ay[i] = n[i]), (az[i] = N[i])
+  }
+}
+
+// ---- the camera, while it rests here: from behind them to just behind the right lens, then back out as they come apart,
+// and to the board, clicked. [s, ln d, pitch, yaw, the point looked at (mm from the place's own: east, up, north)]
+export const RISE = 0.07
+const BACK = [Math.log(0.36), 0.1, 0.05, 0, 0, 0]
+const EYEV = [Math.log(620 * GM), 0.02, 0, -31, EYE - (0.01 + RISE) / GM, -436] // the eye 220 mm behind the right lens, looking 400 mm past it
+const OUT = [Math.log(0.3), 0.32, -0.75, 0, 0, 0]
+const KEYS = [[0, ...BACK], [2.5, ...BACK], [5, ...EYEV], [APART, ...EYEV], [APART + 3, ...OUT]]
+const cam = [0, 0, 0, 0, 0, 0]
+export function steer(s: number, _picked: string, o: Steer) {
+  if (s > APART + 3.5 && lift < 1e-3) return false
+  glide(KEYS, s, cam)
+  board(c)
+  const a = lift
+  o.d = Math.exp(mix(cam[0], Math.log(0.16), a)), o.pitch = mix(cam[1], 0.15, a), o.yaw = mix(cam[2], -1.3, a)
+  for (let i = 0; i < 3; i++) o.at[i] = mix((e[i] * cam[3] + n[i] * cam[4] + N[i] * cam[5]) * GM, c[i] - n[i] * (1.01 + RISE), a)
+  return true
+}
+
+// ---- what it sounds like, on the picture's clock: the valves' own drive, a low hum while they are dark (100 Hz, their
+// ±3.3 V pairs) and quiet while they are clear, so it pulses twice a second as the lenses do; and the bounce in front of
+// them, a soft tock.
+const tock = new Plucks(48000, 0.3)
+let hum = 0, ph = 0, was = false
 export function voice(t: number, dt: number) {
-  open += 0.02 * (+valve(t) - open)
-  const light = open * (0.5 + 0.5 * Math.cos(BLADES * angle(t)))
-  mean += 1e-4 * (light - mean)
-  purr += 4e-4 * (light - mean - purr) // the beat, without the strobe's own 20 Hz
-  ph += 95 * dt, ph -= Math.floor(ph)
-  const v = valve(t / SLOW)
-  if (v && !was) click = 1
-  was = v, click *= 1 - 60 * dt
-  return 3 * purr * Math.sin(TAU * ph) + 0.08 * click * Math.sin(TAU * 1520 * t)
+  const tau = t / SLOW - PHASE, down = tau - PERIOD * Math.floor(tau / PERIOD) - T0 >= arcs[1][0]
+  hum = clamp(hum + (valve(tau) ? -40 : 40) * dt)
+  ph += 100 * dt, ph -= Math.floor(ph)
+  if (down && !was) tock.strike(150, 0.25, 0, 0.25, 3) // (the bounce in front of them)
+  was = down
+  return 0.12 * hum * (Math.sin(TAU * ph) + Math.sin(3 * TAU * ph) / 3 + Math.sin(5 * TAU * ph) / 5) + tock.mono() // (a square's first three)
 }

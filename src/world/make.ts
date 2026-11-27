@@ -1,7 +1,10 @@
-// What River has not drawn in CAD, made here out of boxes and cylinders, in millimetres: the strobe glasses' two LCD
-// valves (clear and dark), the wheel they strobe, its post and the glasses' stand. Each is written as a GLB in memory, so
-// mesh.ts and the tracer take it exactly as they take River's own (a blob: URL through the same worker).
-type Mat = { col: number[]; metal: number; rough: number } // linear albedo (and alpha), as glTF's
+// What River has not drawn in CAD, made here out of boxes, cylinders and strokes, in millimetres: the strobe glasses'
+// LCD valves, their stand and the ball they watch; the desk PEEP plugs into (a monitor, a keyboard and its USB-A port,
+// a TV remote) and the words it types. Each is written as a GLB in memory, so mesh.ts and the tracer take it exactly as
+// they take River's own (a blob: URL through the same worker).
+import { faces } from '../beam/font'
+
+export type Mat = { col: number[]; metal: number; rough: number } // linear albedo (and alpha), as glTF's
 type Part = { mat: Mat; P: number[]; N: number[]; I: number[] }
 const parts = new Map<string, Part[]>()
 let into: Part[] = []
@@ -64,6 +67,44 @@ export function dome(m: Mat, c: V3, a: V3, r: number, n = 24) {
     const s0 = (j / (n / 2)) * (Math.PI / 2), s1 = ((j + 1) / (n / 2)) * (Math.PI / 2)
     tube(m, [0, 1, 2].map((i) => c[i] + a[i] * r * Math.sin(s0)) as V3, a, r * Math.cos(s0), r * Math.cos(s1), r * (Math.sin(s1) - Math.sin(s0)), n)
   }
+}
+
+// a ball round c, radius r
+export function ball(m: Mat, c: V3, r: number, n = 24) {
+  dome(m, c, [0, 1, 0], r, n), dome(m, c, [0, -1, 0], r, n)
+}
+// a w × h rectangle about the origin with corners of radius r, as a convex outline for prism()
+export function rounded(w: number, h: number, r: number, n = 6) {
+  const q: [number, number][] = []
+  for (let k = 0; k < 4; k++) {
+    const cx = (k === 0 || k === 3 ? 1 : -1) * (w / 2 - r), cy = (k < 2 ? 1 : -1) * (h / 2 - r)
+    for (let i = 0; i <= n; i++) {
+      const a = ((k + i / n) * Math.PI) / 2
+      q.push([cx + r * Math.cos(a), cy + r * Math.sin(a)])
+    }
+  }
+  return q
+}
+// a stroke from a to b on the plane z, w wide, its ends squared off w/2 past them (so a polyline's joints close)
+function stroke(m: Mat, ax: number, ay: number, bx: number, by: number, z: number, w: number) {
+  let dx = bx - ax, dy = by - ay
+  const l = Math.hypot(dx, dy), h = w / 2
+  l < 1e-9 ? ((dx = h), (dy = 0)) : ((dx *= h / l), (dy *= h / l))
+  quad(m, [ax - dx + dy, ay - dy - dx, z], [bx + dx + dy, by + dy - dx, z], [bx + dx - dy, by + dy + dx, z], [ax - dx - dy, ay - dy + dx, z], [0, 0, 1])
+}
+// Text in a single-stroke face (beam/font.ts: cap height 1, baseline 0, y up) on the plane z, facing +z: its baseline
+// from (x, y) along +x, `size` its cap height, its strokes w wide, character i in ink(i). Returns the pen's x after each.
+export function text(ink: (i: number) => Mat, s: string, x: number, y: number, z: number, size: number, w: number, f = faces.hershey) {
+  const ends: number[] = []
+  for (let i = 0; i < s.length; i++) {
+    const g = f.g[s[i]]
+    for (const st of g?.[1] ?? []) {
+      if (st.length === 2) stroke(ink(i), x + st[0] * size, y + st[1] * size, x + st[0] * size, y + st[1] * size, z, w)
+      for (let j = 0; j + 3 < st.length; j += 2) stroke(ink(i), x + st[j] * size, y + st[j + 1] * size, x + st[j + 2] * size, y + st[j + 3] * size, z, w)
+    }
+    ends.push((x += (g?.[0] ?? 0.6) * size))
+  }
+  return ends
 }
 
 // What is being made goes into `parts` under `id`.
