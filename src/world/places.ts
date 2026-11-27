@@ -23,7 +23,17 @@ export type Place = {
   where?: (o: number[], t: number) => number[] // where it is at planet time t, if it moves: the camera rides with it
   rise?: number // how high over the ground the camera looks (radii), if not at the ground
   orbit?: readonly number[] // its orbit's normal, if it is in orbit: the camera rides in the orbit's own frame
+  // Steers the camera while it rests here, `since` seconds after it came to rest, with part `picked` (ctx.picked) or ''
+  // clicked: write the distance, elevation and bearing wanted into o, and o.at, an offset (radii, the planet's frame)
+  // of the point looked at from the place's own; return false to leave the camera to the visitor. A drag or the wheel
+  // takes the camera back for a while.
+  steer?: (since: number, picked: string, o: Steer) => boolean
+  // What its clickable parts (ctx.part) are, by id: a name and a line of what each does, and the board's picture
+  // (public/media/boards/) if it is one of River's boards.
+  about?: Record<string, About>
 }
+export type Steer = { d: number; pitch: number; yaw: number; at: number[] }
+export type About = { name: string; does: string; board?: string }
 
 // In the order the index lists them, the work of now first. (Those on land keep their order among themselves in
 // planet.wgsl's FLAT; the arrival finds the hearts among them.)

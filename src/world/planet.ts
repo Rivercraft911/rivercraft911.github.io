@@ -62,6 +62,7 @@ export type Pose = { eye: V; at: V; up: V }
 const pose = (): Pose => ({ eye: [0, 0, 3], at: [0, 0, 0], up: [0, 1, 0] })
 const now = pose(), from = pose(), to = pose()
 let focus = -1 // the place we are at, or home
+const steer = { d: 0, pitch: 0, yaw: 0, at: [0, 0, 0] }, gaze = [0, 0, 0] // what a place's steer asks, and where it has the camera look
 let flight = -1, fstart = 0, flen = 1 // flying from `from` toward `focus` since fstart, for flen seconds
 export const HOME = { d: 5.2, pitch: 0.38, yaw: 0.6 } // where the arrival leaves the eye, and Escape takes it
 const rest = { ...HOME } // where the eye is about what it looks at
@@ -88,7 +89,7 @@ function restAt(k: number, o: Pose) {
     unit(e0), cross(n0, e0, N0)
   } else frame(n0, e0, N0)
   for (let i = 0; i < 3; i++) {
-    o.at[i] = n0[i] * r
+    o.at[i] = n0[i] * r + gaze[i]
     o.up[i] = n0[i]
     o.eye[i] = o.at[i] + d * (c * (Math.sin(yaw) * e0[i] + Math.cos(yaw) * N0[i]) + s * n0[i])
   }
@@ -187,6 +188,7 @@ for (const ev of ['pointermove', 'pointerdown', 'wheel', 'keydown'])
   addEventListener(ev, () => ((idle = 0), (touring = false)), { capture: true, passive: true })
 
 // ---- the pointer ---------------------------------------------------------------------------------------------
+let grabbed = -1e9 // when the visitor last took the camera (a drag or the wheel)
 let active = false, lastSeen = 0, lastBuild = 0, dragging = false, moved = 0, px = 0, py = 0, idle = 0, hover = -1
 let clickAt: [number, number] | null = null
 const canvas = document.querySelector('canvas')!
@@ -203,7 +205,7 @@ addEventListener('pointermove', (e) => {
   moved += Math.abs(dx) + Math.abs(dy)
   want.yaw -= dx * k
   want.pitch = clamp(want.pitch + dy * k, focus < 0 || PLACES[focus].orbit ? -1.4 : 0.06, 1.45) // (round what flies, from under it too)
-  idle = 0
+  idle = 0, grabbed = performance.now()
 })
 addEventListener('pointerup', (e) => {
   if (!active || !dragging) return
@@ -213,7 +215,7 @@ addEventListener('pointerup', (e) => {
 addEventListener('wheel', (e) => {
   if (!active) return
   want.d = clamp(want.d * Math.exp(e.deltaY * 0.0012), focus < 0 ? 1.25 : 0.03, focus < 0 ? 9 : 1.2)
-  idle = 0
+  idle = 0, grabbed = performance.now()
 }, { passive: true })
 addEventListener('keydown', (e) => {
   if (!active) return
@@ -390,6 +392,11 @@ export const planet: Scene = {
       const n = Math.floor((idle - AFTER) / DWELL)
       if (n !== showing) (showing = n), go(ATTRACT[n % ATTRACT.length], t, true)
     }
+    // a place may steer the camera while it rests there, until the visitor takes it (and for a while after)
+    const P = PLACES[focus], free = performance.now() - grabbed > 3000
+    const steering = focus >= 0 && flight < 0 && free && !!P.steer?.(t - fstart - flen, ctx.picked, steer)
+    if (steering) (want.d = steer.d), (want.pitch = steer.pitch), (want.yaw = steer.yaw)
+    for (let i = 0; i < 3; i++) gaze[i] += ((steering ? steer.at[i] : 0) - gaze[i]) * fol
     rest.d += (want.d - rest.d) * fol, rest.pitch += (want.pitch - rest.pitch) * fol, rest.yaw += (want.yaw - rest.yaw) * fol
     restAt(focus, to)
     if (flight >= 0 && (flight = (t - fstart) / flen) >= 1) flight = -1
