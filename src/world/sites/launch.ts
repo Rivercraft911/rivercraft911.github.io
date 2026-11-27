@@ -129,10 +129,11 @@ BEADS.forEach((col, k) => make(`pv-bead${k}`, () => lathe({ col: [...col, 1], me
 // the CM5 at MP1, its bottom 1.5 mm over the board on its two connectors, turned as the footprint turns Raspberry Pi's
 // model (its x along −z); Yapogee S3 on its landing J13, turned half round, castellations on the pads.
 const CM5_AT = [13.25, 3.5, -21.875], YAP_AT = [-1.115, 1.6, 34.05]
-// The cameras on their cradles, as the camera section's reference assembly has them: the cradle's back 43 mm out, the
-// front board 64 mm, the lens's face 85.92 mm; the box's middle 64.46 mm, the lens's face 21.46 mm beyond it. Half the
-// tube, cut across their axis: its box's middle 38.1 mm toward its lens port, and halfway up.
-const CAM_R = 64.46, LENS = 21.46, HALF = 0.0381
+// The cameras on their cradles, as the camera section's reference assembly has them (the cradle's back 43 mm out, the
+// front board 64 mm, the lens's face 85.92 mm: the box's middle 64.46 mm, the lens's face 21.46 mm beyond it), set 6 mm
+// further in, so the lens stands only just proud of the tube. Half the tube, cut across their axis: its box's middle
+// 38.1 mm toward its lens port, and halfway up.
+const CAM_R = 64.46 - 6, LENS = 21.46, HALF = 0.0381
 // The signal on Yapogee S3, along its own traces (KiCad, from its outline's centre: x right, z down the page; y up
 // off the board): each run a polyline [x, y, z] and the bead it carries from where on (mm along it).
 type Run = { p: number[][]; bead: number[]; at: number[]; L: number[] }
@@ -176,10 +177,10 @@ const GAP = 4.5 // mm between beads, about: each a byte, leaving at every fourth
 // ---- the place -----------------------------------------------------------------------------------------------
 const pn: V = [0, 0, 0], pe: V = [0, 0, 0], pN: V = [0, 0, 0], foot: V = [0, 0, 0], ant: V = [0, 0, 0]
 const R: V = [0, 0, 0], a: V = [0, 0, 1], u: V = [0, 0, 0], w: V = [0, 0, 0], d: V = [0, 0, 0], q: V = [0, 0, 0], sec: V = [0, 0, 0]
-const nl: V = [0, 0, 0], el: V = [0, 0, 0], n0: V = [0, 0, 0], e0: V = [0, 0, 0], N0: V = [0, 0, 0], hv: V = [0, 0, 0], hs: V = [0, 0, 0], ev: V = [0, 0, 0], o: V = [0, 0, 0], c: V = [0, 0, 0]
+const nl: V = [0, 0, 0], el: V = [0, 0, 0], n0: V = [0, 0, 0], e0: V = [0, 0, 0], N0: V = [0, 0, 0], hv: V = [0, 0, 0], hs: V = [0, 0, 0], o: V = [0, 0, 0], c: V = [0, 0, 0]
 const X: V = [0, 0, 0], Z: V = [0, 0, 0], X2: V = [0, 0, 0], Z2: V = [0, 0, 0], Y2: V = [0, 0, 0], CAR: V = [0, 0, 0], YAP: V = [0, 0, 0], YX: V = [0, 0, 0], YZ: V = [0, 0, 0]
 const lean: V = [0, 0, 0], rb: V = [0, 0, 0], rx: V = [0, 0, 0], rz: V = [0, 0, 0] // the rail: along, its foot, across
-let ready = false, clk = 0, roll = 0, ph = 0, K = 1, sym = 0, wasTs = 0, wasS = 0 // the link's clock runs always
+let ready = false, clk = 0, since = -1, roll = 0, ph = 0, K = 1, sym = 0, wasTs = 0, wasS = 0 // the link's clock runs always
 let Y0 = 0 // the bearing the rocket is looked at from: its cameras' axis lies across it
 
 function init() {
@@ -225,10 +226,12 @@ export function where(o: V, t?: number) {
 }
 
 // ---- the choreography, a pure function of ph (seconds at the place) ----------------------------------------------
-// It comes apart (to 13 s), shows Yapogee's signal (to HOLD), goes back together twice as fast as it came apart, and
-// then flies with the eye at a fisheye, looking round as it climbs, comes down under its canopies and lies landed.
+// It comes apart (to 13 s) and rests there to be looked round (to LOOK; the clock waits while the visitor holds the
+// camera or has a part picked, so only a long look left alone moves it on), shows Yapogee's signal (to HOLD), goes back
+// together twice as fast as it came apart, and then flies with the eye at a fisheye, looking round as it climbs, comes
+// down under its canopies and lies landed.
 const LIFT = 0.08, SLIDE = 0.9, SIDE = 0.6, AWAY = 1.4, OUT = 0.034, RISE = 0.034 // m; rad (the slide's, off the eye's line)
-const APART = 13, HOLD = 36, WHOLE = HOLD + APART / 2, LAUNCH = WHOLE + 4.5, LAND = LAUNCH + T_AP + FALL, END = LAND + REST // s
+const APART = 13, LOOK = 30, HOLD = LOOK + 17, WHOLE = HOLD + APART / 2, LAUNCH = WHOLE + 4.5, LAND = LAUNCH + T_AP + FALL, END = LAND + REST // s
 const tp = (t: number) => (t <= HOLD ? t : Math.max(APART - 2 * (t - HOLD), 0)) // the parts' own clock
 // The camera at ph: [ln distance (m), elevation, bearing from Y0, how far up the axis it looks (m), how much at Yapogee]
 const KEYS = [
@@ -236,9 +239,9 @@ const KEYS = [
   [3, Math.log(7), 0.1, 0.04, -0.5, 0],
   [6.5, Math.log(0.85), 0.14, 0.1, 0, 0],
   [9.5, Math.log(0.66), 0.2, 0.12, 0, 0],
-  [12.8, Math.log(0.5), 0.42, 0.1, 0.01, 0],
-  [19, Math.log(0.47), 0.55, 0.6, 0.01, 0],
-  [23.5, Math.log(0.25), 1.12, Math.PI / 2, 0, 1], // over Yapogee, square to it, as KiCad draws it
+  [12.8, Math.log(0.5), 0.42, 0.1, 0.01, 0], // apart, and still
+  [LOOK, Math.log(0.47), 0.5, 0.35, 0.01, 0],
+  [LOOK + 4.5, Math.log(0.25), 1.12, Math.PI / 2, 0, 1], // over Yapogee, square to it, as KiCad draws it
   [HOLD - 1, Math.log(0.23), 1.02, Math.PI / 2 + 0.15, 0, 1],
   [HOLD + 3.5, Math.log(1.1), 0.35, -0.6, 0, 0],
   [WHOLE, Math.log(0.6), 0.1, 0.3 - Math.PI / 2, 0, 0], // off camera A's lens, to go to it (or B's: KEYS_B)
@@ -263,12 +266,15 @@ const slide = (t: number) => SLIDE * smooth(5.4, 8.4, t)
 const apart = (t: number) => AWAY * smooth(8.6, 11, t) ** 2
 const outward = (t: number) => OUT * smooth(9.6, 11.4, t)
 const rise = (t: number) => smooth(10.6, 12.6, t)
-const beads = (t: number) => smooth(22, 24, t) * (1 - smooth(HOLD - 1.5, HOLD, t))
+const beads = (t: number) => smooth(LOOK + 3, LOOK + 5, t) * (1 - smooth(HOLD - 1.5, HOLD, t))
 
-// What is clicked floats a little toward the eye and turns to show both its faces; each part's share of that, eased.
+// What is clicked (the camera goes to it) comes a little clear of the rest, in the world, and a board stands up on edge
+// so it can be looked round to its back; each part's share of that, eased. How far each goes (m, up the rocket's axis
+// for the boards, out along its own for a camera), and how big each is (m across, for the camera to frame it).
 const PARTS = ['carrier', 'cm5', 'yapogee', 'camera-a', 'camera-b'] as const
-const SIZE = [0.145, 0.055, 0.055, 0.034, 0.034] // m across
-const pick = PARTS.map(() => [0, 0, 0]) // two cascaded lags, and how long it has been picked (s)
+const CLEAR = [-0.07, 0.05, 0.04, 0.03, 0.03]
+const SIZE = [0.145, 0.055, 0.061, 0.062, 0.062]
+const pick = PARTS.map(() => [0, 0]) // two cascaded lags
 const home = PARTS.map(() => [0, 0, 0]) // where each part's middle is, world
 let picked = 0 // how much any part is
 export const ABOUT: Record<string, About> = {
@@ -286,23 +292,17 @@ function toward(n: V, p: number, y: number, out: V) {
   return out
 }
 
-// The camera here: the keys, looking at the section as it slides out (or at Yapogee), or at what is picked; or riding.
+// The camera here (not asked while the visitor holds it or has a part picked): the keys, looking at the section as it
+// slides out, or at Yapogee; or riding.
 const W_: V = [0, 0, 0], Wn: V = [0, 0, 0], E1: V = [0, 0, 0], E2: V = [0, 0, 0], L1: V = [0, 0, 0]
 let lastYaw = 0
 export function steer(_since: number, _picked: string, s: Steer) {
   if (!ready) return false
   glide(lens > 0 ? KEYS : KEYS_B, ph, cam)
   where(W_)
-  const sl = slide(tp(ph)), y = cam[4], free = 1 - Math.min(picked, 1)
-  let lnd = cam[0] * free
-  for (let i = 0; i < 3; i++) s.at[i] = free * ((1 - y) * (a[i] * cam[3] + hs[i] * sl) * M + y * (home[2][i] - W_[i]))
-  for (let k = 0; k < PARTS.length; k++) {
-    const g = pick[k][1]
-    if (g < 1e-4) continue
-    lnd += g * Math.log(SIZE[k] * 2.6)
-    for (let i = 0; i < 3; i++) s.at[i] += g * (float[k][i] - W_[i])
-  }
-  s.d = Math.exp(lnd) * M, s.pitch = cam[1], s.yaw = Y0 + cam[2]
+  const sl = slide(tp(ph)), y = cam[4]
+  for (let i = 0; i < 3; i++) s.at[i] = (1 - y) * (a[i] * cam[3] + hs[i] * sl) * M + y * (home[2][i] - W_[i])
+  s.d = Math.exp(cam[0]) * M, s.pitch = cam[1], s.yaw = Y0 + cam[2]
   const r = ride(ph)
   if (r > 0) {
     // both as an eye, a look (bearing, elevation) and a focus; the eye goes to the lens, then turns to look out
@@ -323,7 +323,6 @@ export function steer(_since: number, _picked: string, s: Steer) {
   lastYaw = s.yaw
   return true
 }
-const float = PARTS.map(() => [0, 0, 0]) // where each part floats to while picked, world
 
 // Model `id` with its own origin at world point p, its axes along x, y, z, `unit` radii a model unit.
 function put(id: string, p: V, x: V, y: V, z: V, unit_: number, k = 1, glow = 0, size = 1) {
@@ -343,12 +342,15 @@ const P3: V = [0, 0, 0], B: V = [0, 0, 0], T: V = [0, 0, 0]
 export function draw(k: number) {
   if (!ready) init()
   const here = ctx.focus === k, dt = ctx.dt
-  // its clock runs while the camera rests here (and nothing of it is picked to look at); away, it runs back (or, whole
-  // again, is done at once); here, the rocket is on its pad until it flies with the eye on it
-  ph = here ? (ctx.since >= 0 && !(ctx.picked in ABOUT) ? Math.min(ph + dt, END) : ph) : ph >= WHOLE ? 0 : Math.max(ph - 4 * dt, 0)
+  // its clock runs as the place's own does (which waits while the visitor holds the camera or has a part picked), but a
+  // flight once begun flies on; away, it runs back (or, whole again, is done at once); here, the rocket is on its pad
+  // until it flies with the eye on it
+  const step = ph > LAUNCH - PAD ? dt : ctx.since >= 0 && since >= 0 ? clamp(ctx.since - since, 0, 0.1) : 0
+  since = ctx.since
+  ph = here ? Math.min(ph + step, END) : ph >= WHOLE ? 0 : Math.max(ph - 4 * dt, 0)
   if (here) clk = ph > LAUNCH - PAD ? Math.min(ph - LAUNCH + PAD, CYCLE - 0.01) : 0
   else if (ph === 0) clk += dt // it flies only whole, and while no one is looking closely
-  tDraw = ctx.t, going = here ? ctx.since >= 0 && ph > LAUNCH - PAD && clk < CYCLE - 0.01 : ph === 0
+  tDraw = ctx.t, going = here ? ph > LAUNCH - PAD && clk < CYCLE - 0.01 : ph === 0
   const t = tp(ph)
   if (ph < HOLD) lens = dot(ctx.L, w) >= 0 ? 1 : -1
   const s = clk % CYCLE, ts = flightTime(s), flying = s > PAD && ts < T_LAND, burning = flying && ts < BURN, chute = ts > T_AP && flying
@@ -406,9 +408,7 @@ export function draw(k: number) {
   shell(1), shell(-1)
 
   // inside: the carrier below the cameras' cradles, rising into their plane as they draw out; the CM5 and Yapogee on it, lifting
-  // off; what is picked floats toward the eye as the camera stands at this ph. Shut in its shell, only the cameras'
-  // lenses show, so only they are drawn.
-  glide(lens > 0 ? KEYS : KEYS_B, ph, cam), toward(n0, cam[1], Y0 + cam[2], ev)
+  // off. Shut in its shell, only the cameras' lenses show, so only they are drawn.
   const ri = rise(t), ou = outward(t)
   picked = 0, open = aw > 0
   for (let i = 0; i < 3; i++) CAR[i] = sec[i] + a[i] * (SECT / 2 - RISE * (1 - ri)) * M
@@ -425,7 +425,7 @@ export function draw(k: number) {
   }
 
   // the signal, lit along its way across Yapogee
-  if (here && ph > 21 && ph < HOLD && picked < 0.01) signal(YAP, YX, YZ, beads(ph))
+  if (here && ph > LOOK + 2 && ph < HOLD && picked < 0.01) signal(YAP, YX, YZ, beads(ph))
 
   // the way down to the antenna, for the downlink's Doppler
   for (let i = 0; i < 3; i++) d[i] = ant[i] - (R[i] + a[i] * CAMS * M)
@@ -433,23 +433,22 @@ export function draw(k: number) {
   for (let i = 0; i < 3; i++) d[i] /= rho_ * SC
 }
 
-// A board (or camera) k of PARTS at its place p with axes x, y, z, unless it is picked: then it floats toward the eye
-// and turns, a board end over end, a camera round.
+// A board (or camera) k of PARTS at its place p with axes x, y, z, unless it is picked: then it comes clear of the rest
+// and a board stands up on edge, about the cameras' axis.
 const ID = ['pigeon-carrier', 'pigeon-cm5', 'yapogee-s3', 'pigeon-camera', 'pigeon-camera']
 const EASE = 3 // 1/s
 let open = false
 function board(k: number, p: V, x: V, y: V, z: V) {
   const g = pick[k], dt = ctx.dt, f = 1 - Math.exp(-EASE * dt), id = PARTS[k], mine = ctx.picked === id && ctx.focus === K
-  g[0] += ((mine ? 1 : 0) - g[0]) * f, g[1] += (g[0] - g[1]) * f, g[2] = mine ? g[2] + dt : g[1] < 1e-3 ? 0 : g[2]
+  g[0] += ((mine ? 1 : 0) - g[0]) * f, g[1] += (g[0] - g[1]) * f
   picked += g[1]
   // its middle where it rests (the model's box, which put() and solid() centre), and where it floats to
   const m = ctx.models[ID[k]]
   if (!m) return
   const cx = (m.hi[0] + m.lo[0]) / 2, cy = (m.hi[1] + m.lo[1]) / 2, cz = (m.hi[2] + m.lo[2]) / 2
-  for (let i = 0; i < 3; i++) (home[k][i] = p[i] + (x[i] * cx + y[i] * cy + z[i] * cz) * M), (float[k][i] = home[k][i] + ev[i] * 0.12 * M)
-  const th = Math.PI * 0.5 * (1 - Math.cos(0.45 * g[2])) * g[1], ax = k < 3 ? w : a
-  turn(x, ax, th, X2), turn(y, ax, th, Y2), turn(z, ax, th, Z2)
-  for (let i = 0; i < 3; i++) T[i] = home[k][i] + (float[k][i] - home[k][i]) * g[1]
+  const th = k < 3 ? (Math.PI / 2) * g[1] : 0, out = k < 3 ? a : x
+  for (let i = 0; i < 3; i++) (home[k][i] = p[i] + (x[i] * cx + y[i] * cy + z[i] * cz) * M), (T[i] = home[k][i] + out[i] * CLEAR[k] * g[1] * M)
+  turn(x, w, th, X2), turn(y, w, th, Y2), turn(z, w, th, Z2)
   const ext = Math.max(m.hi[0] - m.lo[0], m.hi[1] - m.lo[1], m.hi[2] - m.lo[2])
   if (!open && k < 3) return
   solid(ID[k], T, X2, Y2, Z2, ext * M)
@@ -460,10 +459,10 @@ function board(k: number, p: V, x: V, y: V, z: V) {
   }
   if (k === 3 || k === 4) {
     // the fisheye's front glass, on the lens's face
-    for (let i = 0; i < 3; i++) B[i] = T[i] + X2[i] * (LENS - 1.2) * MM
+    for (let i = 0; i < 3; i++) B[i] = T[i] + X2[i] * (LENS - 2.5) * MM
     put('pv-eye', B, X2, Y2, Z2, MM)
   }
-  if (rise(tp(ph)) > 0.5 && ctx.focus === K) part(id, T, (SIZE[k] / 2) * M)
+  if (open && rise(tp(ph)) > 0.5 && ctx.focus === K) part(id, T, (SIZE[k] / 2) * M) // (honestly sized: the camera frames it)
 }
 
 // Beads along the runs on Yapogee (its origin y, its axes x and z), each a byte of the stream, four symbols: they keep
