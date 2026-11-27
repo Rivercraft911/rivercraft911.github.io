@@ -108,18 +108,18 @@ const PIECES: Piece[] = [
   for (const P of PIECES) if (!P.body) P.out = [0, 1, 2].map((i) => P.out[0] * R[i] + P.out[1] * (i === 1 ? 1 : 0) + P.out[2] * T[i])
 }
 const FRONT = [0, 1, 2].map((i) => PIECES.filter((P) => P.model === 'faulhaber-2610').reduce((a, P) => a + P.out[i] / 3, 0)) // the wheels' middle, apart
-const WHEEL = (axis: string) => ({ name: `Reaction wheel, ${axis}: Finertia on its motor`, board: 'finertia', does: `River’s FOC motor-control board on the back of a FAULHABER 2610, whose rotor is the wheel, turning the satellite about its ${axis} axis: an RP2350A on CAN commutates the motor through its bridge from the motor’s own Hall sensors. To slew the 0.00496 kg·m² axis at 1°/s the wheel takes up 86.6 µN·m·s, 1 047 rpm. Finertia is 26 × 26 mm, 6 layers.` })
+const WHEEL = (axis: string) => ({ name: `Reaction wheel, ${axis}: Finertia on its motor`, board: 'finertia', does: `My FOC motor controller, on the back of a FAULHABER 2610 whose rotor is the wheel, turning the satellite about its ${axis} axis: an RP2350A on CAN commutates the motor through its bridge from the motor’s own Hall sensors. To slew the 0.00496 kg·m² axis at 1°/s the wheel takes up 86.6 µN·m·s, 1 047 rpm. Finertia is 26 × 26 mm, 6 layers.` })
 export const about: Record<string, About> = {
-  bleps: { name: 'BLEPS', does: 'Stanford SSI’s next satellite, a 1U CubeSat, 10 × 10 × 11.35 cm, as River’s optical simulator builds it: four wings of cells, the deck with its patch antenna, the 433 MHz tape dipole.' },
+  bleps: { name: 'BLEPS', does: 'Stanford SSI’s next satellite, a 1U CubeSat, 10 × 10 × 11.35 cm, as my optical simulator builds it: four wings of cells, the deck with its patch antenna, the 433 MHz tape dipole.' },
   finertia: WHEEL('x'),
   'finertia-y': WHEEL('y'),
   'finertia-z': WHEEL('z'),
-  yapling: { name: 'Yapling, the TT&C board', board: 'yapling', does: 'The satellite’s whole radio, River’s main work on BLEPS: an ESP32-S3 makes the S-band DVB-S2 downlink (esp-dvbs2) through a GRF5526 PA, a 433 MHz LoRa module is the UHF link, and an RP2350B runs it, booting from MRAM. 80 × 80 mm, 4 layers.' },
-  'payload-carrier': { name: 'Payload board', board: 'payload-carrier', does: 'River’s 80 × 80 mm carrier for a Jetson Orin NX, which runs the cameras: four I-PEX micro-coax links come in from them, and two more run down the backplane.' },
+  yapling: { name: 'Yapling, the TT&C board', board: 'yapling', does: 'The satellite’s whole radio, and most of my work on BLEPS: an ESP32-S3 makes the S-band DVB-S2 downlink (esp-dvbs2) through a GRF5526 PA, a 433 MHz LoRa module is the UHF link, and an RP2350B runs it, booting from MRAM. 80 × 80 mm, 4 layers.' },
+  'payload-carrier': { name: 'Payload board', board: 'payload-carrier', does: 'My 80 × 80 mm carrier for a Jetson Orin NX, which runs the cameras: four I-PEX micro-coax links come in from them, and two more run down the backplane.' },
   'cam-main': { name: 'Main camera', does: 'Looks straight down at the Earth: a FRAMOS IMX676C, 3552 × 3552 colour at 2 µm, behind a Commonlands CIL160, 16 mm f/1.9, on an MC50A micro-coax adapter. About 13 g.' },
   'cam-360': { name: '360 camera, down', does: 'One of a pair back to back, an IMX676C behind a Commonlands CIL220 fisheye that sees a 215° cone; with its twin on the far face, the whole sphere round the satellite. About 12 g.' },
   'cam-360-up': { name: '360 camera, up', does: 'The other of the pair, looking away from the Earth through the rear face: an IMX676C behind a CIL220 fisheye, a 215° cone. About 12 g.' },
-  'star-tracker': { name: 'Star tracker', does: 'River’s big one inside BLEPS: a FRAMOS IMX900M, 2064 × 1552 monochrome at 2.25 µm, behind an Edmund 16 mm f/1.8, seeing the stars to tell the satellite which way it points. About 21 g.' },
+  'star-tracker': { name: 'Star tracker', does: 'The big one I’m building for BLEPS: a FRAMOS IMX900M, 2064 × 1552 monochrome at 2.25 µm, behind an Edmund 16 mm f/1.8, seeing the stars to tell the satellite which way it points. About 21 g.' },
   'star-baffle': { name: 'Star tracker baffle', does: 'Aluminium, four vanes and an entrance stop, its lip 20 mm out from the lens: past a 48.4° angle from its axis no part of the Sun’s disc sees the lens. 11.5 g.' },
 }
 

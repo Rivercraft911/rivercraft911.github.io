@@ -70,8 +70,8 @@ export const PROJECTS: Project[] = [
       ['checks', '495 Python tests; every model names its source and what it leaves out'],
     ],
     body: [
-      'A CubeSat mission simulator for studying radio links, pointing, power and temperature over a single pass or a whole mission, with the radio planned for Stanford SSI’s next satellite in it: DVB-S2 frames down, a 433 MHz LoRa beacon.',
-      'Orbits integrate under J2 and draw their ground tracks; links are budgeted through antenna patterns and real MODCODs; wheels and magnetorquers point the bus and dump its momentum; the panels charge the battery while bus, battery and panels trade heat. Runs play live, replay, and write pass reports.',
+      'A CubeSat mission simulator for radio links, pointing, power and heat, over one pass or a whole mission, with the radio I’m designing for BLEPS inside it: DVB-S2 down and a 433 MHz LoRa beacon.',
+      'Orbits integrate under J2 and draw their ground tracks; links are budgeted through antenna patterns and real MODCODs; wheels and magnetorquers point the bus and dump momentum; the panels charge the battery while everything trades heat. Every model names its source and what it leaves out.',
     ],
     media: [{ src: `${RAW}yapling-observatory/main/docs/random-screenshot.png`, alt: 'Yapling Observatory running a simulated mission in the browser' }],
     links: [['source', `${GH}yapling-observatory`]],
@@ -81,22 +81,22 @@ export const PROJECTS: Project[] = [
   {
     slug: 'samwise',
     title: 'SAMWISE',
-    remarkable: 'Stanford SSI’s CubeSat: River’s magnetorquer coil boards, etched through 6 layers, and its radio test bench',
+    remarkable: 'Stanford SSI’s CubeSat: my magnetorquer coil boards, etched through 6 layers, and its radio test bench',
     freq: ORBIT,
     span: 0.5,
     signature: 'A magnetorquer pushes against Earth’s field, which turns past it once an orbit: ≈0.18 mHz.',
     sig: [{ k: 'lines', f: [ORBIT], p: [-8] }],
     years: '2024 – 2026',
     numbers: [
-      ['River’s part', 'the magnetorquer coil boards (XY and Z) and the radio test bench'],
+      ['my part', 'the magnetorquer coil boards (XY and Z) and the radio test bench'],
       ['coil panels', '6 layers of 2 oz copper; two panels a face in parallel, five coils a board in series'],
       ['optimizer', 'the trace width for the most magnetic moment under a power limit'],
       ['radio test bench', 'a Pico carrying S-band LoRa1280F27 (SX1280) and UHF RFM98PW LoRa'],
       ['range test', 'transmitter, receiver, observer, S-band image transfer'],
     ],
     body: [
-      'SAMWISE is the Stanford Student Space Initiative’s CubeSat. Its magnetorquers are coils etched into six-layer circuit boards, the XY and Z coil panels, two panels to a face in parallel and five coils a board in series. Those coil boards are River’s. Current through them pushes against Earth’s field, which is how the satellite turns itself without fuel. For coils like these River wrote a tool that finds the trace width giving the most magnetic moment for the copper weight, layer count, supply and power limit, with live graphs as the knobs turn.',
-      'Its radios were brought up on River’s radio test bench, a Raspberry Pi Pico carrying the S-band and UHF LoRa modules and the bus to the rest of the stack, driven by River’s range-test firmware down to sending images over S-band.',
+      'Stanford SSI’s CubeSat turns itself without fuel: current through coils etched into six-layer boards pushes against Earth’s magnetic field. Those magnetorquer coil boards are mine, two to a face and five coils a board. For coils like these I wrote a tool that finds the trace width giving the most magnetic moment for the copper, layers, supply and power limit.',
+      'Its radios were brought up on my radio test bench, a Raspberry Pi Pico carrying the S-band and UHF LoRa modules, with my range-test firmware sending images over S-band.',
     ],
     media: [
       { src: `${RAW}magtorque-optimization/main/images/screenshot1.png`, alt: 'The magnetorquer optimizer: magnetic moment against trace width' },
@@ -131,7 +131,7 @@ export const PROJECTS: Project[] = [
       ['alerts', 'keywords to SMS'],
     ],
     body: [
-      'A better Infinity transmitter than the ones old intelligence services used. An ESP32-S3 streams a MEMS microphone to a Raspberry Pi, which transcribes it offline, watches for keywords and texts you when they come up, with a live dashboard of the room.',
+      'A modern take on the old Infinity transmitter. An ESP32-S3 streams a MEMS microphone to a Raspberry Pi, which transcribes it offline, listens for keywords and texts you when they come up.',
       'Version two is a custom board, in KiCad now. For use only where everyone in the room has agreed to it.',
     ],
     media: [],
@@ -185,8 +185,8 @@ export const PROJECTS: Project[] = [
       ['judge', 'verifies every PRIME it prints'],
     ],
     body: [
-      'A riff on karpathy/autoresearch. Autoresearch turns an agent loose overnight to improve a tiny training run; autoprime points the same loop at prime numbers and dreams of climbing, run after run, towards greatness.',
-      'The agent owns a solver workspace and a fixed judge checks every claim: invent an algorithm, tune a classic sieve, use every core, reach for GMP or the GPU, or guess enormous candidates and test them. The judge cares only that the primes are real, not Mersenne, and found in time.',
+      'A riff on Karpathy’s autoresearch: instead of an agent improving a training run overnight, mine improves a prime search, run after run.',
+      'The agent owns a solver and a fixed judge checks every claim. It can invent an algorithm, tune a sieve, use every core, reach for GMP or the GPU; the judge only cares that the primes are real, not Mersenne, and found within 60 s.',
     ],
     media: [],
     links: [['source', `${GH}autoprime`]],
@@ -226,8 +226,8 @@ export const PROJECTS: Project[] = [
       ['pulse shaping', '72 % of a core → about 3 %'],
     ],
     body: [
-      'Can an RP2350 replace the FPGA that feeds a TI AFE7071 transmitter? Digitally: yes, with margin. One RP2350B builds the whole DVB-S2 waveform, BB framing and scrambling, BCH, LDPC, mapping, PL headers, pilots, PL scrambling and pulse shaping, and DMA and PIO stream the I/Q samples out over the AFE’s parallel bus with its DDR clock made on a GPIO.',
-      'Pulse shaping used to take 72 % of a core at 8 Msym/s. With PIO building the table addresses and DMA moving the samples it takes about 3 %, which is just the loop watching for faults. The board around it, an LMX2572 LO and a small driver for 1.28 GHz and 2.4 GHz, is being drawn now.',
+      'Can an RP2350 replace the FPGA that usually feeds a TI AFE7071 transmitter? Digitally, yes, with margin. One RP2350B builds the whole DVB-S2 waveform, from framing and LDPC to pilots and pulse shaping, and PIO and DMA stream the I/Q out over the AFE’s parallel bus.',
+      'Pulse shaping used to take 72 % of a core; with PIO building the table addresses and DMA moving the samples, it takes about 3 %. The board around it, with an LMX2572 LO and drivers for 1.28 and 2.4 GHz, is being drawn now.',
     ],
     media: [
       { src: `${RAW}RP2350_IQ_Benchmark/main/results/plots/summary-2026-10-16/offload.png`, alt: 'Core time spent on pulse shaping, from the CPU shaper to PIO and DMA' },
@@ -253,8 +253,8 @@ export const PROJECTS: Project[] = [
       ['stack', 'FastAPI, vanilla JS, Mapbox GL'],
     ],
     body: [
-      'Have you been struggling with your performativity? Want your friends’ Find My to believe you crossed Antarctica while you were in fact in your dorm room? Have you considered lying with infrastructure?',
-      'Draw a route on a map, snap it to roads, plug in the iPhone and press play: the phone wanders the earth without you, at a walk, a jog, a ride or a drive. No Xcode, nothing installed on the phone.',
+      'Want Find My to believe you crossed Antarctica while you were in your dorm room? Have you considered lying with infrastructure?',
+      'Draw a route, snap it to roads, plug in the iPhone and press play: the phone walks, jogs, rides or drives it at the right speed. Nothing installed on the phone, nothing in the cloud, just USB.',
     ],
     media: [],
     links: [['source', `${GH}driftwood`]],
@@ -279,8 +279,8 @@ export const PROJECTS: Project[] = [
       ['live video', '2.4 h on air, 5 725 408 frames'],
     ],
     body: [
-      'One S3 frames, codes, modulates and pulse-shapes DVB-S2 and sends it out of its own Wi-Fi radio. A second S3 pulls it back in through its own radio and demodulates and decodes every frame on the chip. No PC, no external DAC or ADC, no FPGA.',
-      'The radio hides a test engine that plays samples from RAM into its I/Q DAC: a fresh 16 380-sample bank every 196.75 µs at 80 MS/s, which at 240 MHz is 47 220 cycles to make 15 740 new samples: three cycles a sample. So every possible output of the shaping filter is computed once into a table, making samples is copying rows, and the heavy loops run on the S3’s 128-bit vector unit. It started as a goal of 9.68 Mb/s for live video and kept going.',
+      'A whole DVB-S2 transceiver on one $5 ESP32-S3. It frames, codes, modulates and pulse-shapes the signal and sends it out of its own Wi-Fi radio; a second S3 pulls it back in and decodes every frame on the chip. No PC, no external DAC or ADC, no FPGA.',
+      'The trick: the radio hides a test engine that plays samples from RAM into its I/Q DAC, a fresh bank every 196.75 µs. That leaves three CPU cycles a sample, so I precompute every possible output of the shaping filter into a table, and making samples becomes copying rows on the S3’s vector unit. I set out for 9.68 Mb/s of live video and kept going.',
     ],
     proof: [LIVE],
     media: [
@@ -312,8 +312,8 @@ export const PROJECTS: Project[] = [
       ['build', '129 parts, 19 of them custom'],
     ],
     body: [
-      'Red, green and blue lasers combine through two dichroic mirrors onto a spinning polygon mirror; each facet sweeps one line. An IR sensor sees each facet go by, an interrupt clocks the mirror and arms a timer for the instant the beam reaches the screen, and 320 pixels go out the GPIO ports, each on its own absolute timestamp so jitter never accumulates. Then the galvo steps, odd lines down and even lines back up, and at the top the framebuffers swap.',
-      'Colour is one byte a pixel, rrrgggbb, precomputed at boot into four GPIO port words, so painting a pixel is one lookup and four writes. Postmortemly known as Icarus: the polygon motor caught fire on demo day and the galvo never answered. R-02 is planned. Built with Amy for CS107E.',
+      'A laser projector I built with Amy for CS107E. Red, green and blue lasers combine through two dichroic mirrors onto a polygon mirror spinning at 27 000 RPM; each facet sweeps one line, and a galvo steps between them, odd lines down and even lines back up.',
+      'An IR sensor catches each facet going by and arms a timer for the instant the beam reaches the screen; then 320 pixels go out the GPIO ports, each on its own timestamp so jitter never builds up. A pixel is one byte, precomputed into four port writes. We called it Icarus: the polygon motor caught fire on demo day. R-02 is planned.',
     ],
     proof: [
       { src: `${MEDIA}r01/polyspin.mp4`, alt: 'The polygon mirror spinning up on the bench', video: true, size: [540, 960] },

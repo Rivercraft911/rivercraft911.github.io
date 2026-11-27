@@ -147,8 +147,8 @@ const NEW: Work[] = [
       ['re-arm', '250 ms of IR silence'],
     ],
     body: [
-      'A USB keyboard the size of a fingertip that plugs straight into a USB-A port on its own board edge. A burst of 38 kHz infrared from across the room starts its stored macro; it types it as ordinary keyboard reports, ignores IR while it types, and re-arms after 250 ms of quiet.',
-      'Its trigger is a XIAO ESP32-C6 driving an Adafruit high-power IR emitter: it serves one button, fire, on the local Wi-Fi network, and sends three 9 ms bursts of 38 kHz, 30 ms apart. For systems you own or may test.',
+      'A USB keyboard the size of a fingertip that plugs straight into a USB-A port on its own board edge. Three bursts of 38 kHz infrared from across the room set off its stored macro; it types it as ordinary keystrokes, then waits for 250 ms of quiet before it will fire again.',
+      'The trigger is a XIAO ESP32-C6 driving an Adafruit high-power IR emitter, with one button, fire, served over Wi-Fi. For systems you own or may test.',
     ],
     proof: [{ src: `${RAW}PEEP/main/docs/media/peep-on-fingertip.jpg`, alt: 'An assembled PEEP board on a fingertip' }],
     boards: ['peep'],
@@ -167,17 +167,17 @@ const NEW: Work[] = [
     years: '2026 –',
     numbers: [
       ['spacecraft', '1U, 10 × 10 × 11.35 cm, about 2 kg; planned for a 550 km circular orbit'],
-      ['cameras', 'four, on River’s payload board round a Jetson Orin'],
-      ['River’s part', 'the TT&C board, its whole radio; the Jetson Orin payload board; the FOC motor-control board for its wheels; the star tracker'],
+      ['cameras', 'four, on my payload board around a Jetson Orin'],
+      ['my part', 'the TT&C board, its whole radio; the Jetson Orin payload board; the FOC motor controller for its wheels; the star tracker'],
       ['S-band', 'esp-dvbs2 again: DVB-S2 from an ESP32-S3 at 2.4 GHz, through a GRF5526 PA'],
       ['UHF', 'LoRa at 433 MHz, SX1262'],
       ['pointing', 'reaction wheels on Finertia, FOC from an RP2350A: 26 × 26 mm, 6 layers, a Faulhaber 2610'],
       ['status', 'in design for a 2027 flight; the radio being laid out, Finertia routed'],
     ],
     body: [
-      'Stanford SSI’s next satellite is a 1U CubeSat built round its cameras. It takes its name from Anableps, the four-eyed fish that sees above and below the waterline at once, and it has four cameras on one payload board. In the simulator its cameras are planned in, a pair of 190° fisheyes, back to back, stitch the whole sphere around it while a main camera looks down at Earth. Its pictures come down the way Pigeon Vision’s video does: esp-dvbs2, an ESP32-S3 making DVB-S2 out of its own Wi-Fi radio.',
-      'River co-leads the satellite team. The heart of River’s part is the TT&C board, Yapling: the satellite’s whole radio, its S-band downlink from the ESP32-S3 and its UHF link, a 433 MHz LoRa beacon, with an RP2350B that boots from MRAM. Then the payload board, a Jetson Orin carrying the four cameras’ links. Beside them, Finertia, the FOC motor-control board for the reaction wheels, bolts to the motor’s 26 mm flange: an RP2350A on CAN commutates a Faulhaber 2610 BLDC through a DRV8311P bridge, its phase currents Kelvin-sensed. To slew the 0.00496 kg·m² axis at 1°/s the wheel takes up 86.6 µN·m·s, 1 047 rpm of the bare rotor. And River is building its star tracker.',
-      'Its cameras and its links are planned in two simulators River wrote: Field of View flies the cameras over Stanford at 550 km and sends their video down a DVB-S2 link, and Yapling Observatory couples the orbit, radio, pointing, power and heat.',
+      'A 1U CubeSat built around its cameras. Two 190° fisheyes back to back see the whole sphere around it while a main camera looks down at Earth, and the pictures come down the way Pigeon Vision’s video does: esp-dvbs2, an ESP32-S3 making DVB-S2 out of its own Wi-Fi radio.',
+      'I co-lead the satellite team. Most of my time goes into the TT&C board, Yapling: the satellite’s whole radio, an S-band downlink from the ESP32-S3 and a 433 MHz LoRa beacon on UHF, run by an RP2350B that boots from MRAM. I’m also building the Jetson Orin payload board that carries the cameras, Finertia, the FOC controller that spins each reaction wheel’s Faulhaber 2610, and the star tracker.',
+      'I planned its cameras and links in two simulators of my own: Field of View flies the cameras over Stanford at 550 km, and Yapling Observatory couples the orbit, radio, pointing, power and heat.',
     ],
     media: [
       { src: `${RAW}cubesat-imaging-sim/main/docs/media/space-over-the-bay.webp`, alt: 'A 1U above San Francisco Bay in the optical simulator, its 433 MHz tape antennas out and a lens’s field of view beyond the bus' },
@@ -212,9 +212,9 @@ const NEW: Work[] = [
       ['boards', 'CM5 carrier, 6 layers, 144.78 mm round, Rev 1.1; Yapogee S3, 4 layers, 55 × 43 mm'],
     ],
     body: [
-      'esp-dvbs2, flying. The ESP32-S3 that makes DVB-S2 out of its own Wi-Fi radio rides Stanford SSI’s IREC rocket and sends its video to the ground live. Two fisheye cameras look opposite ways; a CM5 encodes both into one MPEG transport stream and clocks it over SPI into the S3; on the ground the two views are stitched into a whole sphere, so anyone watching can look wherever they like.',
-      'Yapogee S3 carries the S3. It makes DVB-S2 at 2.42 GHz, and an RFFC5072A mixes it with a 3.70 GHz LO down to 1.28 GHz. The LO sits above the signal, so the spectrum comes out mirrored, and the I/Q go out conjugated to mirror it back. A separate GRF5613 board is the PA. Round them is the carrier, a six-layer board 144.78 mm across for the CM5, both cameras, power and sensors: 148 parts and 645 filled and capped vias.',
-      'The link already works end to end on the bench, one S3 to another through coax and 30 dB of attenuation: sixteen back-to-back 540 s runs, 2.4 hours on air, 5 725 408 frames decoded and none failed, both cameras at 30.0 frames/s. On the ground, an AntSDR E200 at 12 MS/s feeds a Mac that already decodes the flight profile from recorded samples. The carrier is released for fab and Yapogee S3 is routed; bring-up and the RF chain under power come next.',
+      'esp-dvbs2, flying. A $5 ESP32-S3 rides Stanford SSI’s IREC rocket and sends live video to the ground out of its own Wi-Fi radio. Two fisheye cameras look opposite ways, a CM5 encodes both into one transport stream and clocks it into the S3, and on the ground the two views stitch into a whole sphere you can look around in.',
+      'I designed its two boards. On Yapogee S3 the S3’s 2.42 GHz is mixed down to 1.28 GHz by an RFFC5072A; the LO sits above the signal, so the I/Q go out conjugated to undo the mirror. Around it is the carrier, six layers and 144.78 mm across, holding the CM5, both cameras, power and sensors.',
+      'It already works end to end on the bench, S3 to S3 through coax and 30 dB of attenuation: 2.4 hours on air, 5 725 408 frames, not one failed, both cameras at 30 frames/s. The carrier is released for fab and Yapogee S3 is routed; bring-up is next.',
     ],
     proof: [LIVE],
     boards: ['pigeon-carrier', 'yapogee-s3'],
@@ -244,12 +244,12 @@ const NEW: Work[] = [
       ['link', 'ESP-NOW: two hearts near each other lock to one beat'],
     ],
     body: [
-      'A heart-shaped board that beats: a slow double pulse, and shaking it adds an extra beat. Put two near each other and they find each other over ESP-NOW and beat together. Tilt one and red liquid sloshes round inside it; hold the button for a second and both play I ♥ U.',
-      'Scripts generated the outline, placed the LEDs and routed the power, and a browser simulator runs the same effects with no hardware at all.',
+      'A heart of 144 LEDs that beats: a slow double pulse, and an extra beat when you shake it. Put two near each other and they find each other over ESP-NOW and beat as one. Tilt one and red liquid sloshes around inside; hold the button and both play I ♥ U.',
+      'I wrote scripts to draw the outline, place the LEDs and route the power, and a browser simulator that runs the same effects with no hardware at all.',
     ],
     boards: ['heart'],
     media: [],
-    proof: [{ src: `${import.meta.env.BASE_URL}media/rava-heart/demo.mp4`, poster: `${import.meta.env.BASE_URL}media/rava-heart/demo.jpg`, video: true, size: [360, 398], alt: 'Two hearts in River’s hands, beating in sync' }],
+    proof: [{ src: `${import.meta.env.BASE_URL}media/rava-heart/demo.mp4`, poster: `${import.meta.env.BASE_URL}media/rava-heart/demo.jpg`, video: true, size: [360, 398], alt: 'Two hearts in my hands, beating in sync' }],
     links: [['source', `${GH}rava-heart`], ['simulator', `${GH}rava-heart/tree/main/firmware/simulator`]],
   },
   {
@@ -265,8 +265,8 @@ const NEW: Work[] = [
       ['550 km orbit', '1.30 m p95 3D error, replayed into the RP2350'],
     ],
     body: [
-      'Spacecraft GPS receivers are quoted in the thousands of dollars. Ephemeris 1 is the front end of an in-house one for about $33 of parts: a MAX2769B takes GPS L1 in through the SMA and hands raw I/Q to the host header, and the receiver behind it is firmware on an RP2350.',
-      'The receiver already works on recorded signals. Fed a real rooftop recording from cold, the Pico tracked six satellites and fixed in 55 s, a median 2.56 m (horizontally) from GNSS-SDR’s fixes on the same data; on a simulated 550 km orbit it holds 1.30 m p95 at 5 Hz. The first boards are on the bench for assembly, and tests on a Safran simulator follow bring-up.',
+      'Spacecraft GPS receivers cost thousands of dollars. Ephemeris 1 is the front end of my own, for about $33 of parts: a MAX2769B turns GPS L1 into raw I/Q, and the receiver behind it is firmware I wrote for an RP2350.',
+      'It already works on recorded sky. From a cold start on a real rooftop recording it tracked six satellites and fixed in 55 s, a median 2.56 m from GNSS-SDR on the same data, and on a simulated 550 km orbit it holds 1.30 m (p95) at 5 Hz. The first boards are being assembled.',
     ],
     boards: ['gnss'],
     media: [
@@ -290,9 +290,8 @@ const NEW: Work[] = [
       ['released', 'MK1, 19 Nov 2026: KiCad, firmware, STEP and STLs, MIT'],
     ],
     body: [
-      'Strobe glasses for visual reaction-time training, open source, to take on the expensive ones. An LCD light valve slides down into each rim of a printed frame and switches between clear and dark. One button runs it: a tap cycles the presets, a hold edits the rate and darkness of a custom one, and a double tap sets the eyes going together or alternating, the right half a frame behind the left. At 5 frames/s and 50 % dark the left eye goes dark for 100 ms, then the right for 100 ms.',
-      'A liquid crystal must never sit on DC, so the ATtiny402’s timer cuts every dark window into balanced pairs near 100 Hz, +3.3 V then −3.3 V for 5 ms each, and stopping finishes the pair and drives both leads low. Left floating, a valve’s voltage takes 477 ms to fall from 90 % to 10 %; shorting its leads clears it far faster. The settings survive power cycles.',
-      'MK1 is released, and River is building the first pair: the KiCad board and its BOM, the firmware, and a top-loading frame and brow cover to print in PETG or resin, held on by two screws from above.',
+      'Open-source strobe glasses for visual reaction training, to take on the expensive ones. An LCD light valve in each rim switches between clear and dark at 2 to 20 frames a second; one button cycles the presets, edits a custom one, or sets the eyes alternating half a frame apart.',
+      'Liquid crystal must never sit on DC, so the ATtiny402 cuts every dark window into balanced ±3.3 V pairs near 100 Hz and always finishes the pair. MK1 is released (board, firmware and a printable frame), and I’m building the first pair now.',
     ],
     media: [
       { src: `${RAW}strobeGlasses/main/assets/strobe-glasses.gif`, alt: 'MK1, rendered, both lenses switching between dark and clear' },
@@ -323,8 +322,8 @@ const NEW: Work[] = [
       ['GPU', 'WebGPU; a 1080 × 1080 frame reaches the encoder in 0.2 ms'],
     ],
     body: [
-      'Fly a 1U CubeSat over Stanford, change lenses, aim the fisheye pair, and set the full-resolution frame beside the video that arrives over the downlink. Built for Stanford SSI, to choose the cameras of its next satellite, BLEPS.',
-      'Frames are rendered at the sensor’s native resolution from real imagery, blurred by the lens’s Airy core, pointing jitter and exposure smear, then really encoded by the browser and queued against the link’s payload rate, B η / (1 + α) × (1 − r). Dropped chunks and late keyframes look the way they would.',
+      'Fly a 1U CubeSat over Stanford at 550 km, swap lenses, aim the fisheye pair, and set the full-resolution frame beside the video that actually arrives over the downlink. I built it for Stanford SSI, to choose BLEPS’s cameras.',
+      'Frames render at the sensor’s native resolution from real imagery, blurred by the lens, pointing jitter and exposure smear, then really encoded by the browser and squeezed through the link’s payload rate, so dropped chunks and late keyframes look the way they would.',
     ],
     media: [
       { src: `${RAW}cubesat-imaging-sim/main/docs/media/stanford-daylight-pass.webp`, alt: 'A daylight pass: the stitched panorama, and the 50 mm camera looking straight down' },
@@ -345,8 +344,8 @@ const NEW: Work[] = [
       ['proofs', 'PRP proofs made and independently checked on M1279 and M1283'],
     ],
     body: [
-      'Can a new way of building numbers find a prime of at least 100 million digits, and prove it, on a home machine or a small cluster? Each experiment keeps its proof, its code and its measurements together, and the ones that failed are written down as results, with what would reopen them.',
-      'The baseline is the Mersenne search, and its first region is measured: exponents near 149.5 million, past the current record, where one probable-prime test is 149 500 003 squarings at 4.907 ms each, 8.49 days of arithmetic on one M4 Pro. Every challenger is charged everything, sieving and proofs included, and has to beat that per verified discovery.',
+      'Can a new way of building numbers find a prime of 100 million digits, and prove it, on a home machine? Every experiment keeps its proof, code and measurements together, and the ones that fail are written down too, with what would reopen them.',
+      'The baseline is the Mersenne search just past the record, exponents near 149.5 million, where one test is 149 500 003 squarings at 4.907 ms each: 8.49 days on one M4 Pro. Every challenger pays for everything, sieving and proofs included, and has to beat that per verified prime.',
     ],
     media: [],
     links: [],
