@@ -35,7 +35,7 @@ export const board = (name = '') => {
 // Who, and how to reach them. An empty slot renders nothing.
 export const CONTACT = {
   name: 'River Dowdy',
-  what: 'RF · embedded · space hardware',
+  what: 'RF · DSP · embedded · PCB design · space hardware',
   github: 'https://github.com/Rivercraft911',
   email: '', // TODO(River): the address hiring managers should write to
   linkedin: '', // TODO(River): the profile URL
@@ -60,7 +60,7 @@ export const BEST: Record<string, string> = {
 // What River is up to, for whoever has 30 seconds: one line, then every project in the order to show them, the work
 // of now first (`now`). `status` is where it stands (empty: not shown), `proof` its single strongest number. `see` is
 // for whoever builds its place, never shown: what someone should see there, and why it is true.
-export const NOW = 'Now: designing BLEPS, Stanford SSI’s next satellite, a 1U CubeSat with four cameras. Pigeon Vision’s carrier is released for fab.'
+export const NOW = 'Radios out of chips never meant to be radios, flown on rockets and satellites. Now building a satellite’s whole radio, and its star tracker.'
 export type Entry = { slug: string; now?: true; status: string; proof: string; see: string }
 export const ORDER: Entry[] = [
   {
@@ -139,22 +139,22 @@ const NEW: Work[] = [
     numbers: [
       ['spacecraft', '1U, 10 × 10 × 11.35 cm, about 2 kg; planned for a 550 km circular orbit'],
       ['cameras', 'four, on one payload card round a Jetson Orin or a CM5'],
-      ['downlink', 'esp-dvbs2 again: DVB-S2 from an ESP32-S3 at 2.4 GHz, through a GRF5526 PA'],
-      ['beacon', 'LoRa at 433 MHz, SX1262'],
-      ['pointing', 'reaction wheels on Finertia: 26 × 26 mm, 6 layers, an RP2350A driving a Faulhaber 2610'],
-      ['status', 'in design for a 2027 flight; Finertia routed, the radio and payload boards being laid out'],
+      ['River’s part', 'the TT&C board, its whole radio; the FOC motor-control board for its wheels; the star tracker'],
+      ['S-band', 'esp-dvbs2 again: DVB-S2 from an ESP32-S3 at 2.4 GHz, through a GRF5526 PA'],
+      ['UHF', 'LoRa at 433 MHz, SX1262'],
+      ['pointing', 'reaction wheels on Finertia, FOC from an RP2350A: 26 × 26 mm, 6 layers, a Faulhaber 2610'],
+      ['status', 'in design for a 2027 flight; the radio being laid out, Finertia routed'],
     ],
     body: [
       'Stanford SSI’s next satellite is a 1U CubeSat built round its cameras. It takes its name from Anableps, the four-eyed fish that sees above and below the waterline at once, and it has four cameras on one payload card. In the simulator its cameras are planned in, a pair of 190° fisheyes, back to back, stitch the whole sphere around it while a main camera looks down at Earth. Its pictures come down the way Pigeon Vision’s video does: esp-dvbs2, an ESP32-S3 making DVB-S2 out of its own Wi-Fi radio.',
-      'River co-leads the satellite team and draws three of BLEPS’s boards. Finertia, the reaction wheel controller, bolts to the motor’s 26 mm flange: an RP2350A on CAN commutates a Faulhaber 2610 BLDC through a DRV8311P bridge, its phase currents Kelvin-sensed. To slew the 0.00496 kg·m² axis at 1°/s the wheel takes up 86.6 µN·m·s, 1 047 rpm of the bare rotor. Yapling, the radio board, carries the ESP32-S3 downlink, a 433 MHz LoRa beacon and an RP2350B that boots from MRAM. The payload card fits the four camera links round a Jetson Orin or a CM5.',
+      'River co-leads the satellite team. The heart of River’s part is the TT&C board, Yapling: the satellite’s whole radio, its S-band downlink from the ESP32-S3 and its UHF link, a 433 MHz LoRa beacon, with an RP2350B that boots from MRAM. Beside it, Finertia, the FOC motor-control board for the reaction wheels, bolts to the motor’s 26 mm flange: an RP2350A on CAN commutates a Faulhaber 2610 BLDC through a DRV8311P bridge, its phase currents Kelvin-sensed. To slew the 0.00496 kg·m² axis at 1°/s the wheel takes up 86.6 µN·m·s, 1 047 rpm of the bare rotor. And River is building its star tracker.',
       'Its cameras and its links are planned in two simulators River wrote: Field of View flies the cameras over Stanford at 550 km and sends their video down a DVB-S2 link, and Yapling Observatory couples the orbit, radio, pointing, power and heat.',
     ],
     media: [
       { src: `${RAW}cubesat-imaging-sim/main/docs/media/space-over-the-bay.webp`, alt: 'A 1U above San Francisco Bay in the optical simulator, its 433 MHz tape antennas out and a lens’s field of view beyond the bus' },
       { src: `${SSI}Satellite-Avionics/feature/bleps-rotor-controller/project-janus/ADCS/rotor-controller/review/Reaction-Wheel-Controller-assembly.png`, alt: 'Finertia, the reaction wheel controller, on its Faulhaber 2610 motor, rendered from KiCad' },
-      { src: `${SSI}Satellite-Avionics/feature/bleps-rotor-controller/project-janus/ADCS/rotor-controller/review/Finertia-routing.png`, alt: 'Finertia’s routing: six layers in 26 × 26 mm' },
     ],
-    boards: ['finertia'],
+    boards: [],
     links: [
       ['Finertia', 'https://github.com/stanford-ssi/Satellite-Avionics/tree/feature/bleps-rotor-controller/project-janus/ADCS/rotor-controller'],
       ['optical simulator', 'https://rivercraft911.github.io/cubesat-imaging-sim/'],
@@ -164,7 +164,6 @@ const NEW: Work[] = [
       'is BLEPS public yet, and what of it may be shown? (Finertia is on a public stanford-ssi branch; the rest is from your SSI folders and repos)',
       'BLEPS or Hyperion? The payload fit study says “Project Hyperion/Bleps” and Field of View calls itself the optical simulator for Hyperion',
       'the four cameras: which lenses, and where? (the payload card has upper cameras A and B through the backplane and a lower “360 camera” and “second camera” direct; Field of View flies two 190° fisheyes and one main camera)',
-      'your role in your words (satellite team co-lead; Finertia, Yapling and the payload card look like yours)',
       'may the 2027 flight target and the 550 km orbit be shown?',
       'the name: after Anableps, the four-eyed fish, as Finertia’s rear art suggests? And may that art (Anableps-Waterline-Eclipse) be shown?',
     ],
