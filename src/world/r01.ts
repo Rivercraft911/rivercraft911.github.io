@@ -212,7 +212,7 @@ const PAGE: Page = {
     'Paint a colour image with three lasers and two moving mirrors. At the 15 fps target that is 1800 lines a second, one per facet of a 4-facet polygon spinning at 27 000 RPM, and the beam is on the wall for only the middle 30 % of each 555 µs sweep: 320 pixels there is a 1.92 MHz pixel clock, out of a MangoPi’s GPIO, locked to the mirror.',
   built: [
     'The firmware. An IR sensor sees each facet go by; an interrupt clocks the mirror’s period and arms a timer for the instant the beam reaches the screen; then each of the 320 pixels goes out on its own absolute timestamp, so jitter never accumulates. The galvo steps odd lines down and even lines back up, so it never makes a big jump, and the framebuffers swap at the top.',
-    'The laser driver: twelve iC-HG30 switches, four per laser, their currents set binary-weighted by MCP4728 DACs, so the enable pins are the colour. And the mechanics, in parametric CAD: 129 parts, 19 of them custom. With Amy, for CS107E.',
+    'The laser driver: twelve iC-HG30 switches, four per laser, their currents set binary-weighted by MCP4728 DACs, so the enable pins are the colour. And the mechanics, in parametric CAD: 129 parts, 19 of them custom.',
   ],
   proof: [
     '1.83 MHz',

@@ -67,7 +67,7 @@ function runs(px) {
   return Buffer.from(out).toString('base64')
 }
 
-const frames = [['the firmware’s intro frame', firmware('gif_logo_intro.h')], ['River’s photo of the laser driver boards', photo('../public/media/r01/raster.png')], ['River’s name', text('RIVER DOWDY', 2.2)], ['from R-01’s README: what it was to project on Hoover Tower', text('107E ROCKS!', 2.2)]]
+const frames = [['the firmware’s intro frame', firmware('gif_logo_intro.h')], ['River’s photo of the laser driver boards', photo('../public/media/r01/raster.png')], ['River’s name', text('RIVER DOWDY', 2.2)]]
 writeFileSync(new URL('../src/world/sites/r01-frames.ts', import.meta.url), `// R-01's frames, baked by scripts/bake-r01-frames.mjs: 320 × 120 bytes each, rrrgggbb as its firmware holds them, a
 // line at a time as runs (length, byte), in base64.
 export const FRAMES = [

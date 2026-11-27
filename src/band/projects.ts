@@ -312,7 +312,7 @@ export const PROJECTS: Project[] = [
       ['build', '129 parts, 19 of them custom'],
     ],
     body: [
-      'A laser projector I built with Amy for CS107E. Red, green and blue lasers combine through two dichroic mirrors onto a polygon mirror spinning at 27 000 RPM; each facet sweeps one line, and a galvo steps between them, odd lines down and even lines back up.',
+      'A raster laser projector. Red, green and blue lasers combine through two dichroic mirrors onto a polygon mirror spinning at 27 000 RPM; each facet sweeps one line, and a galvo steps between them, odd lines down and even lines back up.',
       'An IR sensor catches each facet going by and arms a timer for the instant the beam reaches the screen; then 320 pixels go out the GPIO ports, each on its own timestamp so jitter never builds up. A pixel is one byte, precomputed into four port writes. We called it Icarus: the polygon motor caught fire on demo day. R-02 is planned.',
     ],
     proof: [

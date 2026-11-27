@@ -471,7 +471,7 @@ export const about: Record<string, About> = {
   },
   laserbrain: {
     name: 'LaserBrain',
-    does: 'The MangoPi’s hat, with Amy: every rail from one 15 V jack (−5 V for the galvo, 3.5, 6 and 9 V for the lasers, 12 and 24 V for the polygon), the galvo’s SPI DAC made differential, the polygon’s clock lifted to 5 V, the facet sensor, and the cable to the laser driver.',
+    does: 'The MangoPi’s hat: every rail from one 15 V jack (−5 V for the galvo, 3.5, 6 and 9 V for the lasers, 12 and 24 V for the polygon), the galvo’s SPI DAC made differential, the polygon’s clock lifted to 5 V, the facet sensor, and the cable to the laser driver.',
     board: 'laserbrain',
   },
   optics: { name: 'The optics', does: 'Three lasers; two dichroic mirrors join green and then blue to red; the polygon, four facets on a printer’s motor, sweeps each line while an IR sensor sees each facet go by; the galvo steps the lines.' },
