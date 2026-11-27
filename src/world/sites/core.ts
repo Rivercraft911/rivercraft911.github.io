@@ -198,14 +198,17 @@ export function core(k: number) {
 }
 
 // What it sounds like, from inside.
-// The bore: the integers read out at 1200 a second, a tick for each the sieve has left standing at this stratum. Under
-// 2 that is every other one, a note; each prime taken out drops it and roughens it, until what is left is no note
-// but the rhythm of what no small prime divides.
+// The bore: the sieve as a spectrum. Every prime it has taken out down to the stratum the eye is in sounds as that
+// harmonic of a low A (55 Hz), as loud as 1/p^0.7: under 2 an octave, then a twelfth joins, a seventeenth (the major
+// third), the seventh harmonic's flat seventh, the eleventh's sharp fourth, and down through the strata the chord
+// grows richer and stranger: the primes' own timbre, with the A they all stand on never sounded.
 // The dome: a bell for every row of k that kills an exponent, its pitch k's place in the harmonic series over a low
 // A (folded under 1760 Hz), as loud as the root of how many died. Most factors are small, so a thousand exponents
 // begin as a peal up the series and thin to single strokes.
-// The floor: the ticks again, the integers on from the one under the eye, a tick a prime (Miller and Rabin's test to
-// the bases 2, 7 and 61, which is proof this far): 1/ln n of them.
+// The floor: the integers on from the one under the eye, read at 1200 a second, and every prime among them (Miller and
+// Rabin's test to the bases 2, 7 and 61, which is proof this far) plucks a string tuned to its gap from the last: the
+// gap's odd part as a harmonic of A3, folded into one octave. Most gaps are multiples of six, so the strings ring
+// mostly E, round A, with the sevenths and elevenths of the rarer gaps shimmering through.
 const READ = 1200, BELLS = 32, SIEVED = [2, 3, 5, 7, 11, 13, 61], BASES = [2, 7, 61]
 function prime(n: number) {
   if (n < 2) return false
@@ -222,33 +225,56 @@ function prime(n: number) {
   return true
 }
 const y1 = new Float64Array(BELLS), y2 = new Float64Array(BELLS), c1 = new Float64Array(BELLS), c2 = new Float64Array(BELLS)
-let at = 0, under = 0, owed2 = 0, tick = 0, still = 0, rung = 0, dead = 0, bell = 0
+const organ = new Float64Array(PRIMES.length), turns = new Float64Array(PRIMES.length)
+const STRINGS = 8, s1 = new Float64Array(STRINGS), s2 = new Float64Array(STRINGS), k1 = new Float64Array(STRINGS), k2 = new Float64Array(STRINGS), ks = new Float64Array(STRINGS)
+let at = 0, under = 0, last = 0, owed2 = 0, rung = 0, dead = 0, bell = 0, tuned = 0
 export function voice(_t: number, dt: number) {
   if (!was) return 0
   const z = p[2], bore = z > ZC, floor = z <= 0.08
-  if (floor && vals[0] !== under) at = under = vals[0]
-  if (bore || floor)
-    for (owed2 += READ * dt; owed2 >= 1; owed2--) {
-      let left = true
-      if (floor) left = prime(++at)
-      else for (let i = (at++, 0); left && PRIMES[i] <= vals[0]; i++) left = at % PRIMES[i] !== 0
-      if (left) tick++
+  let out = 0
+  for (let i = 0; i < PRIMES.length; i++) {
+    const a = (organ[i] += 2e-4 * ((bore && PRIMES[i] <= vals[0] ? PRIMES[i] ** -0.7 : 0) - organ[i]))
+    if (a < 1e-4) continue
+    turns[i] += dt * 55 * PRIMES[i]
+    turns[i] -= Math.floor(turns[i])
+    out += 0.5 * a * Math.sin(2 * Math.PI * turns[i])
+  }
+  // the strings: string m is the harmonic 2m + 1 of A3, folded down into the octave over it, ringing a second
+  if (dt !== tuned)
+    for (let m = 0, r = Math.exp(-dt / 1.1); m < STRINGS; m++) {
+      const h = 2 * m + 1, w = 2 * Math.PI * ((220 * h) / 2 ** Math.floor(Math.log2(h))) * (tuned = dt)
+      ;(k1[m] = 2 * r * Math.cos(w)), (k2[m] = r * r), (ks[m] = Math.sin(w))
     }
+  if (floor) {
+    if (vals[0] !== under) at = under = last = vals[0]
+    for (owed2 += READ * dt; owed2 >= 1; owed2--)
+      if (prime(++at)) {
+        let g = at - last
+        last = at
+        while (g > 0 && g % 2 === 0) g /= 2
+        if (g < 2 * STRINGS) s1[(g - 1) / 2] += 0.03 * ks[(g - 1) / 2]
+      }
+  } else owed2 = 0
+  for (let m = 0; m < STRINGS; m++) {
+    const y = k1[m] * s1[m] - k2[m] * s2[m]
+    ;(s2[m] = s1[m]), (out += s1[m] = y)
+  }
   if (front !== rung) {
     const born = tally.dead - dead, k = front
     if (born > 0 && k > 0)
-      // a bell is two decaying partials, each a resonator rung once: y ← 2r cos ω y₁ − r² y₂
-      for (let h = 0; h < 2; h++, bell = (bell + 1) % BELLS) {
+      // a bell is two decaying partials, each a resonator rung once, y ← 2r cos ω y₁ − r² y₂, in whichever two have
+      // died away furthest, so none is cut off ringing
+      for (let h = 0; h < 2; h++) {
+        bell = 0
+        for (let i = 1; i < BELLS; i++) if (Math.abs(y1[i]) + Math.abs(y2[i]) < Math.abs(y1[bell]) + Math.abs(y2[bell])) bell = i
         const w = 2 * Math.PI * ((110 * k) / 2 ** Math.max(0, Math.floor(Math.log2(k)) - 3)) * (h ? 2.76 : 1) * dt, r = Math.exp(-dt / (h ? 0.25 : 0.9))
-        c1[bell] = 2 * r * Math.cos(w), c2[bell] = r * r, y2[bell] = 0, y1[bell] = 0.07 * Math.sqrt(Math.min(born, 16)) * (h ? 0.4 : 1) * Math.sin(w)
+        ;(c1[bell] = 2 * r * Math.cos(w)), (c2[bell] = r * r), (y2[bell] = 0), (y1[bell] = 0.05 * Math.sqrt(Math.min(born, 16)) * (h ? 0.4 : 1) * Math.sin(w))
       }
-    rung = front, dead = tally.dead
+    ;(rung = front), (dead = tally.dead)
   }
-  let bells = 0
   for (let i = 0; i < BELLS; i++) {
     const y = c1[i] * y1[i] - c2[i] * y2[i]
-    y2[i] = y1[i], bells += y1[i] = y
+    ;(y2[i] = y1[i]), (out += y1[i] = y)
   }
-  tick *= 0.8, still += 1e-3 * (tick - still)
-  return 0.4 * (tick - still) + bells * (bore ? 0.35 : floor ? 0.5 : 1)
+  return out
 }

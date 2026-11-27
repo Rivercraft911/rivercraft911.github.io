@@ -150,19 +150,25 @@ export function draw(k: number) {
   numbers('n=\\num{0}{000}\\qquad t\\to t/15', P.ink, vals)
 }
 
-// What it sounds like: the frame as a photodiode on the ground under it would hear it. The three lasers' levels
-// summed, line after line in the galvo's order, the beam on the ground for the middle 30 % of each facet's sweep, at
-// the 120 lines a second shown. One line is much like the next, so it is a note, a low B, whose timbre is the
-// picture's and goes down the frame and back up with the scan once a second.
-let lp = 0, dc = 0
+// What it sounds like: the frame as a chord. A photodiode under it hears the lines go by at 120 a second, so all it
+// can hear is that rate's harmonics; here each laser is one of them, red the second, green the third, blue the fifth
+// (a major triad, in just intonation), each as loud as its own light along the line being painted, read in the
+// galvo's order. The scan goes down the frame and back once a second, so the chord's colour follows the picture's,
+// top to bottom: sky, then the land.
+const HARM = [2, 3, 5], amp = [0, 0, 0], turns = [0, 0, 0, 0, 0, 0]
+let read = -1
 export function voice(t: number, dt: number) {
-  const q = RATE * t, f = Math.floor(q), h = (q - f - W0) / WIN
-  let v = 0
-  if (ready && h >= 0 && h < 1) {
-    const row = line(((f % NY) + NY) % NY) * (NX + 1) * 3, x0 = Math.floor(h * NX), x1 = Math.min(NX, x0 + Math.max(1, Math.ceil((RATE * dt * NX) / WIN)))
-    for (let k = 0; k < 3; k++) v += sum[row + 3 * x1 + k] - sum[row + 3 * x0 + k]
-    v /= 3 * (x1 - x0)
+  const f = Math.floor(RATE * t)
+  if (f !== read && ready) {
+    read = f
+    const row = line(((f % NY) + NY) % NY) * (NX + 1) * 3
+    for (let k = 0; k < 3; k++) amp[k] += 0.25 * ((sum[row + 3 * NX + k] - sum[row + k]) / NX - amp[k]) // over a few lines
   }
-  lp += 0.12 * (v - lp), dc += 2e-4 * (lp - dc)
-  return 1.4 * (lp - dc)
+  let v = 0
+  for (let k = 0; k < 6; k++) {
+    // each a pair a fifth of a hertz apart, so the light shimmers
+    turns[k] += dt * (HARM[k >> 1] * RATE + (k & 1 ? 0.2 : 0)), turns[k] -= Math.floor(turns[k])
+    v += amp[k >> 1] * Math.sin(2 * Math.PI * turns[k])
+  }
+  return 0.3 * v
 }

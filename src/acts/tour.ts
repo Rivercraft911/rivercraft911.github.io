@@ -7,13 +7,13 @@
 // close in, a whip), the hearts on a sweep, and at the last the valley goes to glyphs, the glyphs the climb comes out of.
 // Each place is still running while we are elsewhere, so a cut back finds it further on. The first pass holds each
 // place a second down to 0.6 s, the second comes round faster, to under a third; only cuts of 0.6 s or more flash, so
-// flashes are never closer than 0.6 s. Every cut lands on the splice's beat, and each place bends the choir its own way.
+// flashes are never closer than 0.6 s. The choir sings on under every cut.
 // ?w=<n> plays cut n over and over, for review.
 import type { Look } from '../gpu/phosphor'
 import type { Field } from '../gpu/raster'
-import { place, sing, type Mood } from './choir'
+import { place, sing } from './choir'
 import { CUTS, R3 as AT, TOUR } from './clock'
-import { jump, splice } from './reality'
+import { jump } from './reality'
 import { clamp, smooth, type Frame, type Scene } from './scene'
 import { FISH, beat, despread, fishBeam, fisheye, hodo, iq, tube } from './seeing'
 import { PLACES } from '../world/places'
@@ -34,8 +34,6 @@ const cut = (t: number) => {
   while (i + 1 < STARTS.length && t >= STARTS[i + 1]) i++
   return i
 }
-// how each place bends the choir (choir.ts moods: each keeps it a tone)
-const MOODS: Mood[] = [{ gold: 1, lift: 0 }, { gold: 1, times: 3 }, { gold: 1, snap: 1 }, { gold: 1, mirror: 0 }, { gold: 1, prime: 1 }, { gold: 1, times: 2 }, { gold: 1 }]
 
 // How each cut sees its place, and how its camera moves: pushing in, held, high with the lens tilted to a toy's, in a
 // macro close enough that the lens is wide open, or whipping round it.
@@ -134,8 +132,7 @@ export const tour: Scene = {
     place(t + AT)
     return (tt, o) => {
       const j = cut(tt), from = PIN >= 0 ? tt - (tt % CUTS[j]) : STARTS[j]
-      if (splice(tt - from, o)) return
-      sing(tt + AT, o, smooth(0, 0.03, tt - from), MOODS[j % MOODS.length])
+      sing(tt + AT, o, smooth(0, 0.03, tt - from))
       world(GOLD[j % ORDER.length] + tt, o)
     }
   },

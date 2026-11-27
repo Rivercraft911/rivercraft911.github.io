@@ -16,6 +16,7 @@ import { equation } from '../../acts/reality'
 import { TAU } from '../../acts/scene'
 import { text } from '../../beam/font'
 import { Path } from '../../beam/path'
+import { Plucks } from '../../dsp/pluck'
 import { bench as copper } from '../copper'
 import { ctx, frame, look, seen, site, solid, unit, type V } from '../ctx'
 import { PLACES } from '../places'
@@ -146,18 +147,22 @@ export function draw(k: number) {
 }
 
 // What it sounds like. PEEP at the bench's own slowing of time, 25×, which brings its 38 kHz carrier down to
-// 1520 Hz: the trigger is three beeps. The macro is a tune: every report's usage code a semitone over a low A,
-// sounding while its key is down. And under them, in real time as it is drawn, the wheel as a photodiode behind a
-// valve sees it: the five blades passing, let through for 10 ms in every 50, so what is heard is the strobe's own
-// beat, a 20 Hz purr swelling and dying at 5(f − 4) Hz: it slows, stops and turns over as the wheel's picture does.
-const NOTE = [...MACRO].map((ch) => 110 * 2 ** (hid(ch)[1] / 12))
-let beep = 0, key = 0, kp = 0, valve = 0, mean = 0
+// 1520 Hz, the key here: the trigger is three soft notes an octave under it. The macro is a tune: each report's
+// usage code picks a note of the pentatonic over 190 Hz (the carrier three octaves down), struck as its key goes
+// down. And under them, in real time as it is drawn, the wheel as a photodiode behind a valve sees it: the five
+// blades passing, let through for 10 ms in every 50, so what is heard is the strobe's own beat, 5(f − 4) Hz,
+// swelling a low note and letting it go, slowing, stopping and turning over as the wheel's picture does.
+const PENTA = [0, 2, 4, 7, 9], NOTE = CODES.map(([, u]) => 190 * 2 ** ((PENTA[u % 5] + 12 * (Math.floor(u / 5) % 2)) / 12))
+const typed = new Plucks(48000, 0.42)
+let down = -1, burst = -1, valve = 0, mean = 0, purr = 0, ph = 0
 export function voice(t: number, dt: number) {
-  const ms = ((((t * 1000) / SLOW) % CYCLE) + CYCLE) % CYCLE, i = Math.floor(ms / KEY), fr = t * FS
-  beep += 0.01 * (+lit(ms) - beep), key += 0.004 * (+(i < MACRO.length && ms % KEY < 10) - key)
-  if (i < MACRO.length) kp += dt * NOTE[i]
+  const ms = ((((t * 1000) / SLOW) % CYCLE) + CYCLE) % CYCLE, i = Math.floor(ms / KEY), fr = t * FS, b = Math.floor(ms / (BURST + GAP))
+  if (i !== down) (down = i), i < MACRO.length && typed.strike(NOTE[i], 0.3, 0, 1.1, 1.8)
+  if (b !== burst) (burst = b), b < 3 && lit(ms) && typed.strike(760, 0.14, 0, 0.5, 0.8)
   valve += 0.02 * (+(fr - Math.floor(fr) < CLEAR) - valve)
   const light = valve * (0.5 + 0.5 * Math.cos(BLADES * angle(t)))
   mean += 1e-4 * (light - mean)
-  return 0.16 * beep * Math.sin((TAU * 38000 * t) / SLOW) + 0.3 * key * (Math.sin(TAU * kp) + 0.3 * Math.sin(2 * TAU * kp)) + 0.35 * (light - mean)
+  purr += 4e-4 * (light - mean - purr) // the beat, without the strobe's own 20 Hz
+  ph += 95 * dt, ph -= Math.floor(ph)
+  return typed.mono() + 3 * purr * Math.sin(TAU * ph)
 }

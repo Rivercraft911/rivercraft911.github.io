@@ -11,6 +11,7 @@ import { equation } from '../../acts/reality'
 import { TAU } from '../../acts/scene'
 import { Path } from '../../beam/path'
 import { Frames, Kind, SPAN, rc, rings } from '../../dsp/dvbs2'
+import { Plucks } from '../../dsp/pluck'
 import { ctx, cross, frame, site, unit, type V } from '../ctx'
 import { PLACES, RIVER } from '../places'
 import { numbers, to, up } from './sky'
@@ -86,21 +87,19 @@ export function draw(k: number) {
   numbers('k=\\num{0}{00000}\\qquad I=\\num{1}{-0.00}\\qquad Q=\\num{2}{-0.00}', PLACES[k].ink, vals)
 }
 
-// What it sounds like: the same s(t) on a carrier, as it leaves the antenna, Re s(t) e^{2πi f t}, the carrier
-// brought down to 480 Hz, eight cycles to a symbol. A pilot block is 0.6 s of bare tone and a header a second and a
-// half of one phase rocking; the data is that tone made to carry three bits, sixty times a second.
-const FC = 8 * RS, EVERY = 32 // the envelope is slow: it is found every 32nd sample, and runs straight between
-let vi = 0, vq = 0, di = 0, dq = 0, due = 0
-export function voice(t: number, dt: number) {
-  if (--due < 0) {
-    const x = (t + EVERY * dt + T0) * RS, k = Math.floor(x), f = x - k
-    let I = 0, Q = 0
-    for (let m = 1 - SPAN; m <= SPAN; m++) {
-      const j = sym(k + m), w = rc(f - m)
-      I += CI[j] * w, Q += CQ[j] * w
-    }
-    di = (I - vi) / EVERY, dq = (Q - vq) / EVERY, due = EVERY - 1
+// What it sounds like: the constellation as a scale. Four times a second the symbol going out is struck as a note,
+// its phase, one of eight points round the circle, picking one of eight notes up the pentatonic over the carrier
+// (brought down to 480 Hz, then an octave under that). So the data is a melody no one wrote, a header's π/2-BPSK
+// rocks between two notes, and a pilot block, the same symbol over and over, is one note held.
+const NOTE = [0, 2, 4, 7, 9, 12, 14, 16].map((s) => 240 * 2 ** (s / 12)), EVERY = 15 // symbols to a note
+const notes = new Plucks(48000, 0.36)
+let struck = NaN
+export function voice(t: number) {
+  const k = EVERY * Math.floor(((t + T0) * RS) / EVERY)
+  if (k !== struck) {
+    struck = k
+    const j = sym(k), n = Math.round((4 * Math.atan2(CQ[j], CI[j])) / Math.PI - 0.5) & 7
+    notes.strike(NOTE[n], CT[j] === Kind.Data ? 0.3 : 0.22, 0, CT[j] === Kind.Pilot ? 2.4 : 1.5, 1.6)
   }
-  vi += di, vq += dq
-  return 0.28 * (vi * Math.cos(TAU * FC * t) - vq * Math.sin(TAU * FC * t))
+  return notes.mono()
 }

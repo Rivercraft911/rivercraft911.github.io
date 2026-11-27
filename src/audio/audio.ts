@@ -12,17 +12,21 @@ export const stereo = (): Stereo => ({ l: 0, r: 0, s: new Float64Array(VOICES) }
 
 const AHEAD = 0.15 // seconds of signal kept queued past the present: enough to ride out a slow frame
 const C = 2 + VOICES - BED
-const GAIN = 0.22
+const GAIN = 0.22, CEIL = 0.89 / GAIN
 
-// The bed's room: rt seconds for its hall to fall 60 dB, how much of the hall is heard, the level, and
-// tone, where the hall's highs start to die (Hz). The choir sets it.
-export const room = { rt: 2.5, wet: 0.5, gain: 1, tone: 7000 }
+// The bed's room: rt seconds for its hall to fall 60 dB, how much of the hall is heard, the level, tone, where
+// the hall's highs start to die (Hz), shimmer, how much of its tail comes back an octave up, and chorus, how much
+// of the ensemble's doubling is heard. The choir and the world set it.
+export const room = { rt: 2.5, wet: 0.5, gain: 1, tone: 7000, shimmer: 0, chorus: 0.5 }
 
-// The bed: voices 0 and 1 straight to left and right, voice 2 in the middle and deeper in the hall, its
-// DC blocked (scenes bend the voices), then a gentle stereo-linked compressor, 2:1 over a knee with fast
-// attack and slow release, so the swell never clips. The hall hears nothing much below 150 Hz, so the
-// bass stays dry and close and the room never booms.
+// The bed: voices 0 and 1 to left and right through an ensemble, voice 2 in the middle and deeper in the hall,
+// its DC blocked (scenes bend the voices), then a gentle stereo-linked compressor, 2:1 over a knee with fast
+// attack and slow release, so the swell never clips. The ensemble is a string machine's (Juno-60, chorus I): each
+// side read back 1.7 to 5.3 ms late, the delay swung by a slow triangle that runs the other way on the other side,
+// so every partial is doubled by one a few cents off it that sways across the stage. The hall hears nothing much
+// below 150 Hz, so the bass stays dry and close and the room never booms.
 const KNEE = 1
+const CH = 512, CHMASK = CH - 1
 export class Bed {
   private hall: Hall
   private env = 0
@@ -33,24 +37,52 @@ export class Bed {
   private lo = [0, 0]
   private x = [0, 0]
   private y = [0, 0]
+  private ch = [new Float32Array(CH), new Float32Array(CH)]
+  private cl = [0, 0]
+  private chp: number
+  private cw = 0
+  private lfo = 0
+  private dlfo: number
+  private ms: number
   constructor(sr: number) {
     this.hall = new Hall(sr)
     this.att = 1 - Math.exp(-1 / (0.005 * sr))
     this.rel = 1 - Math.exp(-1 / (0.4 * sr))
     this.dc = 1 - (2 * Math.PI * 15) / sr
     this.hp = 1 - Math.exp((-2 * Math.PI * 150) / sr)
+    this.dlfo = 0.5 / sr
+    this.chp = 1 - Math.exp((-2 * Math.PI * 250) / sr)
+    this.ms = sr / 1000
   }
 
   clear() {
     this.hall.clear()
     this.lo[0] = this.lo[1] = 0
+    this.ch[0].fill(0), this.ch[1].fill(0)
+  }
+
+  // The ensemble's late copy of side i, d ms back.
+  private late(i: number, d: number) {
+    const p = this.cw - d * this.ms, k = Math.floor(p), f = p - k, c = this.ch[i]
+    return c[k & CHMASK] + (c[(k + 1) & CHMASK] - c[k & CHMASK]) * f
   }
 
   mix(o: Stereo) {
-    const s = o.s, a = s[0], b = s[1], c = s[2], h = this.hall
+    const s = o.s, c = s[2], h = this.hall
+    let a = s[0], b = s[1]
     if (!(Math.abs(a + b + c) < 1e3)) return void (s[0] = s[1] = s[2] = 0) // a bad sample must never reach the hall's memory
+    if (room.chorus > 0) {
+      const w = this.cw & CHMASK, tri = 4 * Math.abs((this.lfo += this.dlfo) - Math.floor(this.lfo) - 0.5) - 1
+      // the doubling is of the voices, not the bass: what goes in is highpassed near 250 Hz
+      this.ch[0][w] = a - (this.cl[0] += this.chp * (a - this.cl[0]))
+      this.ch[1][w] = b - (this.cl[1] += this.chp * (b - this.cl[1]))
+      const k = room.chorus
+      a += k * this.late(0, 3.5 + 1.8 * tri)
+      b += k * this.late(1, 3.5 - 1.8 * tri)
+      this.cw++
+    }
     const lo = this.lo, k = this.hp
-    h.run(a + c - (lo[0] += k * (a + c - lo[0])), b + c - (lo[1] += k * (b + c - lo[1])), room.rt, room.tone)
+    h.run(a + c - (lo[0] += k * (a + c - lo[0])), b + c - (lo[1] += k * (b + c - lo[1])), room.rt, room.tone, room.shimmer)
     const l = this.block(0, room.gain * (a + 0.5 * c + room.wet * h.l)), r = this.block(1, room.gain * (b + 0.5 * c + room.wet * h.r))
     const p = Math.max(Math.abs(l), Math.abs(r))
     this.env += (p > this.env ? this.att : this.rel) * (p - this.env)
@@ -81,6 +113,7 @@ export class Audio {
   private buf = new Float32Array(4096 * C)
   private o = stereo()
   private bed = new Bed(48000)
+  private peak = 0
 
   async start() {
     const ctx = (this.ctx = new AudioContext({ latencyHint: 'interactive' }))
@@ -138,6 +171,11 @@ export class Audio {
       o.s.fill(0)
       voice?.(this.t + i / sr, o)
       this.bed.mix(o)
+      // last, a limiter that only the loudest moments ever reach: both sides held under 1 dB below full scale
+      // together, at once, let go over a third of a second
+      const p = Math.max(Math.abs(o.l), Math.abs(o.r))
+      this.peak = p > this.peak ? p : this.peak + (p - this.peak) * (3 / sr)
+      if (this.peak > CEIL) (o.l *= CEIL / this.peak), (o.r *= CEIL / this.peak)
       const j = i * C
       let m = (b[j] = o.l) + (b[j + 1] = o.r)
       for (let v = BED; v < VOICES; v++) m += b[j + 2 + v - BED] = o.s[v]

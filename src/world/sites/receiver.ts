@@ -264,20 +264,32 @@ export function draw(k: number) {
   }
 }
 
-// What it sounds like: every satellite in view as its carrier is once its code is wiped off, a tone, at 1320 Hz and
-// a quarter of its Doppler (two octaves down: ±4.5 kHz would not fit under it), so each falls the whole of its
-// pass, from rising to setting, as loud as 1/ρ. Its own C/A code still keys it, the phase turned over chip by chip
-// at the pace the rays run. The one being searched for stands out, as its ray does.
-const amp = new Float32Array(24), chip = new Float32Array(24), turns = new Float64Array(24)
-export function voice(t: number, dt: number) {
-  const c = ((Math.floor(RUN * t) % 1023) + 1023) % 1023
-  let out = 0
-  for (let i = 0; i < 24; i++) {
-    const a = (amp[i] += 4e-4 * ((seenUp[i] ? ((SHELL - 1) / range[i]) * (i === cur ? 1 : 0.4) : 0) - amp[i]))
-    if (a < 1e-3) continue
-    chip[i] += 4e-3 * (1 - 2 * CODES[i][c] - chip[i])
-    turns[i] += dt * (1320 + doppler[i] / 4)
-    out += a * chip[i] * Math.sin(TAU * turns[i])
+// What it sounds like: every satellite in view as its carrier is once its code is wiped off, a pure tone, a chord of
+// them. Each PRN has its own note of the pentatonic over 330 Hz (1320 Hz, the receiver's tone, two octaves down), and
+// its Doppler bends it by up to a quarter tone, so each rises sharp and sets flat across its pass and the chord beats
+// slowly against itself; each as loud as 1/ρ, coming in as it clears the mask. The one being searched for sings out,
+// as its ray does.
+// Each is a phasor turned a step a sample (x + iy times e^{iω}); its level and step are set every 64th sample.
+const PENTA = [0, 2, 4, 7, 9], amp = new Float64Array(24), px = new Float64Array(24).fill(1), py = new Float64Array(24)
+const NOTE = Float64Array.from({ length: 24 }, (_, i) => 330 * 2 ** ((PENTA[i % 5] + 12 * (Math.floor(i / 5) % 3)) / 12))
+const rc = new Float64Array(24), rs = new Float64Array(24), live = new Int32Array(24)
+let nl = 0, due = 0
+export function voice(_t: number, dt: number) {
+  if (--due < 0) {
+    due = 63
+    nl = 0
+    for (let i = 0; i < 24; i++) {
+      const a = (amp[i] += 0.0064 * ((seenUp[i] ? ((SHELL - 1) / range[i]) * (i === cur ? 1 : 0.35) : 0) - amp[i]))
+      if (a < 1e-3) continue
+      const w = TAU * dt * NOTE[i] * 2 ** (doppler[i] / 4500 / 24), n = 1 / Math.hypot(px[i], py[i])
+      ;(rc[i] = Math.cos(w)), (rs[i] = Math.sin(w)), (px[i] *= n), (py[i] *= n), (live[nl++] = i)
+    }
   }
-  return 0.25 * out
+  let out = 0
+  for (let k = 0; k < nl; k++) {
+    const i = live[k], x = px[i]
+    px[i] = rc[i] * x - rs[i] * py[i]
+    out += amp[i] * (py[i] = rs[i] * x + rc[i] * py[i])
+  }
+  return 0.2 * out
 }

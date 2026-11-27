@@ -16,6 +16,7 @@
 import { equation } from '../../acts/reality'
 import { TAU, clamp, hash, view } from '../../acts/scene'
 import { Path } from '../../beam/path'
+import { Plucks } from '../../dsp/pluck'
 import { QPSK, rc, symbol } from '../../dsp/dvbs2'
 import { pigeon } from '../copper'
 import { ctx, cross, dot, frame, len, site, solid, unit, type V } from '../ctx'
@@ -287,27 +288,28 @@ export function draw(k: number) {
   ctx.f.ch.push({ w: 0.5, path: eyes })
 }
 
-// What it sounds like, from beside the airframe. The motor, as loud as it pushes: noise, heavy at the bottom. The
-// air going by, as loud as its dynamic pressure ½ρv²: all there is after burnout, dying away to nothing at apogee.
-// And the downlink, on a receiver whose oscillator puts the carrier at rest on 1760 Hz, so its Doppler −v_r f/c is
-// heard hertz for hertz: 1.3 kHz down as it leaves, back to pitch at apogee, a little sharp coming home under the
-// canopy. The symbols on it are its QPSK, at the pace the beam draws them.
-const BFO = 1760, QMAX = 56_700, EVERY = 64 // Hz; the most ½ρv² gets, Pa; the flight is looked up every 64th sample
-let burn = 0, wind = 0, fd = 0, bi = 0, bq = 0, di = 0, dq = 0, due = 0, cycles = 0, low = 0, mid = 0, high = 0
+// What it sounds like, from beside the airframe. The motor, as loud as it pushes: a low A and the rumble under it.
+// The air going by, a soft rush as loud as its dynamic pressure ½ρv²: all there is after burnout, dying away to
+// nothing at apogee. And the downlink: its QPSK symbols at the pace the beam draws them, each of the four a note of A major
+// over A4 (the receiver's BFO, 1760 Hz, two octaves down), all of them bent by a quarter of the Doppler −v_r f/c as
+// a receiver beside the pad hears it: flat as it leaves, back in tune at apogee, a little sharp coming home under
+// the canopy.
+const BFO = 1760, QMAX = 56_700, EVERY = 64, CHORD = [0, 7, 12, 16] // Hz; the most ½ρv² gets, Pa; the flight is looked up every 64th sample
+const downlink = new Plucks(48000, 0.33)
+let burn = 0, roar = 0, wind = 0, fd = 0, due = 0, sent = NaN, ph = 0, low = 0, mid = 0, high = 0
 export function voice(t: number, dt: number) {
   if (--due < 0) {
-    const c = clk + t - ctx.t, s = ((c % CYCLE) + CYCLE) % CYCLE, ts = flightTime(s), up = s > PAD && ts < T_LAND
+    const c = clk + t - ctx.t, s = ((c % CYCLE) + CYCLE) % CYCLE, ts = flightTime(s), up = s > PAD && ts < T_LAND, j = Math.floor(FLOW * c)
     fetch(ts)
     burn = up && ts < BURN ? push(ts, 1) : 0
     wind = up ? (0.5 * RHO * Math.exp(-state.z / SCALE_H) * (state.vx ** 2 + state.vz ** 2)) / QMAX : 0
     fd = up ? ((state.vx * dot(d, pe) + state.vz * dot(d, pn)) / C) * FREQ : 0
-    const x = FLOW * (c + EVERY * dt), k = Math.floor(x)
-    let I = 0, Q = 0
-    for (let j = k - 4; j <= k + 5; j++) (I += QPSK.pts[2 * symbol(j, 2)] * rc(x - j)), (Q += QPSK.pts[2 * symbol(j, 2) + 1] * rc(x - j))
-    di = (I - bi) / EVERY, dq = (Q - bq) / EVERY, due = EVERY - 1
+    if (j !== sent) (sent = j), downlink.strike(440 * (1 + fd / (4 * BFO)) * 2 ** (CHORD[symbol(j, 2)] / 12), 0.22, 0, 0.9, 1.6)
+    due = EVERY - 1
   }
-  bi += di, bq += dq, cycles += dt * (BFO + fd), cycles -= Math.floor(cycles)
+  roar += 2e-4 * (burn - roar)
+  ph += 55 * dt, ph -= Math.floor(ph)
   const n = 2 * Math.random() - 1
-  low += 0.02 * (n - low), mid += 0.06 * (n - mid), high += 0.25 * (n - high)
-  return burn * (7 * low + 0.6 * high) + 2.5 * wind * (high - mid) + 0.16 * (bi * Math.cos(TAU * cycles) - bq * Math.sin(TAU * cycles))
+  low += 0.004 * (n - low), mid += 0.06 * (n - mid), high += 0.25 * (n - high)
+  return downlink.mono() + roar * (0.4 * Math.sin(TAU * ph) + 8 * low) + 0.6 * wind * (mid - low)
 }
