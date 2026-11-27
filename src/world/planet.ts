@@ -80,6 +80,11 @@ const pose = (): Pose => ({ eye: [0, 0, 3], at: [0, 0, 0], up: [0, 1, 0] })
 const now = pose(), from = pose(), to = pose()
 let focus = -1 // the place we are at, or home
 const steer = { d: 0, pitch: 0, yaw: 0, at: [0, 0, 0] }, gaze = [0, 0, 0] // what a place's steer asks, and where it has the camera look
+// Where the camera is asked to look, as an offset from the place's own point: a place's steer, a picked part, or what
+// it last looked at while the visitor holds it; the place's own point (anchor); the view before a part was picked; and
+// how long the place's choreography has been held (while the visitor holds the camera or has a part picked).
+const toward = [0, 0, 0], anchor = [0, 0, 0], back = { d: 0, pitch: 0, yaw: 0, at: [0, 0, 0] }
+let paused = 0
 let flight = -1, fstart = 0, flen = 1 // flying from `from` toward `focus` since fstart, for flen seconds
 export const HOME = { d: 5.2, pitch: 0.38, yaw: 0.6 } // where the arrival leaves the eye, and Escape takes it
 const rest = { ...HOME } // where the eye is about what it looks at
@@ -106,7 +111,8 @@ function restAt(k: number, o: Pose) {
     unit(e0), cross(n0, e0, N0)
   } else frame(n0, e0, N0)
   for (let i = 0; i < 3; i++) {
-    o.at[i] = n0[i] * r + gaze[i]
+    anchor[i] = n0[i] * r
+    o.at[i] = anchor[i] + gaze[i]
     o.up[i] = n0[i]
     o.eye[i] = o.at[i] + d * (c * (Math.sin(yaw) * e0[i] + Math.cos(yaw) * N0[i]) + s * n0[i])
   }
@@ -139,7 +145,7 @@ export function go(k: number, t: number, quiet = false) {
   if (k === focus && flight < 0) return
   for (const key of ['eye', 'at', 'up'] as const) for (let i = 0; i < 3; i++) from[key][i] = now[key][i]
   focus = k
-  ctx.picked = ''
+  ctx.picked = was = '', paused = 0, toward.fill(0)
   const [d, pitch, yaw] = k < 0 ? [HOME.d, HOME.pitch, rest.yaw] : PLACES[k].view
   want.d = rest.d = d, want.pitch = rest.pitch = pitch, want.yaw = rest.yaw = yaw
   restAt(k, to)
@@ -271,6 +277,20 @@ function pick(cx: number, cy: number) {
   })
   return best
 }
+// A part picked (or '' to let it go), here or by the page: the page hears of it as a 'part' event.
+const choose = (id: string) => ((ctx.picked = id), dispatchEvent(new CustomEvent('part', { detail: id })))
+// However it was picked, the camera goes to it, as near as its size, and the visitor turns round it; let go, the camera
+// goes back to the view it had.
+let was = ''
+function follow() {
+  if (ctx.picked === was) return
+  if (ctx.picked && !was) (back.d = want.d), (back.pitch = want.pitch), (back.yaw = want.yaw), back.at.splice(0, 3, ...toward)
+  if (!ctx.picked && was) (want.d = back.d), (want.pitch = back.pitch), (want.yaw = back.yaw), toward.splice(0, 3, ...back.at)
+  const q = ctx.picked ? find(ctx.picked) : undefined
+  if (q) want.d = clamp(q.r * 4.5, 0.004, 1.2)
+  was = ctx.picked
+}
+const find = (id: string) => parts.list.slice(0, parts.n).find((q) => q.id === id)
 // the part of the place looked at under the pointer (ctx.part), if any: the nearest whose ball the pointer is within
 function touch(cx: number, cy: number) {
   const x = ((2 * cx) / innerWidth - 1) * view.a, y = 1 - (2 * cy) / innerHeight
@@ -399,12 +419,14 @@ export const planet: Scene = {
     idle += dt
     if (dbg.has('go') && !(globalThis as { went?: boolean }).went && ((globalThis as { went?: boolean }).went = true)) go(PLACES.findIndex((P) => P.id === dbg.get('go')), t) // ?go=<id>: straight to a place
     if (clickAt) {
+      // a part picks it (again lets it go); anywhere else lets a picked part go; only then does a click fly anywhere
       const hit = focus >= 0 && flight < 0 ? touch(clickAt[0], clickAt[1]) : ''
-      const k = hit ? -1 : pick(clickAt[0], clickAt[1])
+      const k = hit || ctx.picked ? -1 : pick(clickAt[0], clickAt[1])
       clickAt = null
-      if (hit) (ctx.picked = ctx.picked === hit ? '' : hit), dispatchEvent(new CustomEvent('part', { detail: ctx.picked }))
+      if (hit || ctx.picked) choose(hit === ctx.picked ? '' : hit)
       else if (k >= 0) go(k, t)
     }
+    follow()
     // the pointer's asks, followed the way an operator follows: quickly, never at once
     const fol = 1 - Math.exp(-dt * 6)
     if (idle > 4) want.yaw += dt * (focus < 0 ? 0.04 : 0.03) // drifting round whatever is looked at
@@ -413,11 +435,16 @@ export const planet: Scene = {
       const n = Math.floor((idle - AFTER) / DWELL)
       if (n !== showing) (showing = n), go(ATTRACT[n % ATTRACT.length], t, true)
     }
-    // a place may steer the camera while it rests there, until the visitor takes it (and for a while after)
-    const P = PLACES[focus], free = performance.now() - grabbed > 3000
-    const steering = focus >= 0 && flight < 0 && free && !!P.steer?.(t - fstart - flen, ctx.picked, steer)
-    if (steering) (want.d = steer.d), (want.pitch = steer.pitch), (want.yaw = steer.yaw)
-    for (let i = 0; i < 3; i++) gaze[i] += ((steering ? steer.at[i] : 0) - gaze[i]) * fol
+    // A place may steer the camera while it rests there. While the visitor holds the camera (and for a while after) or
+    // has a part picked, its choreography waits where it is, and the camera keeps looking at what it was looking at.
+    const P = PLACES[focus], at = focus >= 0 && flight < 0, held = performance.now() - grabbed < 3000 || !!ctx.picked
+    if (at && held) paused += dt
+    const since = at ? t - fstart - flen - paused : -1
+    const steering = at && !held && !!P.steer?.(since, '', steer)
+    if (steering) for (let i = 0; i < 3; i++) (want.d = steer.d), (want.pitch = steer.pitch), (want.yaw = steer.yaw), (toward[i] = steer.at[i])
+    const q = ctx.picked ? find(ctx.picked) : undefined
+    if (q) for (let i = 0; i < 3; i++) toward[i] = q.c[i] - anchor[i]
+    for (let i = 0; i < 3; i++) gaze[i] += (toward[i] - gaze[i]) * fol
     rest.d += (want.d - rest.d) * fol, rest.pitch += (want.pitch - rest.pitch) * fol, rest.yaw += (want.yaw - rest.yaw) * fol
     restAt(focus, to)
     if (flight >= 0 && (flight = (t - fstart) / flen) >= 1) flight = -1
@@ -432,7 +459,7 @@ export const planet: Scene = {
 
     const c = covered(), fe = framed ? 1 - Math.exp(-4 * dt) : ((framed = true), 1) // (from the first frame as the arrival left it: clear of the index)
     side[0] += (c[0] - side[0]) * fe, side[1] += (c[1] - side[1]) * fe
-    paint(f, now, t, dt, focus, DEBUG ? +(dbg.get('ap') ?? 0) : focus >= 0 && flight < 0 ? 1 : 0, true, 0, focus >= 0 && flight < 0 ? t - fstart - flen : -1)
+    paint(f, now, t, dt, focus, DEBUG ? +(dbg.get('ap') ?? 0) : at ? 1 : 0, true, 0, since)
     label() // the parts' names, where they now stand
     return sound()
   },
