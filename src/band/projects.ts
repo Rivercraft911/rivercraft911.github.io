@@ -81,22 +81,22 @@ export const PROJECTS: Project[] = [
   {
     slug: 'samwise',
     title: 'SAMWISE',
-    remarkable: 'Stanford SSI’s CubeSat. River laid out its magnetorquers: coils etched through 6-layer boards',
+    remarkable: 'Stanford SSI’s CubeSat: River’s magnetorquer coil boards, etched through 6 layers, and its radio test bench',
     freq: ORBIT,
     span: 0.5,
     signature: 'A magnetorquer pushes against Earth’s field, which turns past it once an orbit: ≈0.18 mHz.',
     sig: [{ k: 'lines', f: [ORBIT], p: [-8] }],
     years: '2024 – 2026',
     numbers: [
-      ['River’s part', 'designed the Z coil panel and the Pico radio hat; re-laid the XY coil panels’ traces'],
+      ['River’s part', 'the magnetorquer coil boards (XY and Z) and the radio test bench'],
       ['coil panels', '6 layers of 2 oz copper; two panels a face in parallel, five coils a board in series'],
       ['optimizer', 'the trace width for the most magnetic moment under a power limit'],
-      ['radios', 'S-band LoRa1280F27 (SX1280) and UHF RFM98PW LoRa, on the Pico hat'],
+      ['radio test bench', 'a Pico carrying S-band LoRa1280F27 (SX1280) and UHF RFM98PW LoRa'],
       ['range test', 'transmitter, receiver, observer, S-band image transfer'],
     ],
     body: [
-      'SAMWISE is the Stanford Student Space Initiative’s CubeSat. Its magnetorquers are coils etched into six-layer circuit boards, the XY and Z coil panels, two panels to a face in parallel and five coils a board in series: River designed the Z panel and re-laid the XY panels’ coils. Current through them pushes against Earth’s field, which is how the satellite turns itself without fuel. For coils like these River wrote a tool that finds the trace width giving the most magnetic moment for the copper weight, layer count, supply and power limit, with live graphs as the knobs turn.',
-      'Its radios were brought up on River’s Pico radio hat, a Raspberry Pi Pico carrying the S-band and UHF LoRa modules and the bus to the rest of the stack, driven by River’s range-test firmware down to sending images over S-band.',
+      'SAMWISE is the Stanford Student Space Initiative’s CubeSat. Its magnetorquers are coils etched into six-layer circuit boards, the XY and Z coil panels, two panels to a face in parallel and five coils a board in series. Those coil boards are River’s. Current through them pushes against Earth’s field, which is how the satellite turns itself without fuel. For coils like these River wrote a tool that finds the trace width giving the most magnetic moment for the copper weight, layer count, supply and power limit, with live graphs as the knobs turn.',
+      'Its radios were brought up on River’s radio test bench, a Raspberry Pi Pico carrying the S-band and UHF LoRa modules and the bus to the rest of the stack, driven by River’s range-test firmware down to sending images over S-band.',
     ],
     media: [
       { src: `${RAW}magtorque-optimization/main/images/screenshot1.png`, alt: 'The magnetorquer optimizer: magnetic moment against trace width' },
@@ -106,14 +106,12 @@ export const PROJECTS: Project[] = [
     links: [
       ['magtorque-optimization', `${GH}magtorque-optimization`],
       ['coil panels', 'https://github.com/stanford-ssi/samwise-avionics'],
-      ['Pico radio hat', `${GH}SoftwareDebugPicoHat`],
+      ['radio test bench', `${GH}SoftwareDebugPicoHat`],
       ['range-test firmware', `${GH}RangeTestSoftware`],
     ],
     log: [[0, 1], [1, 9], [14, 7], [17, 1], [65, 7], [66, 3], [68, 9], [69, 34]],
     todo: [
       'SAMWISE’s orbit period and launch status',
-      'the XY coil panel’s silkscreen names Eric Liu and Maya Bridgman (v2.2); your commits re-laid its traces and set the 0.17 mm width, so the page says “re-laid”. Say if it should say more',
-      'the 2.4 GHz ground station hat is left out: its silkscreen reads “Kristopher Luo, Austin Chan, Ver 1.1” and its history in samwise-avionics has no commits of yours. If a version of it is yours, say which, and it goes back in (bake-boards.mjs, content.ts BOARDS, this entry’s boards)',
       'a photo of flight hardware, if public',
     ],
   },

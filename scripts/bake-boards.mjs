@@ -39,7 +39,7 @@ export const BOARDS = [
   { id: 'coil', title: 'Magnetorquer coil', project: 'SAMWISE', repo: 'stanford-ssi/samwise-avionics', path: 'Universal_Z_MagTorq/Coil_Panel_Z_v1/Coil_Panel_Z.kicad_pcb', clone: GH + 'samwise-avionics' },
   // not in the zoom: for the pages
   { id: 'coil-xy', title: 'XY magnetorquer coil', project: 'SAMWISE', repo: 'stanford-ssi/samwise-avionics', path: 'Universal_XY_MagTorq/Coil_Panel_XY.kicad_pcb', clone: GH + 'samwise-avionics' },
-  { id: 'picohat', title: 'Pico radio hat', project: 'SAMWISE', file: GH + 'samwise-groundstation/SoftwareDebugPicoHat/SoftwareDebugPicoHat.kicad_pcb' },
+  { id: 'picohat', title: 'Radio test bench', project: 'SAMWISE', file: GH + 'samwise-groundstation/SoftwareDebugPicoHat/SoftwareDebugPicoHat.kicad_pcb' },
   { id: 'pigeon-carrier', title: 'Pigeon carrier', project: 'Pigeon Vision', file: PV + 'carrier/PigeonCarrier/PigeonCarrier.kicad_pcb' },
   { id: 'yapogee-s3', title: 'Yapogee S3', project: 'Pigeon Vision', file: PV + 'yapogee-s3/kicad/YapogeeS3.kicad_pcb' },
   { id: 'finertia', title: 'Finertia', project: 'BLEPS', file: SATS + 'Satellite-Avionics-rotor/project-janus/ADCS/rotor-controller/Rotor.kicad_pcb', skip: /2610T/ }, // (Faulhaber's motor model stays out)

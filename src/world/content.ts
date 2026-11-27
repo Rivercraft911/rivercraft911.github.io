@@ -23,7 +23,7 @@ export const BOARDS: Record<string, Board> = {
   heart: { name: 'Rava Heart', mm: [94, 88.3], layers: 4 },
   'coil-xy': { name: 'XY coil panel', mm: [81.5, 215.5], layers: 6 },
   coil: { name: 'Z coil panel', mm: [96.97, 97.33], layers: 6, as: ['coil-z'] },
-  picohat: { name: 'Pico radio hat', mm: [69.03, 54.7], layers: 4 },
+  picohat: { name: 'Radio test bench', mm: [69.03, 54.7], layers: 4 },
   finertia: { name: 'Finertia', mm: [26, 26], layers: 6 },
 }
 // The board a name means (an id here, one of its other names, or its picture's file), if it is one of River's.
