@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="icon" href="data:," />
     <title>One Beam · River Dowdy</title>
-    <meta name="description" content="How the intro to River Dowdy's site works: one simulated oscilloscope beam, and every line of it a signal." />
+    <meta name="description" content="How the intro to River Dowdy's site works: one simulated oscilloscope beam, a river, a waterfall plot, a black hole, and a planet of projects." />
     <style>
       :root {
         --paper: #f8f6f1; --ink: #1c1c1c; --soft: #6b6b6b; --rule: #ddd8cc; --link: #3f6f5c;
@@ -54,254 +54,125 @@
       </header>
 
       <p>
-        Ok so that minute of chaos before my projects? All of it is drawn by one simulated oscilloscope
-        beam. No video, no sprites, no images. Just a single dot of light flying around a phosphor screen
-        a couple million times a second, and wherever it has been the screen glows for a bit and then
-        fades. Everything you just watched is wherever that dot went.
+        Ok so that minute before my projects? Up to the lip of the falls, every line on screen is drawn by one simulated oscilloscope beam. No video, no sprites, no images: a single dot of light flying around a phosphor screen, glowing wherever it has been and fading behind it. From the lip on it's rendered, but by the same rule.
       </p>
       <p>
-        There was exactly one rule: <em>nothing on screen is fake</em>. If something claims to be a signal,
-        it is one. The equations up top are live, drawn by the same beam, and the numbers ticking inside
-        them are the numbers actually drawing the picture. And for the first half, the sound <em>is</em>
-        the picture. Left speaker is the beam's x, right speaker is its y. So if you plugged a real scope
-        into your headphone jack (please do this, it would make my week) it would draw the site.
+        There was exactly one rule: <em>nothing on screen is fake</em>. If something claims to be a signal, it is one. The equations up top are live, drawn by the same beam. And up to the falls, the sound <em>is</em> the picture: left speaker is the beam's x, right speaker is its y, thinned each moment to a table of points played at musical refresh rates as a bass line in A. So if you plugged a real scope into your headphone jack (please do this, it would make my week) it would draw the site.
       </p>
-      <!-- River: a line on why you built this, or how it got so out of hand, would land well here -->
 
       <h2>The phosphor</h2>
       <p>
-        A beam dragging across a tube dumps energy along its path. So every little step of the beam, from
-        a to b, lays down a Gaussian spot smeared along that segment, which very kindly has a closed form,
-        a difference of two error functions:
+        A beam dragging across a tube dumps energy along its path. So every little step of the beam, from a to b, lays down a Gaussian spot smeared along that segment, which very kindly has a closed form, a difference of two error functions:
       </p>
-      <span class="eq">E(p) ∝ ∫<sub>0</sub><sup>1</sup> e<sup>−|p − a − s(b−a)|² ⁄ 2σ²</sup> ds &nbsp;&nbsp; E ← E · e<sup>−Δt⁄τ</sup></span>
+      <span class="eq">E(p) ∝ ∫<sub>0</sub><sup>1</sup> e<sup>−|p − a − s(b−a)|² ⁄ 2σ²</sup> ds</span>
+      <span class="eq">E ← E · e<sup>−Δt⁄τ</sup></span>
       <p>
-        The screen holds on to that energy and lets it decay exponentially, the way real phosphor does. A
-        few percent of it scatters around inside the glass as a faint halo that falls off as
-        <i>r</i><sup>−2.5</sup> (this is the part that makes it look like an actual tube and not a line
-        drawing). Brightness is energy per second, so it looks the same at 60 Hz and 120 Hz. And if your
-        display can do HDR, the core of the trace is brighter than white, which is super fun.
+        The screen holds on to that energy and lets it decay exponentially, the way real phosphor does. A few percent of it scatters around inside the glass as a faint halo that falls off as <i>r</i><sup>−2.5</sup> (this is the part that makes it look like an actual tube and not a line drawing). Brightness is energy per second, so it looks the same at 60 Hz and 120 Hz. And if your display can do HDR, the core of the trace is brighter than white, which is super fun.
       </p>
 
-      <h2>A square wave</h2>
+      <h2>A sine</h2>
       <p>
-        It opens on the oldest trick in the book: a square wave is just a pile of sines, and you get to
-        watch the pile get stacked.
-      </p>
-      <span class="eq">x(t) = (4 ⁄ π) Σ<sub>k</sub> sin((2k+1)ωt) ⁄ (2k+1)</span>
-      <p>
-        Each harmonic shows up like a control loop locking. It overshoots, rings, and settles. Almost
-        everything that moves in the intro moves this way, as a sum of second-order step responses, which
-        has the very nice side effect that every frame is a pure function of time (so you can scrub it
-        like a video):
-      </p>
-      <span class="eq">s(τ) = 1 − e<sup>−ζω<sub>n</sub>τ</sup> (cos ω<sub>d</sub>τ + (ζω<sub>n</sub> ⁄ ω<sub>d</sub>) sin ω<sub>d</sub>τ)</span>
-      <p>
-        That's why the corners flicker while they sharpen. Those are the Gibbs ears, and you can hear
-        every harmonic land. All fifty-one of them arrive in about a second and a half, and the square is
-        still ringing when the next part grabs it.
+        It starts at power-on: the beam degausses, spiralling inward to a dot, and then settles into a pure 440 Hz sine, a circle on the scope swept out into a wave.
       </p>
       <p>
-        Ok so that's week one of Signals and Systems, and a reasonable person would stop here. I did not
-        stop here.
+        Then a copy of that wave steps up the harmonics and the sine takes its phase:
+      </p>
+      <span class="eq">y = A cos(nωt + β sin ωt)</span>
+      <p>
+        As the modulation index β swells to 2.405, the first zero of J<sub>0</sub>, the carrier vanishes, and a fan of FM waves fills in between. A reasonable person would stop here. I did not stop here.
       </p>
 
       <h2>The wave becomes a river</h2>
       <p>
-        The square wave stops being a height and becomes a <em>heading</em>. Rivers turn as they run, and
-        the curve real meandering rivers follow is the sine-generated curve of Langbein and Leopold (yes,
-        my name is River, yes this was always going to happen):
+        Each FM wave stops being a height and folds into a river. Rivers turn as they run, and the curve real meandering rivers follow is the sine-generated curve of Langbein and Leopold (yes, my name is River, yes this was always going to happen):
       </p>
-      <span class="eq">θ(s) = ω sin(2πs ⁄ M)</span>
+      <span class="eq">θ(s) = ω<sub>1</sub> sin(2πs ⁄ M<sub>1</sub>) + ω<sub>2</sub> sin(2πs ⁄ M<sub>2</sub> + φ)</span>
+      <span class="eq">z(s) = ∫ e<sup>iθ</sup> ds</span>
       <p>
-        Feed θ the square wave and you get a zigzag. Then the harmonics let go, highest first, and the
-        elbows round off into meanders. The river's direction e<sup>iθ</sup> is literally phase
-        modulation, so as the bends swell you can hear Bessel sidebands bloom. And the same Bessel
-        function tells you how windy the river is, the length along the channel over the distance down
-        the valley:
-      </p>
-      <span class="eq">sinuosity = 1 ⁄ J<sub>0</sub>(ω)</span>
-      <p>
-        That line lands exactly on the river in the valley. Not near it. On it.
+        Integrating e<sup>iθ</sup> means the river's direction is literally phase modulation. The fan of FM waves becomes a sheaf of rivers, which combs out onto the land's contour lines, and the valley carries those lines on.
       </p>
 
       <h2>The valley</h2>
       <p>
-        The ground is a power-law random field, random phases under |k|<sup>−β</sup>, which is the same
-        spectral trick behind basically all synthetic terrain, carved into a valley:
+        The ground is a power-law random field, random phases under |k|<sup>−β</sup>, carved into a valley:
       </p>
       <span class="eq">h(x) = 𝓕<sup>−1</sup>[ |k|<sup>−β</sup> e<sup>iφ<sub>k</sub></sup> ]</span>
       <p>
-        It's drawn the way the pulsar plot on <em>Unknown Pleasures</em> was drawn: cross-section after
-        cross-section, each one hidden behind the ones in front of it, recomputed every single frame. The
-        firs are triangle waves under a tapering envelope. The water is streamlines of an actual flow
-        field, with a pool turning inside every bend.
-      </p>
-      <!-- River: the pen-and-ink sketch that started the valley would be a good story here -->
-
-      <h2>The storm</h2>
-      <p>
-        Halfway down the river there's a pool, and in the pool there's a modem. (Stay with me.) A carrier
-        shows up a few hundred hertz off frequency, so it spins, and a little control loop drags it in
-        until it stands still. You can hear that happen: the beat note slides down to nothing. Then it
-        starts talking real DVB-S2, and every point of its constellation is a stone standing in the
-        water. Sixteen of them, 16APSK.
+        It's drawn the way the pulsar plot on <em>Unknown Pleasures</em> was drawn: cross-section after cross-section, each one hidden behind the ones in front of it, recomputed every frame. The firs are triangle waves under a tapering envelope. The water is streamlines of a real flow field, with a pool turning inside every bend.
       </p>
       <p>
-        Then it rains. Rain eats satellite signals, and there is an actual ITU recommendation for how
-        much, per kilometre of wet sky, at a rain rate of R millimetres an hour:
-      </p>
-      <span class="eq">A = k R<sup>α</sup> L &nbsp;&nbsp;&nbsp; E<sub>s</sub> ⁄ N<sub>0</sub> = clear sky − A</span>
-      <p>
-        At 12 GHz that's k = 0.0239 and α = 1.18, so a proper downpour costs about ten decibels. DVB-S2
-        was built for exactly this. Every frame, the modem picks the densest constellation the link can
-        still hold, at the standard's own thresholds, so as the rain comes in the stones run together:
-        sixteen, then eight, then four. At the bottom of the storm it's down to QPSK, and the speakers,
-        which are just hopping from stone to stone, are playing a 110 Hz square wave with rain in it.
-        Which is the first thing you heard in this whole intro.
-      </p>
-      <p>
-        Then the sky clears and the stones split back apart. I decided the sky behind the storm is
-        clearer than the sky in front of it (my valley, my weather), so it ends one step up, on
-        thirty-two. And if you wiggle your mouse while it's locked, you detune the carrier, and if
-        you're quick enough the loop slips a cycle and the whole constellation spins.
+        Out to the speakers, the valley goes as its skyline, its hidden-line contour rows weighted by depth, and the outlines of the nearest firs. Then the camera flies down over the firs and runs for the lip.
       </p>
 
-      <h2>The waterfall</h2>
+      <h2>The falls</h2>
       <p>
-        If you've done any radio you have lost hours of your life staring at a waterfall plot: the
-        spectrum of a signal, one row per moment, every new row shoving the old ones down the screen so
-        the history pours away under you. Frequency across, time down, brightness is energy. It's called
-        a waterfall because it looks like one. So at the end of the river there's a real one.
+        The river ends in a round shaft and pours over its rim all the way round, by moonlight. The soundtrack's bands set how heavily each angle of the rim pours.
       </p>
       <p>
-        The camera flies to the lip, and the falling water stops pretending. Each lane of the curtain is
-        a frequency bin. The lip is the live spectrum of exactly what you're hearing right now, and it
-        tips over the edge row after row, so the curtain below is the recent past of the soundtrack,
-        falling. It's the short-time Fourier transform of the audio, computed while it plays:
-      </p>
-      <span class="eq">X(m, ω) = Σ<sub>n</sub> x[n] w[n − mH] e<sup>−iωn</sup></span>
-      <p>
-        The camera goes over the edge with the water and turns around to face it, close enough that the
-        plot is the whole screen. Then it backs off until you can see all of it, lip to foot, and the
-        plot pours into the pool below and winds itself around the drain: rows bend into rings, lanes fan
-        out into angles, and the rectangle becomes a disc.
+        At the edge, the ink streamlines run into rendered water: a glassy sheet tearing into ropes and droplets, up to about a million droplets on the GPU, each placed as a pure function of its id and the time. A moonbow hangs at its true angles. From the lip on, the beam is done and the whole frame is rendered.
       </p>
 
-      <h2>The fall</h2>
+      <h2>The whirlpool</h2>
       <p>
-        From here on the tube is a raster CRT too: full-screen fields, rendered on the GPU, swept into
-        the same phosphor under the beam. (The beam keeps drawing on top, but from here it has help.) The
-        falls land in a plunge pool that's already turning, a Burgers vortex,
+        If you've done any radio you have lost hours of your life staring at a waterfall plot: the spectrum of a signal, one row per moment, every new row shoving the old ones down the screen so the history pours away under you. Frequency across, time down, brightness is energy. It's called a waterfall because it looks like one. So at the bottom of the falls there's a real one.
+      </p>
+      <p>
+        The plunge pool turns as a Burgers vortex,
       </p>
       <span class="eq">v<sub>θ</sub>(r) = (Γ ⁄ 2πr) (1 − e<sup>−r² ⁄ r<sub>c</sub>²</sup>)</span>
       <p>
-        and the disc is still the waterfall plot, wound into a circle: angle is log-frequency and
-        log-radius is age, so the water carries the spectrum's history inward. The soundtrack's octaves
-        become its spiral arms.
+        and its surface is a real SDR waterfall plot of the soundtrack, computed live with a short-time Fourier transform:
+      </p>
+      <span class="eq">X(m, ω) = Σ<sub>n</sub> x[n] w[n − mH] e<sup>−iωn</sup></span>
+      <p>
+        Each ring is one row of the spectrum, the newest landing at the rim and the older rows winding inward, painted in an SDR display's colours: a speckled dark-blue noise floor through cyan and yellow to red for strong signals. The choir's notes form the bright spiral arms, while the camera rides one smooth path down onto the axis.
       </p>
       <p>
-        Then text spreads over the whirlpool like an infection. Every cell turns into whichever
-        teleprinter glyph has the ink that best matches the light behind it, and the centre row goes out
-        as real RTTY: 45.45 baud, Baudot, 170 Hz shift. You could decode it. (Nobody will. It's there
-        anyway.)
-      </p>
-      <p>
-        Down the drain is Indra's net: the limit set of a Kleinian group (Maskit's slice, straight out of
-        <em>Indra's Pearls</em>), generated by just two Möbius maps,
-      </p>
-      <span class="eq">a(z) = μ + 1 ⁄ z &nbsp;&nbsp;&nbsp; b(z) = z + 2</span>
-      <p>
-        and every pearl is a soap bubble lit by thin-film interference. On the floor the beam plays the
-        chaos game, throwing random words in a, b and their inverses at a point, so the dust it leaves
-        behind is the same limit set.
+        Near the drain, the water's light is read out as glyphs: every cell becomes the character whose ink best matches the light behind it, tinted by the plot's colours, spiralling into the drain.
       </p>
 
-      <h2>The multiverse</h2>
+      <h2>The dive</h2>
       <p>
-        Then it cuts through ten worlds, faster and faster: a kaleidoscopic IFS, the Mandelbulb, an
-        Apollonian packing, a Lyapunov fractal grown from the DVB-S2 start-of-frame word, Newton's method
-        run on the roots of a 32APSK constellation, the {4,3,5} hyperbolic honeycomb, and more. Every
-        world keeps running while you're somewhere else, and every world bends the music its own way.
-      </p>
-
-      <h2>The long zoom</h2>
-      <p>
-        Then the cuts stop and it just falls. It starts in GPS orbit: 24 satellites on six planes tilted
-        55°, 26 560 km out, each one going round every
-      </p>
-      <span class="eq">T = 2π √(a³ ⁄ μ) ≈ 11.97 h</span>
-      <p>
-        (sped up 3600×, because I do not have twelve hours of your attention). Every satellite is beaming
-        its C/A code down at one spot in Antarctica, and those dashes are the actual Gold code chips,
-        stretched out so you can see them. At that spot there's a dot out for a walk at 1.4 m/s, which is
-        <a href="https://github.com/Rivercraft911/driftwood">driftwood</a>, my thing for convincing your
-        phone it's somewhere it isn't. (The constellation is a tidy textbook one and the route is made
-        up. The codes are real.)
+        The drain's throat flares into a cathedral nave, then a Menger sponge, a Mandelbox, and a coral foam, each found inside the last with their distance fields blended into a zoom without end.
       </p>
       <p>
-        The dot turns out to be a GNSS front end I designed, and from there it's my boards all the way
-        down. Every board has a hole in it somewhere, a via or a mounting hole, and through every hole is
-        the next board: the GNSS breakout, the Rava Heart, both R-01 boards, the strobe glasses, PEEP.
-        They're KiCad's own renders of the real layouts, and the number in the corner is the true width
-        of what's on screen, so you can watch it go from a board the size of your hand to about 50
-        microns and back.
+        Then a black hole. Every ray is bent by the Schwarzschild metric, traced with Binet's orbit equation for light:
       </p>
+      <span class="eq">u″ + u = 3Mu²</span>
       <p>
-        The last hole opens onto a magnetorquer coil I laid out for SAMWISE, Stanford's CubeSat. The beam
-        draws its actual copper, the layers pull apart, a pulse of current runs the spiral, and the
-        field blooms out of the middle:
-      </p>
-      <span class="eq">m = N I A &nbsp;&nbsp;&nbsp; r = L sin² θ</span>
-      <p>
-        N and A are counted off the real traces. The 0.1 A is my guess at a drive current, not the flight
-        number. And a magnetorquer works by pushing on the Earth's magnetic field, which is where this
-        whole fall started.
-      </p>
-      <p>
-        On the other side of the coil is a quaternion Julia set, a four-dimensional fractal, sliced by a
-        plane that is turning through 4D (I cannot picture this either).
+        The rays cross a thin accretion disk whose colour includes relativistic beaming, Doppler shift, and gravitational redshift, and then the eye falls in.
       </p>
 
       <h2>The choir</h2>
       <p>
-        The music under the fall is a Shepard tone: octaves sliding down forever under a fixed
-        bell-shaped loudness, so it always sounds like it's falling and it never gets anywhere:
+        The music of the fall is a Shepard tone: octaves sliding down forever under a fixed bell over log-frequency, so it always sounds like it's falling and it never gets anywhere:
       </p>
-      <span class="eq">x(t) = Σ<sub>k</sub> A(log₂ f<sub>k</sub>) sin φ<sub>k</sub>(t), &nbsp;&nbsp; f<sub>k</sub> = 2<sup>k − D(t)</sup> f<sub>0</sub></span>
+      <span class="eq">x(t) = Σ<sub>k</sub> A(log<sub>2</sub> f<sub>k</sub>) sin φ<sub>k</sub>(t)</span>
+      <span class="eq">f<sub>k</sub> = 2<sup>k − D(t)</sup> f<sub>0</sub></span>
       <p>
-        D(t) is how many octaves we've fallen and A is a fixed bell over log-frequency. The partials are
-        pure octaves from 40 Hz to 5 kHz, sung in a little feedback-delay-network hall. The picture
-        follows the same rule: every world is an endless zoom, and the zoom rate <em>is</em> the choir's
-        rate of descent. You are falling exactly as fast as you hear yourself falling.
+        The drawing's own note before the falls is an A, and the choir grows out of it. It speeds up to three octaves a second at the horizon, where the whole choir is redshifted out of hearing, like a tape stopping (seen from outside, light from something falling in reddens with an e-folding time of 4M).
       </p>
-
-      <h2>The black hole</h2>
       <p>
-        At the end the Julia set falls into a black hole sitting in a pseudo-Kleinian cathedral. The
-        light rays really are bent by the Schwarzschild metric on their way through the scene, which is
-        why the arches wrap into Einstein rings around the shadow:
-      </p>
-      <span class="eq">x″ = −3M h² x ⁄ r⁵</span>
-      <p>
-        Then the cathedral itself gets torn in, spaghettified, and wound into a maelstrom by the shear of
-        its own orbits. We fall with angular momentum 3.5M, just short of the 4M that would have let us
-        escape, so we spiral in (so close!). The ring the beam draws on top is a gravitational-wave
-        chirp, h<sub>+</sub> and h<sub>×</sub>, its frequency rising as
-        (t<sub>c</sub> − t)<sup>−3/8</sup>. Then a flash, silence, and the single dot the scope powered
-        on with.
+        For a black hole of about twenty suns, like Cygnus X-1, the inner edge of the disk orbits 110 times a second, which is A2. A hot spot on it is Doppler-beamed once per orbit, so the low A you hear through the dark is the disk itself.
       </p>
 
-      <h2>The name</h2>
+      <h2>The arrival</h2>
       <p>
-        It ends the way it started. The square wave was built from its Fourier series, and so is my name:
-        spinning phasors chained tip to tail, the last tip writing RIVER DOWDY, getting sharper as more
-        terms show up:
+        Out of the dark (it was the inside of a thunderhead), we drop out of its base into a sunrise (ozone is what makes the sky overhead blue at sunrise).
       </p>
-      <span class="eq">z(t) = Σ<sub>n</sub> c<sub>n</sub> e<sup>inωt</sup></span>
       <p>
-        Under it my callsign goes out in Morse at 35 words per minute, and the speakers play the name's
-        own Fourier sum, so that scope on your headphone jack reads it too.
+        We climb past a 47 km tall Rava Heart standing on its tip with its LEDs beating, then fly fast and low past every one of my projects, each name dropping into the index, and climb until the planet hangs whole.
+      </p>
+
+      <h2>The world</h2>
+      <p>
+        The planet is a small world where my projects stand. The hardware is the real thing: boards exported from KiCad, and mechanical CAD from Onshape and Fusion, baked to meshes and lit by a rasteriser plus a path tracer (the LEDs are real lamps the path tracer sees). Click a place and it shows the project working, then comes apart into the boards I designed; click a board and the camera goes to it.
+      </p>
+      <p>
+        The sky behind the planet is fractals baked into a panorama while the intro plays: Indra's pearls, a spiral galaxy with a Mandelbulb heart, a Kleinian cathedral, star streams along the Lorenz and Aizawa attractors, Julia-set filaments, a {7,3} hyperbolic tiling as an aurora, and an Apollonian ring nebula.
+      </p>
+      <p>
+        The music there is generative, keyed to the places nearby, and answers what they do: each keystroke PEEP types, each satellite Ephemeris 1 locks.
       </p>
 
       <hr />
@@ -310,19 +181,20 @@
       <p class="note">
         Built with TypeScript, raw WebGPU, WGSL shaders and an AudioWorklet. No engine, no graphics
         libraries. The source is on <a href="https://github.com/Rivercraft911/rivercraft911.github.io">GitHub</a>.
-        The lace behind this page is an Apollonian packing, the gasket Indra's pearls pack into.
+        The lace behind this page is an Apollonian packing, the same gasket as the ring nebula in the sky.
       </p>
 
       <ol class="refs">
         <li>W. B. Langbein and L. B. Leopold, “River meanders: theory of minimum variance,” USGS Prof. Paper 422-H, 1966.</li>
         <li>D. Mumford, C. Series and D. Wright, <em>Indra's Pearls: The Vision of Felix Klein</em>, 2002.</li>
         <li>R. N. Shepard, “Circularity in judgments of relative pitch,” JASA 36, 1964.</li>
-        <li>ETSI EN 302 307, DVB-S2.</li>
+        <li>J. M. Burgers, “A mathematical model illustrating the theory of turbulence,” Adv. Appl. Mech. 1, 1948.</li>
+        <li>J.-P. Luminet, “Image of a spherical black hole with thin accretion disk,” A&amp;A 75, 1979.</li>
       </ol>
 
       <footer>
-        <a href="/">↺ watch it again</a>
-        <a href="/?band">take me to the work →</a>
+        <a href="../">↺ watch it again</a>
+        <a href="../?world=planet">take me to the work →</a>
       </footer>
     </article>
     <script type="module" src="/src/how/lace.ts"></script>
