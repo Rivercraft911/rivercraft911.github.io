@@ -64,6 +64,9 @@ const BACK = LAND + 0.6
 const ramp = (x: number) => (x < 0 ? 0 : x < 1 ? x * x * x - (x * x * x * x) / 2 : x - 0.5) // ∫ smooth
 const red = (T: number) => (T < BACK ? 7.2 * 0.6 * ramp((T - HOLE + 0.35) / 0.6) : 0)
 const audible = (T: number) => (T < BACK ? 2 ** -red(T) * (1 - smooth(HOLE + 0.3, BACK, T)) : smooth(BACK, BACK + 1, T))
+// The dive's weight, its swell, sub, opening and hall, up into the hole and let go in the dark while nothing sings: the
+// arrival begins at its own level, and the sunrise's bloom is not stacked on the fall's (it drove the limiter).
+const dove = (T: number) => smooth(DIVE, HOLE, T) * (1 - smooth(HOLE, BACK, T))
 // The dark, from the horizon until the choir is back: the hall's tail drawn out long and dark through it.
 const dark = (T: number) => smooth(HOLE - 0.4, HOLE + 0.2, T) * (1 - smooth(LAND, BACK + 0.4, T))
 const SUNG = new Float64Array(S.length)
@@ -100,7 +103,7 @@ const open = (T: number) => 1 - smooth(FALL, FALL + 2.5, T) // as bright as the 
 
 // The room, once a frame. A world's share w ∈ [0, 1] of it is left as the world set it.
 export function place(T: number, w = 0) {
-  const c = cloud(T), b = sky(T), k = 1 - w, dv = smooth(DIVE, HOLE, T), z = dark(T)
+  const c = cloud(T), b = sky(T), k = 1 - w, dv = dove(T), z = dark(T)
   room.rt = mix(room.rt, 3.2 + 0.8 * smooth(SPIN, TEXT, T) + 2 * dv + 2.5 * c + 2 * b * (1 - smooth(SKY + 4, END, T)) + 5 * z, k) // drawn out in the dark
   room.wet = mix(room.wet, 0.5 + 0.3 * c + 0.15 * b - 0.3 * z, k) // and quieter: the dark is a hush
   room.tone = mix(room.tone, 6000 - 3000 * c + 3500 * b - 3500 * z * (1 - c), k)
@@ -112,7 +115,7 @@ export function place(T: number, w = 0) {
 // The pad, every millisecond.
 let at = -Infinity, sp = 0, stepAt = 0
 function set(T: number) {
-  const c = cloud(T), b = sky(T), text = stepped(T), dv = smooth(DIVE, HOLE, T) ** 2
+  const c = cloud(T), b = sky(T), text = stepped(T), dv = dove(T) ** 2
   stair(sung(T))
   const s = mix(sung(T), st.s, text)
   // a step is a glide of a few milliseconds, so it never clicks; a seek is a jump
@@ -201,7 +204,7 @@ export function sing(T: number, o: Stereo, gain = 1) {
   if (T !== last) {
     last = T
     out.l = out.r = out.m = 0
-    const e = fade(T) * audible(T) * (1 + 0.5 * smooth(DIVE, HOLE, T) ** 2) // swelling into the hole, reddened away, and back
+    const e = fade(T) * audible(T) * (1 + 0.5 * dove(T) ** 2) // swelling into the hole, reddened away, and back
     out.m = DISK * disk(T)
     if (e > 0) {
       if (Math.abs(T - at) >= 1e-3) set(T), arpeggio(T)
