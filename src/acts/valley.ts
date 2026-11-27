@@ -7,7 +7,7 @@
 // spectra. The speakers trace what the beam draws, simplified to what they can (beam/scope.ts), so a scope
 // on the jack draws the valley too, and every equation it is made of is written live above it.
 import { Path, STRIDE } from '../beam/path'
-import { GX, GY, Scope, tune } from '../beam/scope'
+import { screen, tune } from '../beam/scope'
 import { load, use } from '../beam/font'
 import { fft, hann } from '../dsp/fft'
 import { Field } from '../dsp/terrain'
@@ -15,7 +15,7 @@ import { place, sing } from './choir'
 import { VALLEY as DUR, SING } from './clock' // the choirs begin to sing at SING
 import { A0, GF, HF, M, RIM, TAU_RASTER, V as VR, join, loud, ride, sight, vortex as whirl } from './wrap'
 import { LOOK } from '../gpu/phosphor'
-import { Board, Say } from './say'
+import { Board, MORPH, say, type Place } from './say'
 import { TAU, cam, clamp, glide, hash, lock, mix, smooth, view, type Scene } from './scene'
 
 use(await load('tech'))
@@ -235,7 +235,7 @@ const PEAKS = L('h(z) = 20 \\log_{10} |S(e^{i \\omega})|', INK, 5)
 const SPRAY = L('(x, y) = (x_0 + v_x \\tau,\; y_0 + v_y \\tau - 3.5 \\tau^2)', WHITE, 2)
 const EYE = L('eye = (\\num{0}{-00.0}, \\num{1}{-00.0}, \\num{2}{-00.0})', WHITE, 4.2)
 const board = new Board([RIVER, OPEN, FLOWS, LAND, SPRAY, WALL, WAVES, FIRS, EYE, PEAKS]) // in the order they arrive
-const say = new Say()
+const slot: Place = { x: 0, y: 0, size: 0 }, lead = [0, 0, 0], RISE = 0.1, TAKE = RISE + MORPH // the river's line rises into the board, which takes it over
 export const RIVER_EQ = '\\theta(s) = \\omega_1 \\sin(2\\pi s / M_1) + \\omega_2 \\sin(2\\pi s / M_2 + \\phi)'
 let ceil = 1 // nothing of the land is drawn above this: the board's room
 let grown = 0 // firs standing, counted as they are drawn
@@ -248,7 +248,7 @@ const HB = 1024, horizon = new Float32Array(HB)
 const p3 = { x: 0, y: 0, z: 0, k: 1 }, q3 = { x: 0, y: 0, z: 0, k: 1 }
 const sx = new Float32Array(NC), sy = new Float32Array(NC), sz = new Float32Array(NC), sk = new Float32Array(NC), ok = new Uint8Array(NC)
 const ink = new Path(), line = new Path()
-let occlude = 1, landK = 1, lp = 0, hl = 0, hr = 0, hl2 = 0, hr2 = 0 // lp: the roar's low-pass state; hl, hr: the scope's, twice
+let occlude = 1, landK = 1, lp = 0 // lp: the roar's low-pass state
 
 // The flight: one continuous path, eye, target and lens gliding through these without stopping. Straight
 // down on the map the meander drew; a crane up and back as the valley rises; down over the firs to skim the
@@ -432,7 +432,7 @@ function items_(t: number, upto: number, next: { i: number }) {
 // fades in or out on the screen grows or shrinks in the speakers' time instead of popping. Traced forth and
 // back, there is no flyback to hear.
 const AR = 10, AC = 5, FIRS_HEARD = 6
-const sc = new Scope(), shore = new Float32Array(2 * 2 * NR) // the banks' points, left then right
+const sc = screen, shore = new Float32Array(2 * 2 * NR) // the banks' points, left then right
 let flip = false, far = -1, banks = 0
 const firs: number[] = [], near: number[] = [] // the nearest firs drawn this frame: item, closeness
 function heard(i: number, k: number, z: number) {
@@ -493,6 +493,7 @@ const RIFF = [A1, A1, E1, A1, B1, CS, B1, E1, D2, CS, A1, E1, FS, A1, B1, CS, A1
 const CLIMB = [CS, E2, 2 * A1, 2 * CS]
 const NOTES: [number, number][] = [[0, A1], ...RIFF.map((n, i): [number, number] => [1.2 + ((RUN - 1.2) * i) / RIFF.length, n]), ...CLIMB.map((n, i): [number, number] => [RUN + 0.2 * i, n])]
 const CYCLES = tune(NOTES)
+let shift = NaN, was = NaN // the bass line's phase, set to go on from where the meander left the trace
 
 // White water: at each cascade a foam lip curling across the river, and spray thrown downstream on
 // ballistic arcs, each droplet a parabola; around each stone, ripple rings running outward.
@@ -575,7 +576,6 @@ function rim(upto: number, next: { i: number }, k: number) {
 
 export const valley: Scene = {
   dur: DUR,
-  fade: 0.25, // the meander's last picture is this one's first
   build(t, f) {
     crane(t)
     ink.clear(), sc.clear(), (grown = 0), (flip = false), (far = -1), (banks = firs.length = near.length = 0)
@@ -633,13 +633,13 @@ export const valley: Scene = {
     if (land > 0.06) items_(t, Infinity, next)
     // the contours the meander's rivers combed out onto, carried on at their own heights, so they tilt with the land
     // as we crane up, and give way as its cross-sections rise; the speakers keep the three a side they traced
-    const cl = 0.2 * (1 - smooth(1, 2.6, t))
+    const cl = 0.22 * (1 - smooth(1, 2.6, t))
     if (cl > 0.01)
       for (const side of [-1, 1])
         for (let l = 0; l < LEVELS; l++) {
           let pen = false, kept = 0
           if (l % 4 === 2) (sc.weight = 5 * cl), (kept = 1)
-          for (let x = X0; x < XM + 8; x += 0.4) {
+          for (let x = X0; x < XM + 8; x += CDX) {
             const z = contour(side, l, x)
             if (z !== z || !look(x, riverY(x) + (l + 0.5) * CI, z)) {
               pen = false
@@ -695,8 +695,6 @@ export const valley: Scene = {
       }
       f.ch.push({ w: fade, path: line, gain: WIDE })
     }
-    // the equations: the meander's carries on a moment, then the board of everything takes over
-    if (t < 0.6) say.say(f, t, RIVER_EQ, WATER, [['\\omega_1', W1, 2], ['\\omega_2', W2, 2], ['M_1', M1, 0], ['M_2', M2, 0]], 1 - smooth(0, 0.6, t))
     const hero = (a: number, b: number) => smooth(a - 0.3, a, t) * (1 - smooth(b - 0.3, b, t)) // what is new, from a to b: the river, the land, the firs
     RIVER.vals[0] = W1, RIVER.vals[1] = W2, RIVER.hot = hero(-1, SCAN)
     OPEN.vals[0] = clamp(X0 + (t - 0.25) / 0.03, X0, LIP), OPEN.hot = 1 - smooth(2, 3.5, t)
@@ -704,9 +702,18 @@ export const valley: Scene = {
     FIRS.vals[0] = grown, FIRS.hot = hero(3, 4.8)
     WAVES.vals[0] = (7 * t) % TAU, WAVES.vals[1] = (5.3 * t) % TAU, WAVES.hot = FLOWS.hot = 0.4
     EYE.vals[0] = eye.x, EYE.vals[1] = eye.y, EYE.vals[2] = eye.z, EYE.hot = 0.3
+    // the equations: the meander's carries on a moment, then rises into the head of the board as it takes the
+    // numbers in, one equation morphing, and the board goes on drawing it among everything the valley is made of
+    const now = (f.at ?? 0) + t, led = t < TAKE
+    if (t < RISE) say.say(f, now, RIVER_EQ, WATER, [['\\omega_1', W1, 2], ['\\omega_2', W2, 2], ['M_1', M1, 0], ['M_2', M2, 0]])
+    else if (led) {
+      const h = RIVER.hot // lit as the board will light it when it takes it over
+      ;(lead[0] = mix(0.75, WATER[0], h)), (lead[1] = mix(0.8, WATER[1], h)), (lead[2] = mix(0.85, WATER[2], h))
+      say.say(f, now, RIVER.src, lead, [], mix(0.35, 1, h), board.first(slot), RIVER.vals)
+    }
     // running for the lip the board goes, and from the lip on nothing is written: only the water
     const hand = smooth(7.1, 7.7, t)
-    ceil = mix(board.show(f, t, smooth(0.2, 0.8, t) * (1 - hand)), 1, hand)
+    ceil = mix(board.show(f, t, smooth(0.2, 0.8, t) * (1 - hand), led), 1, hand)
 
     f.rate = mix(2.4e6, 7.2e6, smooth(1, 8, t))
     if (t > SING) place(t - SING)
@@ -727,16 +734,15 @@ export const valley: Scene = {
     for (const i of firs) traced(items[i], 4, 1, t)
     if (banks) bank(-1, 1.5 * land), bank(1, 1.5 * land)
     if (t > FAR) rimmed(2 * smooth(FAR, FAR + 1, t))
-    sc.commit(t)
-    const tip = { x: 0, y: 0 }
+    sc.commit(now)
+    if (!(t > was)) shift = NaN
+    was = t
     return (tt, o) => {
-      // the speakers trace it forth and back at the bass line's note; hushed at the lip, where the scope ends
-      const c = CYCLES(tt), u = 2 * (c - Math.floor(c)), k = 1 - smooth(RUN + 0.8, RUN + 1, tt)
-      if (k > 0) {
-        sc.at(u < 1 ? u : 2 - u, tt, tip)
-        ;(hl += (GX * tip.x - hl) * 0.5), (hr += (GY * tip.y - hr) * 0.5), (hl2 += (hl - hl2) * 0.5), (hr2 += (hr - hr2) * 0.5)
-        ;(o.l += k * hl2), (o.r += k * hr2)
-      }
+      // the speakers trace it forth and back at the bass line's note, going on from where the meander's trace
+      // was; hushed at the lip, where the scope ends
+      if (shift !== shift) shift = sc.u / 2 - (CYCLES(tt) % 1)
+      const c = CYCLES(tt) + shift, u = 2 * (c - Math.floor(c)), k = 1 - smooth(RUN + 0.8, RUN + 1, tt)
+      if (k > 0) sc.play(u < 1 ? u : 2 - u, tt, o, k)
       // the falls are heard coming; at the lip everything holds its breath; over the edge the scope rule
       // ends, and they roar
       const hush = 1 - 0.9 * smooth(7.8, 8, tt) * (1 - smooth(8.25, 8.55, tt))

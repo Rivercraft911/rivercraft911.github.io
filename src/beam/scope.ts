@@ -18,6 +18,11 @@ export class Scope {
   private t = NaN
   private span = 1 / 60
   private t0 = NaN
+  u = 0 // where on the table it last played
+  private lx = 0 // the plates, through a gentle low-pass: two poles of k a sample
+  private ly = 0
+  private lx2 = 0
+  private ly2 = 0
 
   clear() {
     this.x.length = this.y.length = this.c.length = 0
@@ -79,7 +84,27 @@ export class Scope {
     const xb = B[j] + (B[j + 2] - B[j]) * a - B[2 * N], yb = B[j + 1] + (B[j + 3] - B[j + 1]) * a - B[2 * N + 1]
     o.x = xa + (xb - xa) * k, o.y = ya + (yb - ya) * k
   }
+
+  // Plays the table at u into the speakers' pair, scaled by g, through the plates' gentle low-pass. The scope
+  // keeps where the trace is, so a scene that takes it over goes on from where the last one left it.
+  play(u: number, tt: number, o: { l: number; r: number }, g = 1, k = 0.5) {
+    this.at(u, tt, tip)
+    this.u = u
+    ;(this.lx += (GX * tip.x - this.lx) * k), (this.ly += (GY * tip.y - this.ly) * k)
+    ;(this.lx2 += (this.lx - this.lx2) * k), (this.ly2 += (this.ly - this.ly2) * k)
+    ;(o.l += g * this.lx2), (o.r += g * this.ly2)
+  }
+
+  // The plates driven straight from a signal (x, y about the screen's axis), not from the table.
+  hold(x: number, y: number) {
+    ;(this.lx = this.lx2 = GX * x), (this.ly = this.ly2 = GY * y)
+  }
 }
+const tip = { x: 0, y: 0 }
+
+// The opening's one scope: the hook drives its plates, then the meander and the valley draw their tables on it
+// in turn, so at each handover the trace goes on from where it was and the new table morphs out of the last.
+export const screen = new Scope()
 
 // The refresh rate as a tune: [from, Hz] steps, and the number of refreshes by time t (its integral), so the
 // phase never jumps when the note changes.

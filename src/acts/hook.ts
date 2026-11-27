@@ -13,8 +13,8 @@
 // scope on the jack draws all of it, and the screen is that scope.
 import { GREEN } from '../beam/beam'
 import { Path } from '../beam/path'
-import { GX, GY } from '../beam/scope'
-import { Say } from './say'
+import { GX, GY, screen } from '../beam/scope'
+import { say } from './say'
 import { LEVELS } from './valley' // the fan's members a side: as many as the meander's sheaf has rivers
 import { TAU, clamp, lock, mix, smooth, view, type Scene } from './scene'
 
@@ -72,12 +72,19 @@ export function signal(t: number, o: { x: number; y: number; z: number }) {
   ;(o.x = r * q * ca + A * (2 * u - 1) * sa), (o.y = SEAT.cy + r * y), (o.z = Math.sin(2 * a) * (0.5 + 0.5 * ((2 * u - 1) * ca - q * sa)))
 }
 
-// What the speakers play: the signal, centred on the screen's axis.
+// What the speakers play: the signal, centred on the screen's axis; the scope keeps where it left the plates.
 const sv = { x: 0, y: 0, z: 0 }
 export function sing(tt: number, o: { l: number; r: number }, k = 1) {
   signal(tt, sv)
   ;(o.l += k * GX * sv.x), (o.r += k * GY * (sv.y - SEAT.cy))
+  screen.hold(sv.x, sv.y - SEAT.cy)
 }
+
+// The light the sweep lays on its waves at the last, a pass's worth spread over u, in a display list's
+// intensity: the beam's share (1 of 1.8; the fan and the equation have the rest) of 1.2 M samples a second
+// at z = 0.9, a 60th of it a frame, over the 1000 a display list lays to a unit of length. The meander draws
+// the waves it takes over this bright, by time and not length, so the handover is the same picture.
+export const SWEPT = ((0.9 / 1.8) * 1.2e6) / 60 / 1000
 
 // The fan the screen draws over the speakers' four: three a side between them, from the outside in.
 const P = 360
@@ -103,7 +110,6 @@ const COIL = 'z(t) = a\\, e^{-t / \\tau}\\, e^{i 2\\pi 60 t}'
 const TONE = 'x = A \\sin(\\omega t) \\cos \\alpha + v t \\sin \\alpha,\\; y = A \\cos(\\omega t)'
 const HARM = 'y = A \\cos(n \\omega t)'
 const FM = 'y = A \\cos(n \\omega t + \\beta \\sin(\\omega t))'
-export const say = new Say()
 
 const p = new Path()
 export const hook: Scene = {

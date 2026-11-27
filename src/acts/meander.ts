@@ -11,8 +11,9 @@
 // the sheaf combed out.
 import { GREEN } from '../beam/beam'
 import { Path } from '../beam/path'
-import { GX, GY, Scope, tune } from '../beam/scope'
-import { CLOSED, CYC, DUR as HOOK, FANNED, J0, NC, PR, SEAT, say, wave } from './hook'
+import { screen, tune } from '../beam/scope'
+import { CLOSED, CYC, DUR as HOOK, FANNED, J0, NC, PR, SEAT, SWEPT, wave } from './hook'
+import { say } from './say'
 import { CI, LEVELS, M1, M2, MEANDER as END, PHI, RIVER_EQ, SPRING, W1, W2, WIDE, contour, glow, map, reach, riverY, room } from './valley'
 import { TAU, cam, clamp, lock, mix, smooth, view, type Scene } from './scene'
 
@@ -40,11 +41,13 @@ function put(dx: number, dz: number, h = 0) {
 // on the way from the wave it was, the scope's member with index b0 and n carrier cycles across; level > 0
 // leans a line onto its contour as the sheaf settles. The hero (level 0) carries the current's glow. Each
 // vertex as far as the sweep reached goes to the speakers' stroke, if one is given. Unfolded, it is only as
-// long as the sweep it was, and it runs on past the sweep's end as it folds.
+// long as the sweep it was, and it runs on past the sweep's end as it folds; and a wave the sweep drew (the
+// share of its passes, swept) is lit as the sweep lit it, by time and not length, brightest where it runs
+// flat, until it folds into a river and is lit along its length.
 const AMP = (SEAT.r * CYC * M1) / (2 * view.a * 0.9) // the wave's height, in metres of the hook's frame
-function strand(p: Path, a: number, b: number, z0: number, fold: number, i0: number, n: number, b0: number, ds: number, every: number, side = 0, level = 0, rec?: number[]) {
-  let x = 0, z = z0, pen = false
-  const end = SA + (REACH - SA) * clamp(fold), h = level ? (level - 0.5) * CI : 0
+function strand(p: Path, a: number, b: number, z0: number, fold: number, i0: number, n: number, b0: number, ds: number, every: number, side = 0, level = 0, rec?: number[], swept = 0) {
+  let x = 0, z = z0, pen = false, px = NaN, py = NaN
+  const end = SA + (REACH - SA) * clamp(fold), h = level ? (level - 0.5) * CI : 0, du = (ds * every) / SA, f = clamp(fold)
   if (rec) rec.length = 0
   for (let k = 0, s = 0; s < end + 1e-6; k++, s += ds) {
     const S = Math.sin(TAU * (s / M1 - v))
@@ -52,7 +55,9 @@ function strand(p: Path, a: number, b: number, z0: number, fold: number, i0: num
       const zz = level && set > 0 ? mix(z, contour(side, level - 1, SPRING + x), set) : z, u = s / SA
       put(mix(s, x, fold), mix(-AMP * (b0 || n !== CYC ? wave(u, n, b0) : S), zz, fold), h)
       if (q.x > view.a + 0.05 && (!rec || s > SA)) break
-      const i = i0 * room(q.y) * (level ? 1 + 3 * Math.exp(-(((level - ring) / 2) ** 2)) : glow(reach(SPRING + x), now))
+      const own = i0 * (level ? 1 + 3 * Math.exp(-(((level - ring) / 2) ** 2)) : glow(reach(SPRING + x), now))
+      const i = room(q.y) * (swept && f < 1 ? mix((SWEPT * swept * du) / (Math.hypot(q.x - px, q.y - py) || kh * ds * every), own, f) : own)
+      ;(px = q.x), (py = q.y)
       const seen = i > 0.01 && q.y > -1.05 && q.x > -view.a - 0.05 && q.x < view.a + 0.05
       if (rec && s <= SA + 1e-6) seen ? rec.push(q.x, q.y) : rec.push(NaN, NaN) // what is not drawn is not traced
       if (!seen) pen = false
@@ -76,15 +81,13 @@ const SINE = 'z(s) = \\int_0^s e^{i \\theta} ds,\\; \\theta = \\omega \\sin(2\\p
 // refresh, at A, the sine's river traced twice through the middle of them.
 const PAIR = 1.2, CYCLES = tune([[0, PR / 4], [PAIR, 55]], (PR * HOOK) / 4)
 const FOUR = [0, LEVELS, 0, -LEVELS], EIGHT = [-11, -7, -3, 0, 0, 3, 7, 11] // levels by side, −z (the far bank) first
-const sc = new Scope(), recs = new Map([...FOUR, ...EIGHT].map((l) => [l, [] as number[]])), tip = { x: 0, y: 0 }
-let lp = 0, rp = 0
+const sc = screen, recs = new Map([...FOUR, ...EIGHT].map((l) => [l, [] as number[]]))
 
 const sheaf = new Path(), c = [0, 0, 0]
 const tint = (a: readonly number[], b: readonly number[], k: number) => ((c[0] = mix(a[0], b[0], k)), (c[1] = mix(a[1], b[1], k)), (c[2] = mix(a[2], b[2], k)), c)
 
 export const meander: Scene = {
   dur: END,
-  fade: 0.25, // the hook's last picture is this one's first: across the fade the beam and the speakers share them
   build(t, f) {
     const T = HOOK + t, A = view.a * 0.9
     map()
@@ -105,12 +108,12 @@ export const meander: Scene = {
         const k = fold(0.14 + (0.5 * l) / LEVELS), z0 = contour(side, l - 1, SPRING), b0 = (side * CLOSED * l) / LEVELS
         const ink = tint(tint(GREEN, WATER, wet), INK, comb)
         sheaf.color(ink[0], ink[1], ink[2])
-        strand(sheaf, mix(b0, w, comb), w2 * comb, comb * (z0 === z0 ? z0 : side * 12), k, 0.22 * (FANNED.includes(l) ? mix(0.5, 1, Math.min(1, k)) : l === LEVELS ? mix(2, 1, Math.min(1, k)) : Math.min(1, k)), NC, b0, 0.1, 1, side, l, rec(side * l))
+        strand(sheaf, mix(b0, w, comb), w2 * comb, comb * (z0 === z0 ? z0 : side * 12), k, 0.22 * (FANNED.includes(l) ? mix(0.5, 1, Math.min(1, k)) : Math.min(1, k)), NC, b0, 0.1, 1, side, l, rec(side * l), l === LEVELS ? 0.25 : 0)
       }
     const ink = tint(GREEN, WATER, wet)
     sheaf.color(ink[0], ink[1], ink[2])
-    strand(sheaf, w, w2, 0, fold(0.08), mix(1.5, 1, smooth(DRY, END, t)), CYC, 0, 0.02, 5, 0, 0, rec(0)) // as bright as the valley will draw it, by the end
-    f.ch.push({ w: 1, path: sheaf, gain: WIDE }) // exposed as the valley's first moments are, which carry it on
+    strand(sheaf, w, w2, 0, fold(0.08), mix(1.5, 1, smooth(DRY, END, t)), CYC, 0, 0.02, 5, 0, 0, rec(0), 0.5) // as bright as the valley will draw it, by the end
+    f.ch.push({ w: 1, path: sheaf, gain: mix(1, WIDE, smooth(0.3, 3.5, t)) }) // opening to the valley's first exposure, which carries it on
 
     // the speakers' picture: each stroke forth or back in turn, as the sweep's passes were
     sc.clear()
@@ -123,7 +126,7 @@ export const meander: Scene = {
         else pen ? sc.lineTo(x, y, 1) : ((pen = true), sc.moveTo(x, y))
       }
     }
-    sc.commit(t)
+    sc.commit(T)
 
     const a = M1 * (v + 0.25)
     if (t < STOP) say.say(f, T, SINE, ink, [['\\omega', w, 2], ['a', a, 1], ['\\sigma', 1 / J0(w), 3]])
@@ -132,9 +135,7 @@ export const meander: Scene = {
     f.rate = 2.4e6
     return (tt, o) => {
       const c = CYCLES(tt)
-      sc.at(c - Math.floor(c), tt, tip)
-      ;(lp += (GX * tip.x - lp) * 0.6), (rp += (GY * tip.y - rp) * 0.6)
-      ;(o.l += lp), (o.r += rp)
+      sc.play(c - Math.floor(c), tt, o)
     }
   },
 }
