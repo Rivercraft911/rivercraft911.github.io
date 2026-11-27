@@ -11,7 +11,7 @@
 // the sheaf combed out.
 import { GREEN } from '../beam/beam'
 import { Path } from '../beam/path'
-import { screen, tune } from '../beam/scope'
+import { SHARP, screen, tune } from '../beam/scope'
 import { CLOSED, CYC, DUR as HOOK, FANNED, J0, NC, PR, SEAT, SWEPT, wave } from './hook'
 import { say } from './say'
 import { CI, LEVELS, M1, M2, MEANDER as END, PHI, RIVER_EQ, SPRING, W1, W2, WIDE, contour, glow, map, reach, riverY, room } from './valley'
@@ -77,11 +77,13 @@ function strand(p: Path, a: number, b: number, z0: number, fold: number, i0: num
 const SINE = 'z(s) = \\int_0^s e^{i \\theta} ds,\\; \\theta = \\omega \\sin(2\\pi (s - a) / M)'
 
 // The speakers trace the sine's river and the outermost pair, forth and back as the sweep did, on the
-// sweep's own clock, so they go on from the hook without a seam; then the sheaf combed out, eight rivers a
-// refresh, at A, the sine's river traced twice through the middle of them.
-const PAIR = 1.2, CYCLES = tune([[0, PR / 4], [PAIR, 55]], (PR * HOOK) / 4)
-const FOUR = [0, LEVELS, 0, -LEVELS], EIGHT = [-11, -7, -3, 0, 0, 3, 7, 11] // levels by side, −z (the far bank) first
-const sc = screen, recs = new Map([...FOUR, ...EIGHT].map((l) => [l, [] as number[]]))
+// sweep's own clock, so they go on from the hook without a seam; then, from the first refresh after PAIR, the
+// sheaf combed out, swung forth over one page and back over the other at A: three rivers a side, then four
+// others, each page beginning and ending with the sine's river, so the swing has no flyback.
+const PAIR = 1.2, CYCLES = tune([[0, PR / 4], [PAIR, 55]], (PR * HOOK) / 4) // a whole refresh at PAIR
+const FOUR = [0, LEVELS, 0, -LEVELS] // levels by side, −z (the far bank) first
+const PAGES = [[0, -11, -7, -3, 3, 7, 11, 0], [0, -13, -9, -5, -1, 1, 5, 9, 13, 0]], BOTH = PAGES.flat()
+const sc = screen, recs = new Map([...FOUR, ...BOTH].map((l) => [l, [] as number[]]))
 
 const sheaf = new Path(), c = [0, 0, 0]
 const tint = (a: readonly number[], b: readonly number[], k: number) => ((c[0] = mix(a[0], b[0], k)), (c[1] = mix(a[1], b[1], k)), (c[2] = mix(a[2], b[2], k)), c)
@@ -100,7 +102,7 @@ export const meander: Scene = {
     const wet = smooth(0.2, 1.1, t)
     ;(set = smooth(2.9, 3.5, t)), (ring = (t - 3.25) * 2.2 * LEVELS)
     const fold = (from: number) => clamp(lock([[0, 0], [from, 1]], t, 12, 0.7), 0, 1.15)
-    const order = t < PAIR ? FOUR : EIGHT, rec = (level: number) => (order.includes(level) ? recs.get(level) : undefined)
+    const order = t < PAIR ? FOUR : BOTH, rec = (level: number) => (order.includes(level) ? recs.get(level) : undefined)
 
     sheaf.clear()
     for (let l = 1; l <= LEVELS; l++)
@@ -116,14 +118,19 @@ export const meander: Scene = {
     f.ch.push({ w: 1, path: sheaf, gain: mix(1, WIDE, smooth(0.3, 3.5, t)) }) // opening to the valley's first exposure, which carries it on
 
     // the speakers' picture: each stroke forth or back in turn, as the sweep's passes were
-    sc.clear()
-    for (let r = 0; r < order.length; r++) {
-      const s = recs.get(order[r])!, m = s.length / 2
-      let pen = false
-      for (let j = 0; j < m; j++) {
-        const i = r & 1 ? m - 1 - j : j, x = s[2 * i], y = s[2 * i + 1]
-        if (x !== x) pen = false
-        else pen ? sc.lineTo(x, y, 1) : ((pen = true), sc.moveTo(x, y))
+    const pages = t < PAIR ? 1 : 2
+    sc.clear(pages)
+    for (let p = 0; p < pages; p++) {
+      const strokes = pages > 1 ? PAGES[p] : FOUR
+      sc.page(1 << p)
+      for (let r = 0; r < strokes.length; r++) {
+        const s = recs.get(strokes[r])!, m = s.length / 2
+        let pen = false
+        for (let j = 0; j < m; j++) {
+          const i = r & 1 ? m - 1 - j : j, x = s[2 * i], y = s[2 * i + 1]
+          if (x !== x) pen = false
+          else pen ? sc.lineTo(x, y, 1) : ((pen = true), sc.moveTo(x, y))
+        }
       }
     }
     sc.commit(T)
@@ -134,8 +141,7 @@ export const meander: Scene = {
 
     f.rate = 2.4e6
     return (tt, o) => {
-      const c = CYCLES(tt)
-      sc.play(c - Math.floor(c), tt, o)
+      sc.play(CYCLES(tt), tt, o, 1, SHARP, tt >= PAIR)
     }
   },
 }

@@ -7,7 +7,7 @@
 // spectra. The speakers trace what the beam draws, simplified to what they can (beam/scope.ts), so a scope
 // on the jack draws the valley too, and every equation it is made of is written live above it.
 import { Path, STRIDE } from '../beam/path'
-import { screen, tune } from '../beam/scope'
+import { SHARP, screen, tune } from '../beam/scope'
 import { load, use } from '../beam/font'
 import { fft, hann } from '../dsp/fft'
 import { Field } from '../dsp/terrain'
@@ -402,7 +402,8 @@ function items_(t: number, upto: number, next: { i: number }) {
       const o = 3 * (it.a + v), wv = it.kind === FLOW ? wave(VX[o], VX[o + 2], t) : 0, y = it.kind === FLOW ? VX[o + 1] + wv : it.base + (VX[o + 1] - it.base) * k
       let px = VX[o], pz = VX[o + 2] + 1.5 * wv
       if (it.kind === FLOW) pz = riverZ(px) + (pz - riverZ(px)) * Math.min(1, open(px, t))
-      const sh = look(px, y, pz) ? shade(p3.x, p3.y) : 0
+      const sh = look(px, y, pz) ? shade(p3.x, p3.y) : 0, fir = (it.kind === TREE || it.kind === FIR2) && it.n > 2
+      if (fir) (fs[next.i] = v ? fs[next.i] : nf), (fp[2 * nf] = sh > 0.5 && into(p3.x, p3.y) ? p3.x : NaN), (fp[2 * nf + 1] = p3.y), (fe[next.i] = ++nf)
       if (!sh) {
         pen = false
         continue
@@ -416,7 +417,7 @@ function items_(t: number, upto: number, next: { i: number }) {
       }
       if (it.kind === TREE && it.n > 2 && !v && k >= 1) grown++
       if (!v && (it.kind === TREE || it.kind === FIR2) && it.n > 2) heard(next.i, k * fog(p3.z) * p3.k, p3.z)
-      if (!v && it.kind === PEAK) far = next.i
+      if (it.kind === PEAK) far = next.i
       to(ink, pen, p3.x, p3.y, p3.k * sh, it.c, fog(p3.z) * g * landK)
       pen = true
     }
@@ -424,36 +425,81 @@ function items_(t: number, upto: number, next: { i: number }) {
 }
 
 // ── what the speakers trace ─────────────────────────────────────────────────────────────────────────
-// The beam's own picture, thinned to what 48 kHz can draw at a note (beam/scope.ts): every AR-th of the
-// cross-sections, every AC-th point of each, and where the beam hides a point behind the land in front, the
-// speakers lay it on that land's horizon instead, so the stroke stays whole and only retraces what is lit;
-// the line and the contours the meander left, while they last; the banks; the firs nearest the eye; the far
-// peaks; the rim of the shaft ahead. Each stretch is worth its drawn length times its brightness, so what
-// fades in or out on the screen grows or shrinks in the speakers' time instead of popping. Traced forth and
-// back, there is no flyback to hear.
-const AR = 10, AC = 5, FIRS_HEARD = 6
+// The beam's own picture, thinned to what the speakers can draw at a note (beam/scope.ts), on two pages, one
+// traced forth and the other back, both ending with the river's banks, so the trace swings between them
+// without a flyback. The first begins with the land's skyline, its silhouette against the sky. Then each page
+// takes its share of the cross-sections, only as much of each as the beam shows (what the land in front hides
+// is skipped, as on the screen: the hidden-line picture is the depth), thinned by depth, so that on a scope they
+// stand about as far apart near as far, a little closer near: every row near the eye, every other further,
+// every fourth, and so on, each fading in as the camera brings it near enough, so the picture grows rather
+// than steps. Nearer ones are worth more time, so brighter, as dwell is a scope's only brightness. Then the
+// rim of the shaft ahead, as the land in front hides it; the firs nearest the eye, half on each page; the
+// contours and the line the meander left, while they last; the far peaks. Each stretch is worth its drawn
+// length times its brightness, so what fades in or out on the screen grows or shrinks in the speakers' time
+// instead of popping, and the tables change from one refresh to the next only as much as the picture does: a
+// tone, not static.
+const STRIDE0 = 0.65, FIRS_HEARD = 12, FIR_W = 2.5
 const sc = screen, shore = new Float32Array(2 * 2 * NR) // the banks' points, left then right
-let flip = false, far = -1, banks = 0
-const firs: number[] = [], near: number[] = [] // the nearest firs drawn this frame: item, closeness
+const store = new Float32Array(2 * NT * NC), cut: number[] = [] // the rows taken: their points, and per row its end, page and worth
+let flips = 0, far = -1, banks = 0, nf = 0, rimmed_ = false
+// every fir's outline as the beam drew it, hidden points NaN: the speakers take the nearest
+const fp = new Float32Array(2 * 48 * 1024), fs = new Int32Array(items.length), fe = new Int32Array(items.length)
+const firs: number[] = [], near: number[] = [] // the nearest firs drawn this frame, nearest first: item, closeness
 function heard(i: number, k: number, z: number) {
   if (k < 0.3) return
   let j = firs.length
-  if (j === FIRS_HEARD && z >= near[j - 1]) return
-  if (j === FIRS_HEARD) j--
-  while (j > 0 && near[j - 1] > z) (firs[j] = firs[j - 1]), (near[j] = near[j - 1]), j--
+  if (j === FIRS_HEARD + 1 && z <= near[j - 1]) return
+  if (j === FIRS_HEARD + 1) j--
+  while (j > 0 && near[j - 1] < z) (firs[j] = firs[j - 1]), (near[j] = near[j - 1]), j--
   ;(firs[j] = i), (near[j] = z)
 }
 const into = (x: number, y: number) => Math.abs(x) < view.a && y > -1 && y < ceil
-// A cross-section, from the screen arrays, as the speakers draw it, every other one backwards.
-function section(o: number, w: number) {
-  let pen = false
-  sc.weight = w
-  for (let k = 0; k < NC; k += AC) {
-    const j = flip ? NC - 1 - k : k, y = occlude < 0.5 ? sy[j] : Math.max(sy[j], horizon[col(sx[j])])
-    if (!ok[j] || RK[o + j] > 1 || !into(sx[j], y)) pen = false
-    else pen ? sc.lineTo(sx[j], y) : ((pen = true), sc.moveTo(sx[j], y))
+// A cross-section, from the screen arrays, as the speakers draw it, if its depth d wants it: a row is kept in
+// every 2^λ, λ how many times 2 divides its index (so the choice is the land's, not the camera's), where the
+// depth asks for one in STRIDE0 (d / 6)^1.5, fading over half a doubling; rows alternate pages by the next bit
+// up, and every other one on a page runs backwards, finer the nearer it is.
+function section(i: number, o: number, w: number, x: number) {
+  const d = Math.max(1, (x - eye.x) * fwd.x + (riverY(x) - eye.y) * fwd.y + (riverZ(x) - eye.z) * fwd.z)
+  const l = i ? Math.min(31 - Math.clz32(i & -i), 10) : 10, keep = clamp(l - Math.log2(STRIDE0 * (d / 6) ** 1.5) + 0.5)
+  if (keep < 0.02) return
+  const p = (i >> (l + 1)) & 1, back = (flips >> p) & 1, step = d < 12 ? 2 : d < 30 ? 3 : 5
+  let n = cut.length ? cut[cut.length - 3] : 0
+  for (let k = 0; k < NC; k += step) {
+    const j = back ? NC - 1 - k : k, y = sy[j]
+    const seen = ok[j] && RK[o + j] < 2 && into(sx[j], y) && shade(sx[j], y) > 0.5
+    ;(store[2 * n] = seen ? sx[j] : NaN), (store[2 * n + 1] = y), n++
   }
-  flip = !flip
+  cut.push(n, p, keep * w * (0.7 + 0.8 * clamp(1.5 - d / 20)))
+  flips ^= 1 << p
+}
+// The land's skyline, the floating horizon left to right, where it is on the screen under the board; the
+// cross-sections taken after it, each on its page; then the nearest firs' outlines as the beam drew them.
+function skyline(w: number) {
+  let pen = false
+  sc.page(1).weight = w
+  for (let c = 0; w > 0.02 && c < HB; c += 6) {
+    const x = ((c / (HB - 1) - 0.5) / 0.45) * view.a, y = horizon[c]
+    if (!(y > -1 && y < ceil && Math.abs(x) < view.a)) pen = false
+    else pen ? sc.lineTo(x, y) : ((pen = true), sc.moveTo(x, y))
+  }
+  for (let r = 0, n = 0; r < cut.length; r += 3) {
+    sc.page(1 << cut[r + 1]).weight = cut[r + 2]
+    for (pen = false; n < cut[r]; n++) {
+      const x = store[2 * n], y = store[2 * n + 1]
+      if (x !== x) pen = false
+      else pen ? sc.lineTo(x, y) : ((pen = true), sc.moveTo(x, y))
+    }
+  }
+  for (let j = 0; j < Math.min(FIRS_HEARD, firs.length); j++) {
+    // the last few fade as one further off nears them, so a fir joining or leaving them grows or wanes
+    sc.page(1 << (j & 1)).weight = FIR_W * (firs.length > FIRS_HEARD ? clamp((near[j] - near[FIRS_HEARD]) / 0.15) : 1)
+    for (let n = fs[firs[j]], pen = false; n < fe[firs[j]]; n++) {
+      const x = fp[2 * n], y = fp[2 * n + 1]
+      if (x !== x) pen = false
+      else pen ? sc.lineTo(x, y) : ((pen = true), sc.moveTo(x, y))
+    }
+  }
+  sc.page(3)
 }
 // A world-space polyline of items' vertices, every `every`-th, as it is drawn.
 function traced(it: Item, w: number, every: number, t: number) {
@@ -579,9 +625,10 @@ export const valley: Scene = {
   dur: DUR,
   build(t, f) {
     crane(t)
-    ink.clear(), sc.clear(), (grown = 0), (flip = false), (far = -1), (banks = firs.length = near.length = 0)
+    ink.clear(), sc.clear(2), (grown = 0), (far = -1), (banks = firs.length = near.length = 0)
     horizon.fill(-9)
-    const next = { i: 0 }, edge = { i: 0 }, behind = occlude > 0.5 ? eye.x + 0.3 : -Infinity
+    const next = { i: 0 }, edge = { i: 0 }, behind = occlude > 0.5 ? eye.x + 0.3 : -Infinity, now = (f.at ?? 0) + t
+    ;(cut.length = 0), (flips = 0), (nf = 0), (rimmed_ = false)
     let heroRow = -1
     // Running for the lip, the moonlit world shows through the mouth under the ink, a breath of mist over it; the
     // rim's ink goes where the water's lip catches the moon, the moat's streamlines going on over it as its flow
@@ -597,6 +644,7 @@ export const valley: Scene = {
       if (x < behind) continue
       items_(t, x, next)
       rim(x, edge, brim)
+      if (!rimmed_ && x >= SX - RR && t > FAR) (rimmed_ = true), rimmed(2 * smooth(FAR, FAR + 1, t)) // the speakers' rim, as the land in front of it hides it
       for (const c of CASCADES) if (c >= x0 && c < x && t > opens(c)) whitewater(t, c)
       // the banks and the current, from the last row to this one
       if (i > 0 && i < NR && x0 >= behind && t > opens(x0)) {
@@ -628,18 +676,19 @@ export const valley: Scene = {
         pen = true
       }
       if (t >= SCAN && rise < 1.2) heroRow = i
-      if (i % AR === 0) section(o, index * fog(sz[NC >> 1]))
+      section(i, o, index * fog(sz[NC >> 1]), x)
       for (let j = 1; j < NC; j++) if (ok[j] && ok[j - 1] && RK[o + j] < 2 && RK[o + j - 1] < 2) raise(sx[j - 1], sy[j - 1], sx[j], sy[j])
     }
     if (land > 0.06) items_(t, Infinity, next)
+    skyline(1.2 * smooth(0.5, 0.9, occlude) * land)
     // the contours the meander's rivers combed out onto, carried on at their own heights, so they tilt with the land
-    // as we crane up, and give way as its cross-sections rise; the speakers keep the three a side they traced
+    // as we crane up, and give way as its cross-sections rise
     const cl = 0.22 * (1 - smooth(1, 2.6, t))
     if (cl > 0.01)
       for (const side of [-1, 1])
         for (let l = 0; l < LEVELS; l++) {
           let pen = false, kept = 0
-          if (l % 4 === 2) (sc.weight = 5 * cl), (kept = 1)
+          if (l % 2 === 0) (sc.page(l % 4 ? 1 : 2).weight = 8 * cl), (kept = 1) // the speakers keep every other, a page each
           for (let x = X0; x < XM + 8; x += CDX) {
             const z = contour(side, l, x)
             if (z !== z || !look(x, riverY(x) + (l + 0.5) * CI, z)) {
@@ -705,7 +754,7 @@ export const valley: Scene = {
     EYE.vals[0] = eye.x, EYE.vals[1] = eye.y, EYE.vals[2] = eye.z, EYE.hot = 0.3
     // the equations: the meander's carries on a moment, then rises into the head of the board as it takes the
     // numbers in, one equation morphing, and the board goes on drawing it among everything the valley is made of
-    const now = (f.at ?? 0) + t, led = t < TAKE
+    const led = t < TAKE
     if (t < RISE) say.say(f, now, RIVER_EQ, WATER, [['\\omega_1', W1, 2], ['\\omega_2', W2, 2], ['M_1', M1, 0], ['M_2', M2, 0]])
     else if (led) {
       const h = RIVER.hot // lit as the board will light it when it takes it over
@@ -724,12 +773,12 @@ export const valley: Scene = {
     ;(space[9] = -Math.sin(half)), (space[10] = 0), (space[11] = -Math.cos(half))
     ;(space[12] = Math.sin(half)), (space[13] = 0), (space[14] = -Math.cos(half))
     ;(space[15] = 0), (space[16] = -0.4), (space[17] = -0.9)
-    // the speakers' picture: the land, then the line and contours while they last, the far peaks, the firs
-    // nearest us, the banks, and the shaft's rim ahead (wrap.ts draws what is over it)
+    // the speakers' picture goes on, on both pages: the line while it lasts, the far peaks, and last the banks
+    sc.page(3)
     if (fade > 0) {
       let pen = false
       for (let i = 0; i < 2; i++) {
-        sc.weight = 3 * fade
+        sc.weight = 2 * fade
         for (let j = 0, n = line.v.length / STRIDE; j < n; j += 4) {
           const v = STRIDE * (i ? j : n - 1 - j)
           if (!line.v[v + 7] || !into(line.v[v], line.v[v + 1])) pen = false
@@ -738,19 +787,17 @@ export const valley: Scene = {
       }
     }
     if (far >= 0) traced(items[far], 0.6, 3, t)
-    for (const i of firs) traced(items[i], 4, 1, t)
     if (banks) bank(-1, 1.5 * land), bank(1, 1.5 * land)
-    if (t > FAR) rimmed(2 * smooth(FAR, FAR + 1, t))
     sc.commit(now)
     if (!(t > was)) shift = NaN
     was = t
     return (tt, o) => {
-      // the speakers trace it forth and back at the bass line's note, going on from where the meander's trace
-      // was. Over the lip the scope rule ends: the note falls with the choir, the plates' low-pass closes with
-      // the choir's filter, and the trace gives way to the choir that grew out of it
+      // the speakers swing forth over one page and back over the other at the bass line's note, going on from
+      // where the meander's trace was. Over the lip the scope rule ends: the note falls with the choir, the
+      // plates' low-pass closes with the choir's filter, and the trace gives way to the choir that grew out of it
       if (shift !== shift) shift = sc.u / 2 - (CYCLES(tt) % 1)
-      const c = CYCLES(tt) + 2 * A1 * lag(tt - SING) + shift, u = 2 * (c - Math.floor(c)), k = 1 - smooth(OVER, OVER + 1.4, tt)
-      if (k > 0) sc.play(u < 1 ? u : 2 - u, tt, o, k, 0.5 - 0.42 * smooth(OVER, OVER + 1.2, tt))
+      const c = CYCLES(tt) + 2 * A1 * lag(tt - SING) + shift, k = 1 - smooth(OVER, OVER + 1.4, tt)
+      if (k > 0) sc.play(c, tt, o, k, SHARP - (SHARP - 0.08) * smooth(OVER, OVER + 1.2, tt), true)
       // the falls are heard coming, from the shaft ahead; at the lip they draw a breath; over the edge they are
       // all round us, and roar
       const hush = 1 - 0.35 * smooth(OVER - 0.2, OVER + 0.2, tt) * (1 - smooth(OVER + 0.4, OVER + 1, tt))

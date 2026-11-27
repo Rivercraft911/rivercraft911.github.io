@@ -23,7 +23,8 @@ const [width, height] = size.split('x').map(Number), scale = opt('--scale')
 const SX = scale ? Number(scale) : (GX * width) / height, SY = scale ? Number(scale) : GY
 const [from = '0', secs = '4', out = 'scope.png'] = args
 const every = Number(opt('--every', String(Math.max(0.25, Number(secs) / 8)))), marks = opt('--at')?.split(',').map(Number)
-const SR = 48000, HZ = 60
+const HZ = 60
+let SR = 48000 // until the page says what its audio runs at (headless Chrome is often 44.1 kHz)
 const dir = mkdtempSync(join(tmpdir(), 'scope-')), webm = join(dir, 'rec.webm')
 
 let server, browser
@@ -45,6 +46,7 @@ try {
       constructor(ctx, name, o) {
         super(ctx, name, o)
         C = 2 + (o?.processorOptions?.voices ?? 0)
+        window.__pcm(`#${ctx.sampleRate}`)
       }
     }
     const post = MessagePort.prototype.postMessage
@@ -67,10 +69,11 @@ try {
     window.requestAnimationFrame = (cb) => raf((n) => (cb.name === 'tick' && window.__frames.push(performance.now()), cb(n)))
   })
   // the pair laid out on the timeline: each run of samples from where the page's clock put it
-  const SPAN = Math.ceil((Number(secs) + 2) * SR), x = new Float32Array(2 * SPAN), t0 = Number(from)
-  let at = 0, resets = 0, begun = false, done
+  const t0 = Number(from)
+  let SPAN = Math.ceil((Number(secs) + 2) * SR), x = new Float32Array(2 * SPAN), at = 0, resets = 0, begun = false, done
   const chunks = [], finished = new Promise((r) => (done = r))
   await page.exposeFunction('__pcm', (b64) => {
+    if (b64[0] === '#') return void ((SR = Number(b64.slice(1))), (SPAN = Math.ceil((Number(secs) + 2) * SR)), (x = new Float32Array(2 * SPAN))) // before any sample
     if (b64[0] === '@') return void ((at = Math.max(0, Math.round((Number(b64.slice(1)) / HZ) * SR))), resets++, (begun = true))
     const b = Buffer.from(b64, 'base64'), v = new Float32Array(b.buffer, b.byteOffset, b.length >> 2)
     if (!begun) (at = Math.round(-t0 * SR)), (begun = true) // it began at 0, before the first frame
