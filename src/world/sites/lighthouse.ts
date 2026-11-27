@@ -6,21 +6,24 @@
 // the odd lines down and the even lines back up; each laser's four binary-weighted currents give it 16 levels, through
 // the firmware's rrrgggbb palette (config.c). The beam's path is the assembly's, straightened through its optics' middles.
 //
-// Its time is its own, slowed so it can be seen: 60× as it runs, 30 lines a second and a frame in 4 s; and as it starts
-// a frame, 2000×, a line a second, the beam crossing the screen, quickening as it paints. What is shown is what a camera
-// sees whose shutter stays open a whole facet whenever the beam would otherwise blink faster than three times a second.
-// A scanned beam on a flat screen draws a pincushion, x = D tan α, y = D tan ε / cos α: so does this one. The light in
-// the air is the beams' scatter in a little haze, brightest looking down a beam and toward where it heads; the sheets
-// the sweeps make are drawn several times brighter than they would be.
+// It runs at life's speed, 15 frames a second, and the eye holds a frame whole: the picture steady on the screen, and in
+// the air between, a pyramid of rays, one to each patch of the picture in that patch's colour, out of the white beam the
+// three lasers make at the dichroics. To print a frame it slows to 2000× (a line a second, the beam crossing the
+// screen) and quickens back to life as it paints. What is shown is what a camera sees whose shutter is open at least a
+// whole facet, and a whole frame once frames come faster than one and a half a second, so nothing ever blinks faster
+// than three times a second. A scanned beam on a flat screen draws a pincushion, x = D tan α, y = D tan ε / cos α: so
+// does this one. The light in the air is the beams' scatter in a little haze, brightest looking down a beam and toward
+// where it heads, drawn many times brighter than it would be; where they meet a mirror or a dichroic, a glint.
 //
 // Once it has printed it comes apart: the lid lifts, then the deck with its optics, then the air duct, and River's two
 // boards come out beside it, each a part; a click on one stands it up before the camera, turning, both faces. A click
 // on the screen, or on R-01, prints the next frame.
 import { TAU, clamp, smooth } from '../../acts/scene'
-import { box, make, prism, tube } from '../make'
+import { box, make, prism, quad, tube, type Mat } from '../make'
 import { ctx, cross, dot, frame, part, site, solid, turn, unit, type V } from '../ctx'
 import { PLACES, type About, type Steer } from '../places'
 import { FRAMES } from './r01-frames'
+import type { Model, Placed } from '../../gpu/mesh'
 
 // ---- R-01, in its assembly's frame: mm, x and y across the deck, z down, as River's Onshape exported it -----------------
 const MM = 0.13 / 182 // radii a millimetre: R-01, 182 mm wide, as wide as a landmark here
@@ -33,10 +36,9 @@ const POLY = [51.55, 33.42, -138.28] // the polygon's middle; its square's facet
 // The throw: the polygon's beam, off the galvo at rest. Right of it as it goes, and up.
 const DIN = unit([G[0] - P[0], G[1] - P[1], 0]), K = dot(DIN, GN), T = DIN.map((x, i) => x - 2 * K * GN[i]), S = [-T[1], T[0], 0], U = [0, 0, -1]
 const TILT = 1 / (2 * Math.abs(K)) // the galvo's turn for a turn of the beam: its axis lies in the beam's plane, so not ½
-// The screen, D along the throw from the galvo's mirror: its middle, its panel's half width and height round the
-// picture, how high its middle stands over the breadboard; and the breadboard, along the throw from under R-01's
-// middle, across it, and thick.
-const D = 200, SC = [G[0] + D * T[0], G[1] + D * T[1], G[2]], SW = 112, SH = 50, H = FLOOR - G[2]
+// The screen, D along the throw from the galvo's mirror: its middle, and its panel's half width and height round the
+// picture; and the breadboard, along the throw from under R-01's middle, across it, and thick.
+const D = 200, SC = [G[0] + D * T[0], G[1] + D * T[1], G[2]], SW = 112, SH = 50
 const B0 = -125, B1 = 275, BS = 125, BT = 25
 const CROSS = Math.hypot((B1 - B0) / 2, BS) * MM // the breadboard's half diagonal, radii
 
@@ -84,7 +86,6 @@ function energy(f: Pic, q: number, c: number) {
 }
 
 // ---- what is not in the CAD, in millimetres -------------------------------------------------------------------------
-type Mat = { col: number[]; metal: number; rough: number }
 // Each frame as its light on the screen: a run of a line's pixels the same byte is one quad, in the pincushion the scan
 // draws, each line standing DZ further back than the one painted before it, so a dark card drawn between two depths
 // shows exactly the lines painted so far (and the screen's face lies behind them all). Model x right, y up, z out of
@@ -99,25 +100,32 @@ pics.forEach((f, k) =>
         let w = 1
         while (x + w < NX && w < 32 && f.px[L * NX + x + w] === v) w++ // (short enough that its edges follow the bow)
         const h0 = x / NX, h1 = (x + w) / NX
-        if (v) prism(pixel(v), [[su(h0), sv(h0, eb)], [su(h1), sv(h1, eb)], [su(h1), sv(h1, et)], [su(h0), sv(h0, et)]], z, z + DZ / 2)
+        if (v) quad(pixel(v), [su(h0), sv(h0, eb), z], [su(h1), sv(h1, eb), z], [su(h1), sv(h1, et), z], [su(h0), sv(h0, et), z], [0, 0, 1])
         x += w
       }
   }),
 )
 const BLACK = { col: [0.012, 0.012, 0.014, 1], metal: 0, rough: 0.85 }
 make('r01-card', () => box(BLACK, [-0.5, -0.5, -0.5], [0.5, 0.5, 0.5]))
-// The screen: a black panel in a thin aluminium frame on two optical posts, its face behind every line of a frame.
+// The screen: a black panel in a thin aluminium frame, its face behind every line of a frame; it stands on two optical
+// posts, which slide in their holders on the breadboard (a post a unit long, drawn as long as it stands).
 make('r01-screen', () => {
-  const alu = { col: [0.5, 0.51, 0.53, 1], metal: 1, rough: 0.35 }, steel = { col: [0.62, 0.62, 0.64, 1], metal: 1, rough: 0.22 }
+  const alu = { col: [0.5, 0.51, 0.53, 1], metal: 1, rough: 0.35 }
   box(BLACK, [-SW, -SH, -6], [SW, SH, -0.3])
   for (const s of [-1, 1]) box(alu, [s > 0 ? SW : -SW - 3, -SH - 3, -6], [s > 0 ? SW + 3 : -SW, SH + 3, 1.5]), box(alu, [-SW, s > 0 ? SH : -SH - 3, -6], [SW, s > 0 ? SH + 3 : -SH, 1.5])
-  for (const s of [-1, 1]) tube(steel, [s * (SW - 30), -SH - 3, -3], [0, -1, 0], 6.35, 6.35, H - SH - 9, 24), box(BLACK, [s * (SW - 30) - 16, -H, -19], [s * (SW - 30) + 16, -H + 6, 13])
 })
-// The optical breadboard: black anodised aluminium, M6 holes on a 25 mm grid. Model x along the throw, y up, its top 0.
+make('r01-post', () => tube({ col: [0.62, 0.62, 0.64, 1], metal: 1, rough: 0.22 }, [0, 0, 0], [0, 1, 0], 6.35, 6.35, 1, 24, true))
+const POST = [-1, 1].map((s) => [0, 1].map((i) => SC[i] + s * (SW - 30) * S[i] + 3 * T[i]).concat(FLOOR - 6)) // their feet, in their holders
+// The optical breadboard: black anodised aluminium, M6 holes on a 25 mm grid, and the screen's post holders. Model x
+// along the throw, y up, z across it to the right; its top 0.
 make('r01-bench', () => {
   const plate = { col: [0.03, 0.032, 0.036, 1], metal: 0.8, rough: 0.45 }, hole = { col: [0.003, 0.003, 0.004, 1], metal: 0, rough: 1 }
   box(plate, [B0, -BT, -BS], [B1, 0, BS])
   for (let x = B0 + 12.5; x < B1; x += 25) for (let z = 12.5 - BS; z < BS; z += 25) tube(hole, [x, 0, z], [0, 1, 0], 3.3, 3.3, 0.05, 10)
+  for (const f of POST) {
+    const x = f[0] * T[0] + f[1] * T[1], z = f[0] * S[0] + f[1] * S[1]
+    box(BLACK, [x - 16, 0, z - 16], [x + 16, 6, z + 16])
+  }
 })
 // The polygon at speed, as a camera's shutter takes it: within its facets' inradius always mirror, out to their corners
 // less and less of the time, 1 − (4/π) acos(a/r) of it. Model y its axis.
@@ -133,6 +141,25 @@ for (let c = 0; c < 3; c++) {
   make(`r01-ray-${c}`, () => prism(m, [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]], 0, 0))
   make(`r01-fan-${c}`, () => prism(m, [[0, 0], [1, -1], [1, 1]], 0, 0))
 }
+// And each frame's light in the air, as the eye holds it: from the galvo's mirror (D out of the screen) a ray to every
+// RAYth pixel of every other line, where it is lit, a pixel wide where it lands and in that pixel's colour (each ray
+// standing for the light to the pixels round it); the lines in groups of GROUP slots, so the rays of only the lines
+// painted lately can be drawn. Screen coordinates, as the frame's.
+const RAY = 32, GROUP = 8
+const tint = new Map<number, Mat>()
+pics.forEach((f, k) => {
+  for (let g = 0; g < NY / GROUP; g++)
+    make(`r01-air-${k}-${g}`, () => {
+      for (let j = g * GROUP; j < (g + 1) * GROUP; j += 2)
+        for (let L = line(j), x = 0; x < NX; x += RAY) {
+          const i = x + RAY / 2, c = [0, 1, 2].map((ch) => lv(f.px[L * NX + i], ch) / 15), key = f.px[L * NX + i]
+          if (!key) continue
+          const m = tint.get(key) ?? (tint.set(key, { col: [0, 1, 2].map((q) => LASER.reduce((a, l, ch) => a + l[q] * c[ch], 0)).concat(1 / 255), metal: 0, rough: 1 }), tint.get(key)!)
+          const h = (i + 0.5) / NX, u = su(h), v = sv(h, elev(L + 0.5)), w = (su(h + 0.5 / NX) - su(h - 0.5 / NX)) / 2
+          quad(m, [0, 0, D], [u - w, v, 0], [u + w, v, 0], [u + w, v, 0], [0, 0, 1])
+        }
+    })
+})
 
 // ---- where it all is, this frame ----------------------------------------------------------------------------------------
 const n: V = [0, 0, 0], e: V = [0, 0, 0], N: V = [0, 0, 0], Tw: V = [0, 0, 0], Sw: V = [0, 0, 0], A: V = [0, 0, 0], B: V = [0, 0, 0], O: V = [0, 0, 0]
@@ -155,18 +182,18 @@ function put(id: string, p: ArrayLike<number>, X: ArrayLike<number>, Y: ArrayLik
   for (let i = 0; i < 3; i++) q[i] = p[i] + unit * (X[i] * mx + Y[i] * my + Z[i] * mz)
   solid(id, at(q, c), dir(X, wx), dir(Y, wy), dir(Z, wz), MM * unit * Math.max(m.hi[0] - m.lo[0], m.hi[1] - m.lo[1], m.hi[2] - m.lo[2]), k, glow)
 }
-const X0 = [1, 0, 0], Y0 = [0, 1, 0], Z0 = [0, 0, 1], NT = [-T[0], -T[1], 0]
+const X0 = [1, 0, 0], Y0 = [0, 1, 0], Z0 = [0, 0, 1], NT = [-T[0], -T[1], 0], sc = [...SC], PY = [0, 0, 0]
 
 // ---- the state of things -----------------------------------------------------------------------------------------------
 // The projector's own time in facets swept, and the slowing (log10 of how many times slower than life): running, and
 // starting a frame. A print: fade what is on the screen and slow, then paint the next frame from facet q0, a line or two
-// at the slowest, then quickening. (It starts at the frame's first line with light in it: the dark ones before are
-// painted as soon as the screen is dark.) It comes apart once it has printed on arriving.
-const RUN = Math.log10(60), START = Math.log10(2000), FADE = 0.8, DWELL = 1.6, QUICKEN = 2.5, APART = 9.5
-let qf = 0.5, shown = 0, next = 0, q0 = -NY, printed = NY, began = -1e9, lit = 1, visit = false, fresh = true
+// at the slowest, then quickening back to life. (It starts at the frame's first line with light in it: the dark ones
+// before are painted as soon as the screen is dark.) It comes apart a while after it has printed on arriving.
+const RUN = 0, START = Math.log10(2000), FADE = 0.8, DWELL = 1.6, QUICKEN = 4, APART = 9
+let qf = 0.5, shown = 0, next = 0, q0 = -NY, printed = NY, from = -Infinity, began = -1e9, lit = 1, visit = false
 function print() {
   if (ctx.t - began < FADE) return
-  next = fresh ? shown : (shown + 1) % pics.length, began = ctx.t, printed = -1, (fresh = false) // (the first time, its own intro frame again)
+  next = (shown + 1) % pics.length, began = ctx.t, printed = -1
 }
 // A click on the screen, or on R-01 itself (or its name), prints; so does clicking it again to put it back.
 let was = ''
@@ -189,13 +216,18 @@ export const events = { n: 0, f: 0 }
 let counted = 0
 
 // ---- the beams ---------------------------------------------------------------------------------------------------------
+// Light in the air is light, not a thing: the path tracer, which takes only what holds still, is not to take it for a
+// lamp. So it never holds still: each frame a pencil, a sheet and a glint is drawn turned end for end (the same light),
+// and every other frame the rays come one place later among the solids.
 let flip = 1
-const RAYK = 20000, FANK = 2, BEAM = 1.2 // brightness of a pencil, a sheet's lift over the truth, the beams' width (mm, assumed)
+const NOTHING: Placed = { model: undefined as unknown as Model, m: new Array(12).fill(0), k: 0, glow: 0 } // a solid of no size
+// The brightness of a pencil, a sheet's and the rays' lift over a pencil's light spread as they spread it, a glint's,
+// and the beams' width (mm, assumed).
+const RAYK = 50000, FANK = 2, AIRK = 20000, GLINT = 2500, BEAM = 1.2
 // How much light a haze sends toward the eye at angle th from a beam's way: Henyey–Greenstein, g 0.6, against its sideways.
 const hg = (cos: number) => ((1 + 0.36) / (1 + 0.36 - 1.2 * cos)) ** 1.5
 const ra: V = [0, 0, 0], rb: V = [0, 0, 0], ax: V = [0, 0, 0], ay: V = [0, 0, 0], az: V = [0, 0, 0], mid: V = [0, 0, 0], to: V = [0, 0, 0]
-// Laser c's pencil from assembly point a to b, its power p (of full, averaged over the shutter). Drawn turned end for end
-// each frame, which is the same pencil: the path tracer takes only what rests for its lamps, and this is not one.
+// Laser c's pencil from assembly point a to b, its power p (of full, averaged over the shutter).
 function ray(ch: number, a: ArrayLike<number>, b: ArrayLike<number>, p: number) {
   if (!(p > 1e-3)) return
   at(a, ra), at(b, rb)
@@ -219,6 +251,20 @@ function fan(ch: number, a: ArrayLike<number>, b0: ArrayLike<number>, b1: ArrayL
   solid(`r01-fan-${ch}`, ra, ax, ay, az, 2, 0, (FANK * RAYK * p * hg(cos)) / spread / Math.max(face, 0.3))
 }
 
+// A glint of laser c's light where it meets an optic at assembly point a, s mm across, as bright as p.
+function glint(ch: number, a: ArrayLike<number>, s: number, p: number) {
+  if (!(p > 1e-3)) return
+  at(a, mid)
+  for (let i = 0; i < 3; i++) (ax[i] = ctx.p[4 + i] * s * MM * flip), (ay[i] = ctx.p[8 + i] * s * MM * flip), (az[i] = ctx.p[12 + i])
+  solid(`r01-ray-${ch}`, mid, ax, ay, az, 1, 0, GLINT * p)
+}
+// How much of the time a window of the scan from slot a to b (facets since the frame began) spends on slots j0 to j1.
+function within(a: number, b: number, j0: number, j1: number) {
+  let s = 0
+  for (let k = Math.floor((a - j1) / NY); k * NY + j0 < b; k++) s += Math.max(0, Math.min(b, k * NY + j1) - Math.max(a, k * NY + j0))
+  return s / Math.max(b - a, 1e-9)
+}
+
 // ---- each frame ----------------------------------------------------------------------------------------------------------
 const TURN = -0.35 // the throw's bearing, east of north
 const e0 = [0, 0, 0], e1 = [0, 0, 0], e2 = [0, 0, 0], e3 = [0, 0, 0], avg = [0, 0, 0], Q0: number[] = [0, 0, 0], Q1: number[] = [0, 0, 0]
@@ -239,22 +285,26 @@ export function draw(k: number) {
   if (here && ctx.since >= 0.6 && !visit) (visit = true), print() // arriving, it prints the next frame
   if (!here) visit = false
   const u = t - began, painting = u >= FADE
-  if (painting && printed < 0) (shown = next), (printed = pics[next].first), (q0 = Math.ceil(qf) - printed)
+  if (painting && printed < 0) (shown = next), (printed = from = pics[next].first), (q0 = Math.ceil(qf) - printed)
   const lg = u < FADE ? RUN + (START - RUN) * smooth(0, FADE, u) : START + (RUN - START) * smooth(FADE + DWELL, FADE + DWELL + QUICKEN, u)
   const rate = 1800 / 10 ** lg // facets a second, here
   qf += rate * Math.min(dt, 0.1)
   lit = u < FADE ? 1 - smooth(0, FADE, u) : 1 // the frame on the screen, fading as a print begins
   const f = pics[shown], qn = qf - q0 // facets into the frame
   if (printed >= 0) printed = Math.min(NY, qn)
-  // the shutter: a frame's worth of the scan, or a whole facet once the beam would blink three times a second
-  const win = Math.min(qn, rate * dt + (1 - rate * dt) * clamp((rate - 1) / 2)), qa = qn - win, j = ((Math.floor(qn) % NY) + NY) % NY
+  // What the eye holds of the scan (facets): a display frame's worth, or a whole facet once the beam would blink three
+  // times a second; a quarter second's once lines come fast; a whole frame once frames come faster than one and a half a
+  // second (so nothing in the air flickers); and never from before the frame being printed began.
+  const shut = rate * dt + (1 - rate * dt) * clamp((rate - 1) / 2), held = Math.max(shut, rate * 0.25 * smooth(3, 8, rate), NY * smooth(60, 180, rate))
+  const win = Math.min(qn - from, held), qa = qn - Math.max(win, 0), j = ((Math.floor(qn) % NY) + NY) % NY
   const on = painting ? 1 : 0 // (the lasers are dark while the screen fades)
   for (let ch = 0; ch < 3; ch++) {
     const p = win > 0 ? (on * Math.max(0, energy(f, qn, ch) - energy(f, qa, ch))) / ((win * NX) / WIN) : 0
     avg[ch] += (p - avg[ch]) * (1 - Math.exp(-dt / 0.12)) // (and the eye's own tenth of a second: no line's light snaps on or off)
   }
   now.L = line(j), now.on = on, now.pic = f
-  if (Math.floor(qn) !== counted && (counted = Math.floor(qn)) >= 0 && on) {
+  if (Math.floor(qn) !== counted && (counted = Math.floor(qn)) >= 0 && on && (rate < 25 || (j === NY - 1 && rate < 240))) {
+    // (lines only while they come slower than 25 a second, frames' ends slower than 2)
     const row = now.L * (NX + 1) * 3, lum = [0, 1, 2].map((c) => f.sum[row + 3 * NX + c] - f.sum[row + c]), c = lum.indexOf(Math.max(...lum))
     events.n++, (events.f = j === NY - 1 ? 120 : lum[c] > 0 ? 120 * HARM[c] : 0)
   }
@@ -273,8 +323,9 @@ export function draw(k: number) {
   put('r01-duct', [0, 1.62, -69 - 45 * kDuct], X0, Y0, Z0)
   put('r01-deck', [0, 1.62, -107.1 + up], X0, Y0, Z0)
   put('r01-lid', [-1.59, 1.62, -144.68 - 175 * kLid], X0, Y0, Z0)
-  // the galvo's mirror, stood up to throw the beam level, then turned for the line being painted
-  const tilt = Math.PI / 2 - TILT * (elev(now.L) - E / NY)
+  // the galvo's mirror, stood up to throw the beam level, then turned for the line being painted (at speed, a blur about
+  // its middle)
+  const tilt = Math.PI / 2 - TILT * (elev(now.L) - E / NY) * (1 - smooth(30, 300, rate))
   turn(X0, GAX, tilt, e0), turn(Y0, GAX, tilt, e1), turn(Z0, GAX, tilt, e2)
   put('r01-galvo-mirror', [G[0], G[1], G[2] + up], e0, e1, e2)
   // the polygon: its facet at the middle of its sweep halfway through each facet's time; at speed, a blur
@@ -290,40 +341,60 @@ export function draw(k: number) {
   }
 
   // ---- the screen and what is painted on it ----
-  put('r01-screen', SC, S, U, NT, 1)
-  put(`r01-frame-${shown}`, SC, S, U, NT, 1, 0, 22 * lit)
+  // (as it comes apart the screen rises with the optics, on its posts, so the light stays level and true)
+  sc[0] = SC[0], sc[1] = SC[1], sc[2] = SC[2] + up
+  put('r01-screen', sc, S, U, NT, 1)
+  for (const f of POST) (PY[2] = sc[2] + SH + 3 - f[2]), put('r01-post', f, S, PY, NT, 1) // (up from its foot to the panel)
+  put(`r01-frame-${shown}`, sc, S, U, NT, 1, 0, 22 * lit)
   // the card behind the lines painted so far; and in front of the line being painted, over what the beam has yet to reach
   const done = printed < 0 ? NY : Math.floor(printed), zc = printed < 0 ? -(NY + 0.25) * DZ : -(done + 0.25) * DZ
-  for (let i = 0; i < 3; i++) (card[i] = SC[i] - zc * T[i]), (cx[i] = 2 * SW * S[i]), (cy[i] = 2 * SH * U[i]), (cz[i] = (DZ / 8) * NT[i])
+  for (let i = 0; i < 3; i++) (card[i] = sc[i] - zc * T[i]), (cx[i] = 2 * SW * S[i]), (cy[i] = 2 * SH * U[i]), (cz[i] = (DZ / 8) * NT[i])
   put('r01-card', card, cx, cy, cz, 1)
   if (printed >= 0 && done < NY) {
     const L = line(done), h = clamp((qn - Math.floor(qn) - W0) / WIN), x0 = su(h), ym = sv(h, elev(L + 0.5))
-    for (let i = 0; i < 3; i++) (card[i] = SC[i] + ((x0 + SW) / 2) * S[i] + ym * U[i] - (-done + 0.75) * DZ * T[i]), (cx[i] = (SW - x0) * S[i]), (cy[i] = 4 * (sv(h, E / NY) - sv(h, 0)) * U[i])
+    for (let i = 0; i < 3; i++) (card[i] = sc[i] + ((x0 + SW) / 2) * S[i] + ym * U[i] - (-done + 0.75) * DZ * T[i]), (cx[i] = (SW - x0) * S[i]), (cy[i] = 4 * (sv(h, E / NY) - sv(h, 0)) * U[i])
     put('r01-card', card, cx, cy, cz, 1)
   }
 
   // ---- the light in the air ----
   if (far < 1.5) {
-    flip = -flip
+    // the three lasers, green joining red at the first dichroic and blue at the second, all three on to the facet; a
+    // glint where each meets an optic
     const z = ZB + up
-    e0[0] = RED[0], e0[1] = RED[1], e0[2] = z, e1[0] = P[0], e1[1] = P[1], e1[2] = z
+    flip = -flip
+    e0[0] = RED[0], e0[1] = RED[1], e0[2] = z, e1[0] = P[0], e1[1] = P[1], e1[2] = z, e3[0] = G[0], e3[1] = G[1], e3[2] = G[2] + up
     ray(0, e0, e1, avg[0])
     e0[0] = GREEN[0], e0[1] = GREEN[1], e2[0] = D1[0], e2[1] = D1[1], e2[2] = z
-    ray(1, e0, e2, avg[1]), ray(1, e2, e1, avg[1])
+    ray(1, e0, e2, avg[1]), ray(1, e2, e1, avg[1]), glint(0, e2, 3, avg[0]), glint(1, e2, 3, avg[1])
     e0[0] = BLUE[0], e0[1] = BLUE[1], e2[0] = D2[0], e2[1] = D2[1]
     ray(2, e0, e2, avg[2]), ray(2, e2, e1, avg[2])
-    // from the facet to the galvo's mirror, and from it to the line on the screen, through the angles swept
+    for (let ch = 0; ch < 3; ch++) glint(ch, e2, 3, avg[ch]), glint(ch, e1, 4, avg[ch]), glint(ch, e3, 4, avg[ch])
+    // from the facet to the galvo's mirror, through the angles swept
     sweep(h0, Q0, G[2] + up), sweep(h1, Q1, G[2] + up)
-    e3[0] = G[0], e3[1] = G[1], e3[2] = G[2] + up
-    const wide = (h1 - h0) * 2 * AW, L = now.L
+    const wide = (h1 - h0) * 2 * AW, kept = smooth(1.5, 4, win) // (how much more than a line the eye holds)
     for (let ch = 0; ch < 3; ch++) fan(ch, e1, Q0, Q1, avg[ch], wide)
-    screen(h0, L, Q0), screen(h1, L, Q1)
-    for (let ch = 0; ch < 3; ch++) fan(ch, e3, Q0, Q1, avg[ch], wide)
+    // and from it out to the screen: the line being swept, or, as the eye holds more of the scan, the rays of the lines
+    // painted lately, each group of them as bright as its share of the time
+    if (kept < 1) {
+      screen(h0, now.L, Q0), screen(h1, now.L, Q1)
+      for (let ch = 0; ch < 3; ch++) fan(ch, e3, Q0, Q1, avg[ch] * (1 - kept), wide)
+    }
+    if (kept > 0 && on) {
+      for (let i = 0; i < 3; i++) e0[i] = (sc[i] + e3[i]) / 2
+      at(e0, mid)
+      for (let i = 0; i < 3; i++) to[i] = ctx.E[i] - mid[i]
+      const ward = hg(dot(to, Tw) / Math.hypot(to[0], to[1], to[2])) // (the haze's scatter toward the eye, from the throw)
+      if (flip > 0 && ctx.models['r01-card']) (NOTHING.model = ctx.models['r01-card']), ctx.items.push(NOTHING) // (it only moves the rays along one)
+      for (let g = 0; g < NY / GROUP; g++) {
+        const w = within(qa, qn, g * GROUP, (g + 1) * GROUP)
+        if (w > 1e-3) put(`r01-air-${shown}-${g}`, sc, S, U, NT, 1, 0, AIRK * ward * w * kept)
+      }
+    }
   }
 
   // ---- what can be clicked ----
   if (here) {
-    part('screen', at(SC, c), SW * MM)
+    part('screen', at(sc, c), SW * MM)
     part('r01', at([0, 1.6, -90], c), 90 * MM)
   }
 }
@@ -340,7 +411,7 @@ function sweep(h: number, o: number[], z: number) {
 // Where on the screen line L's middle is at sweep h (assembly mm).
 function screen(h: number, L: number, o: number[]) {
   const x = su(h), y = sv(h, elev(L + 0.5))
-  for (let i = 0; i < 3; i++) o[i] = SC[i] + x * S[i] + y * U[i]
+  for (let i = 0; i < 3; i++) o[i] = sc[i] + x * S[i] + y * U[i]
 }
 
 // A board at rest at assembly point `rest`, out beside R-01 at `out` as it comes apart (k), and picked (p) stood up in
@@ -371,12 +442,13 @@ function board(id: string, rest: number[], out: number[], k: number, p: number, 
 }
 
 // ---- the camera ----------------------------------------------------------------------------------------------------------
-// At rest the camera stands behind R-01 and to its left, the sheets of light going away from it to the screen; when it
-// comes apart, nearer the boards; a board picked, close on it; the screen picked, square to it.
-const off = [0, 0, 0]
+// At rest the camera stands behind R-01 and to its left, the light going away from it to the screen; arriving, it starts
+// close on the optics and draws back; when it comes apart, nearer the boards; a board picked, close on it; the screen
+// picked, square to it.
+const off = [0, 0, 0], LOOK = [0, 0, 0], OPTICS = [10, 25, ZB], MIDDLE = [(G[0] + SC[0]) / 2, (G[1] + SC[1]) / 2, G[2] + 10]
 export function steer(since: number, picked: string, o: Steer) {
   if (!n[0] && !n[1] && !n[2]) return false // (not drawn yet)
-  const k = PLACES.findIndex((P) => P.id === 'lighthouse'), [d, pitch, yaw] = PLACES[k].view
+  const [d, pitch, yaw] = PLACES[PLACES.findIndex((P) => P.id === 'lighthouse')].view
   const on = (p: number[]) => {
     at(p, off)
     for (let i = 0; i < 3; i++) o.at[i] = off[i] - n[i] * 1.01
@@ -386,12 +458,19 @@ export function steer(since: number, picked: string, o: Steer) {
     return (o.d = picked === 'laserbrain' ? 0.24 : 0.15), (o.pitch = 0.15), (o.yaw = yaw - 0.3), true
   }
   if (picked === 'screen') {
-    on(SC) // (from R-01's side of it, clear of R-01 and of what came out of it)
+    on(sc) // (from R-01's side of it, clear of R-01 and of what came out of it)
     return (o.d = 0.27), (o.pitch = 0.12), (o.yaw = TURN + Math.PI - 0.55), true
   }
-  const apart = since > APART
-  on(apart ? [-90 * S[0], -90 * S[1], -150] : [80 * T[0], 80 * T[1], -110])
-  return (o.d = apart ? d * 0.95 : d), (o.pitch = apart ? pitch * 0.8 : pitch), (o.yaw = apart ? yaw - 0.25 : yaw), true
+  if (since > APART) {
+    on([-90 * S[0], -90 * S[1], -150])
+    return (o.d = d * 0.95), (o.pitch = pitch * 0.8), (o.yaw = yaw - 0.25), true
+  }
+  // arriving: close on the three lasers joining as the first line is swept, slowly; then back, as it quickens, to the
+  // light between it and the screen
+  const k = smooth(2.8, 6.5, since)
+  for (let i = 0; i < 3; i++) LOOK[i] = OPTICS[i] + (MIDDLE[i] - OPTICS[i]) * k
+  on(LOOK)
+  return (o.d = 0.26 + (d - 0.26) * k), (o.pitch = 0.62 + (pitch - 0.62) * k), (o.yaw = yaw + 0.35 * (1 - k)), true
 }
 
 // What can be clicked here.

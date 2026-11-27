@@ -15,7 +15,7 @@ const part = (mat: Mat) => {
 }
 type V3 = [number, number, number]
 // a quad, corners a, b, c, d in turn, facing n
-function quad(m: Mat, a: V3, b: V3, c: V3, d: V3, n: V3) {
+export function quad(m: Mat, a: V3, b: V3, c: V3, d: V3, n: V3) {
   const p = part(m), o = p.P.length / 3
   p.P.push(...a, ...b, ...c, ...d), p.N.push(...n, ...n, ...n, ...n), p.I.push(o, o + 1, o + 2, o, o + 2, o + 3)
 }
