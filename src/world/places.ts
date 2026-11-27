@@ -2,7 +2,7 @@
 // grown to the size of a landmark), and what of it moves or shines. Sites are planet-local (lat, lon) in degrees;
 // sizes in radii. Every place names the projects (projects.ts slugs) whose page it opens. The valley's river is the
 // intro's own θ(s), cut into the land as a canyon (planet.wgsl).
-import { draw as launch, where as rocket } from './sites/launch'
+import { ABOUT as PIGEON, draw as launch, steer as apart, where as rocket } from './sites/launch'
 import { about as rxAbout, draw as receiver, steer as rxSteer } from './sites/receiver'
 import { ABOUT as SAMWISE, NORMAL as SSO, VIEW as SAT, draw as station, steer as detumble, where as bus } from './sites/station'
 import { NORMAL as BLEPS, draw as bleps, where as cube } from './sites/bleps'
@@ -42,7 +42,7 @@ export type About = { name: string; does: string; board?: string }
 // planet.wgsl's FLAT; the arrival finds the hearts among them.)
 export const PLACES: Place[] = [
   { id: 'bleps', slugs: ['bleps', 'cubesat-imaging-sim', 'yapling-observatory'], lat: 90, lon: 0, monuments: [], view: [0.2, 0.42, 0.75], ink: [0.55, 0.85, 1], draw: bleps, where: cube, orbit: BLEPS },
-  { id: 'launch', slugs: ['pigeon-vision', 'yapogee'], lat: 34, lon: -38, monuments: [], view: [0.13, 0.75, -0.5], ink: [1, 0.7, 0.35], draw: launch, where: rocket },
+  { id: 'launch', slugs: ['pigeon-vision', 'yapogee'], lat: 34, lon: -38, monuments: [], view: [0.25, 0.12, 0.35], ink: [1, 0.7, 0.35], draw: launch, where: rocket, steer: apart, about: PIGEON },
   { id: 'valley', slugs: ['esp-dvbs2'], lat: 18, lon: 8, monuments: [], view: [0.36, 0.4, -0.7], ink: [0.5, 0.78, 1], draw: dvbs2, steer: dvSteer, about: dvAbout },
   { id: 'receiver', slugs: ['ephemeris', 'driftwood'], lat: 8, lon: 82, monuments: [], view: [0.38, 0.5, -0.3], ink: [0.6, 0.9, 1], draw: receiver, steer: rxSteer, about: rxAbout },
   { id: 'lighthouse', slugs: ['r-01'], lat: -13.732, lon: 53.734, monuments: [], view: [0.75, 0.38, 3.84], ink: [1, 0.35, 0.3], draw: lighthouse, steer: projector, about: r01 },

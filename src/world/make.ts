@@ -191,3 +191,36 @@ export function sheet(m: Mat, rows: V3[][], nrm?: V3[][]) {
       if (i && j) p.I.push(o + (i - 1) * C + j - 1, o + (i - 1) * C + j, o + i * C + j, o + (i - 1) * C + j - 1, o + i * C + j, o + i * C + j - 1)
     }
 }
+
+// ---- for Pigeon Vision (sites/launch.ts): two more ways to make a thing ------------------------------------------
+// A smooth surface through rows × cols of points, at(i, j) for i ≤ rows, j ≤ cols, each vertex's normal from its
+// neighbours (or, where they meet in a point, from the next row's): a lathe, a cut shell, a cable.
+export function grid(m: Mat, rows: number, cols: number, at: (i: number, j: number) => V3) {
+  const p = part(m), o = p.P.length / 3, P: V3[] = [], N: V3[] = []
+  for (let i = 0; i <= rows; i++) for (let j = 0; j <= cols; j++) P.push(at(i, j))
+  const g = (i: number, j: number) => P[Math.min(Math.max(i, 0), rows) * (cols + 1) + Math.min(Math.max(j, 0), cols)]
+  for (let i = 0; i <= rows; i++)
+    for (let j = 0; j <= cols; j++) {
+      const a = g(i + 1, j), b = g(i - 1, j), c = g(i, j + 1), d = g(i, j - 1)
+      const u = [a[0] - b[0], a[1] - b[1], a[2] - b[2]], v = [c[0] - d[0], c[1] - d[1], c[2] - d[2]]
+      const n: V3 = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]], l = Math.hypot(...n)
+      N.push(l > 1e-9 ? [n[0] / l, n[1] / l, n[2] / l] : [0, 0, 0])
+    }
+  for (let i = 0; i <= rows; i++)
+    for (let j = 0; j <= cols; j++) {
+      let n = N[i * (cols + 1) + j]
+      if (!n[0] && !n[1] && !n[2]) n = N[(i ? i - 1 : 1) * (cols + 1) + j]
+      p.P.push(...g(i, j)), p.N.push(...n)
+    }
+  for (let i = 0; i < rows; i++)
+    for (let j = 0; j < cols; j++) {
+      const q = o + i * (cols + 1) + j
+      p.I.push(q, q + cols + 1, q + cols + 2, q, q + cols + 2, q + 1)
+    }
+}
+// a flat convex polygon, corners in turn, facing n
+export function face(m: Mat, q: V3[], n: V3) {
+  const p = part(m), o = p.P.length / 3
+  for (const c of q) p.P.push(...c), p.N.push(...n)
+  for (let i = 1; i + 1 < q.length; i++) p.I.push(o, o + i, o + i + 1)
+}

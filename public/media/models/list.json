@@ -128,11 +128,11 @@
  {
   "id": "pigeon-carrier",
   "file": "pigeon-carrier.glb",
-  "bytes": 3972716,
-  "tris": 101264,
+  "bytes": 3964544,
+  "tris": 110874,
   "bounds": [
    -0.0729,
-   -0.00301,
+   -0.00298,
    -0.07167,
    0.0729,
    0.01682,
@@ -141,7 +141,7 @@
   "up": "y",
   "materials": 12,
   "project": "Pigeon Vision",
-  "note": "CM5 carrier, 144.78 mm across"
+  "note": "CM5 carrier, 144.78 mm across, without its CM5 and Yapogee S3"
  },
  {
   "id": "yapogee-s3",
@@ -342,24 +342,6 @@
   "note": "Finertia, BLEPS’s reaction wheel controller, 26 × 26 mm (its Faulhaber 2610 motor left out)"
  },
  {
-  "id": "bleps",
-  "file": "bleps.glb",
-  "bytes": 733736,
-  "tris": 27348,
-  "bounds": [
-   -0.151,
-   -0.06158,
-   -0.15775,
-   0.151,
-   0.20245,
-   0.15775
-  ],
-  "up": "y",
-  "materials": 12,
-  "project": "BLEPS",
-  "note": "BLEPS's 1U as the optical simulator builds it (cubesat-imaging-sim src/render/spacecraft.ts, makeSpacecraft of its default scenario), turned so its deck and main camera face −y; textures as their mean colour"
- },
- {
   "id": "samwise",
   "file": "samwise.glb",
   "bytes": 2958888,
@@ -394,5 +376,77 @@
   "materials": 6,
   "project": "SAMWISE",
   "note": "XY magnetorquer coil board, 81.5 × 215.5 mm, five coil layers in series"
+ },
+ {
+  "id": "pigeon-cm5",
+  "file": "pigeon-cm5.glb",
+  "bytes": 2591688,
+  "tris": 95374,
+  "bounds": [
+   -0.0275,
+   -0.00231,
+   -0.02,
+   0.0275,
+   0.00231,
+   0.02
+  ],
+  "up": "y",
+  "materials": 12,
+  "project": "Pigeon Vision",
+  "note": "Raspberry Pi CM5, as its carrier places it (Raspberry Pi’s model)"
+ },
+ {
+  "id": "pigeon-camera",
+  "file": "pigeon-camera.glb",
+  "bytes": 146896,
+  "tris": 4740,
+  "bounds": [
+   -0.02146,
+   -0.031,
+   -0.026,
+   0.02146,
+   0.031,
+   0.026
+  ],
+  "up": "y",
+  "materials": 7,
+  "project": "Pigeon Vision",
+  "note": "IMX900 camera on its P22 adapter, M12 holder and CIL212 fisheye (dimensional envelopes), on its printed cradle"
+ },
+ {
+  "id": "pigeon-shell",
+  "file": "pigeon-shell.glb",
+  "bytes": 153688,
+  "tris": 5456,
+  "bounds": [
+   -0.0381,
+   -0.0762,
+   -0.0762,
+   0.0381,
+   0.0762,
+   0.0762
+  ],
+  "up": "y",
+  "materials": 1,
+  "project": "Pigeon Vision",
+  "note": "half the camera section’s 6 in tube, with one lens port and its cradle’s seats, painted as the airframe"
+ },
+ {
+  "id": "bleps",
+  "file": "bleps.glb",
+  "bytes": 733736,
+  "tris": 27348,
+  "bounds": [
+   -0.151,
+   -0.06158,
+   -0.15775,
+   0.151,
+   0.20245,
+   0.15775
+  ],
+  "up": "y",
+  "materials": 12,
+  "project": "BLEPS",
+  "note": "BLEPS's 1U as the optical simulator builds it (cubesat-imaging-sim src/render/spacecraft.ts, makeSpacecraft of its default scenario), turned so its deck and main camera face −y; textures as their mean colour"
  }
 ]

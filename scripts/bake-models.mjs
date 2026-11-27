@@ -37,7 +37,8 @@ const MODELS = [
   { id: 'laserbrain', project: 'R-01', note: 'LaserBrain, the projector controller', pcb: GH + 'R-01_Raster_Laser_Projector/pcbs/LaserBrain/LaserBrain.kicad_pcb' },
   { id: 'laserdriver', project: 'R-01', note: 'LaserDriverRGB, 4 binary-weighted current channels per laser', pcb: GH + 'R-01_Raster_Laser_Projector/pcbs/LaserDriverRGB/LaserDriverRGB.kicad_pcb' },
   { id: 'coil', project: 'SAMWISE', note: 'Z magnetorquer coil panel', pcb: GH + 'samwise-avionics/Universal_Z_MagTorq/Coil_Panel_Z_v1/Coil_Panel_Z.kicad_pcb' },
-  { id: 'pigeon-carrier', project: 'Pigeon Vision', note: 'CM5 carrier, 144.78 mm across', pcb: PV + 'carrier/PigeonCarrier/PigeonCarrier.kicad_pcb' },
+  // the CM5 and Yapogee S3 come off it, so they are their own models
+  { id: 'pigeon-carrier', project: 'Pigeon Vision', note: 'CM5 carrier, 144.78 mm across, without its CM5 and Yapogee S3', pcb: PV + 'carrier/PigeonCarrier/PigeonCarrier.kicad_pcb', skip: /YapogeeS3_Rev1|CM5R5/ },
   { id: 'yapogee-s3', project: 'Pigeon Vision', note: 'Yapogee S3, the DVB-S2 transmitter daughterboard', pcb: PV + 'yapogee-s3/kicad/YapogeeS3.kicad_pcb' },
   { id: 'picohat', project: 'SAMWISE', note: 'ground station debug hat for a Pico, S-band and UHF LoRa', pcb: GH + 'samwise-groundstation/SoftwareDebugPicoHat/SoftwareDebugPicoHat.kicad_pcb' },
   // the STLs lie as printed; the assembly STEP has the cover on the frame
@@ -62,10 +63,21 @@ const MODELS = [
   { id: 'samwise', project: 'SAMWISE', note: 'the 2U as assembled, arrays deployed, River’s coil boards left out', step: DL + 'samwisesatstep.step',
     drop: /Coil_Panel|universal_coil|Z_universal|Stowed Antenna|WPC_25A|^ZPlus_Panel_v2\.4_2025-04-22:2$|^(Pycubed|Battery Board|Reaction Wheel|ADCS) Assembly|Raspberry Pi 4|Camera Multiplexer|RPi_interface|Torx|Screw|Nut|Spacer|Standoff|ISO14581|HNN SCRIPT|^9\d{4}A\d/ },
   { id: 'coil-xy', project: 'SAMWISE', note: 'XY magnetorquer coil board, 81.5 × 215.5 mm, five coil layers in series', pcb: GH + 'samwise-avionics/Universal_XY_MagTorq/Coil_Panel_XY.kicad_pcb' },
+  { id: 'pigeon-cm5', project: 'Pigeon Vision', note: 'Raspberry Pi CM5, as its carrier places it (Raspberry Pi’s model)', step: PV + 'libraries/3dmodels/CM5R5-3dsteps.step',
+    occt: { paint: { DIELECTRIC_Model_1_Inst: [0.02, 0.12, 0.05, 0, 0.45] } } }, // KiCad can't mesh it; and its board is green, not cream
+  // one camera of the camera section on its cradle, as its reference assembly draws it: board, adapter, M12 holder and
+  // CIL212 fisheye; and half the tube, cut across the cameras' axis, so the section can open
+  { id: 'pigeon-camera', project: 'Pigeon Vision', note: 'IMX900 camera on its P22 adapter, M12 holder and CIL212 fisheye (dimensional envelopes), on its printed cradle',
+    step: IREC + '3dModels/pigeon-camera-section/build/reference_assembly_with_hardware_envelopes.step',
+    keep: { Cradle_A: [0.6, 0.22, 0.06, 0, 0.55], A_sensor_pcb_envelope: [0.02, 0.09, 0.05, 0, 0.4], A_p22_pcb_envelope: [0.02, 0.1, 0.055, 0, 0.4], A_stock_m12_holder_envelope: [0.02, 0.02, 0.022, 0, 0.55],
+      A_cil212_external_envelope: [0.015, 0.015, 0.017, 0.5, 0.35], A_p22_ffc_connector_envelope: [0.7, 0.66, 0.55, 0, 0.6], A_four_mm_purchased_spacers: [0.8, 0.6, 0.3, 1, 0.35] } },
+  { id: 'pigeon-shell', project: 'Pigeon Vision', note: 'half the camera section’s 6 in tube, with one lens port and its cradle’s seats, painted as the airframe',
+    step: IREC + '3dModels/pigeon-camera-section/output/tube.step', occt: { half: [1, 0, 0], paint: { '*': [0.8, 0.8, 0.79, 0, 0.3] } } },
 ]
 const BUDGET = { board: { tris: 150e3, bytes: 4e6 }, mesh: { tris: 150e3, bytes: 3e6 } }
 
 const KICAD = '/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli', BLENDER = '/Applications/Blender.app/Contents/MacOS/Blender'
+const OCP = join(homedir(), '.cache/ssi-cad-venv/bin/python') // a Python with cadquery's OCP, for STEPs KiCad can't mesh (step2glb.py)
 const LIB = '/Applications/KiCad/KiCad.app/Contents/SharedSupport/3dmodels', PCM = join(homedir(), 'Documents/KiCad/10.0/3rdparty')
 // What boards name their 3D models by: older KiCads' variables and River's own libraries.
 const VARS = { KICAD8_3RD_PARTY: PCM, KICAD9_3RD_PARTY: PCM, KICAD10_3RD_PARTY: PCM, KICAD9_3DMODEL_DIR: LIB, KICAD10_3DMODEL_DIR: LIB,
@@ -112,6 +124,7 @@ function pcb(m, tmp, out) {
 // OCCT copies a model into the board's assembly only if its labels are self-contained, and an instance's colour
 // overriding its part's is not: it would flatten the whole into one mesh, names and colours lost. The overrides go.
 function step(m, tmp, out) {
+  if (m.occt) return execFileSync(OCP, [new URL('step2glb.py', import.meta.url).pathname, m.step, out, JSON.stringify(m.occt)], { stdio: 'pipe' }), []
   const f = join(tmp, 'step.kicad_pcb'), s = join(tmp, 'model.step')
   writeFileSync(s, readFileSync(m.step, 'latin1').replace(/#\d+\s*=\s*CONTEXT_DEPENDENT_OVER_RIDING_STYLED_ITEM\([^;]*\);\s*/g, ''), 'latin1')
   writeFileSync(f, `(kicad_pcb (version 20240108) (generator "bake") (general (thickness 1.6)) (paper "A4") (layers (0 "F.Cu" signal) (31 "B.Cu" signal))
