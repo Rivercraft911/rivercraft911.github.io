@@ -6,21 +6,26 @@
 //   spins faster and faster down through it.
 // - When the text spreads, the glide is read out in steps, as text reads out the water: the continuous fall
 //   becomes Shepard's own discrete scale (1964), the major scale down in open fifths, each step struck. It runs
-//   faster down the drain,
-// - and in the dark of the cloud below it slows, step by step, while everything but the sub and the wind goes
-//   dim, so that the last step lands on A as we come out under the cloud into the sunrise. There it resolves:
+//   faster down the drain.
+// - Down the dive, as the real world eats the text, the steps melt back into the glide, and it falls faster and
+//   faster, the zoom's own acceleration, swelling, opening and widening, its singers whirling round the head with
+//   the eye, into the hole; and at the horizon, nothing, its hall and all.
+// - In the dark of the cloud below it comes back, still falling, and slows, step by step, while everything but the
+//   sub and the wind goes dim, so that the last step lands on A as we come out under the cloud into the sunrise. There it resolves:
 //   the filter opens, the fifth harmonics bloom (A sus2 becomes A major nine), the hall shimmers, and the light
 //   is struck in high strings. Then it thins away as we climb, and the world (world/sound.ts) takes over.
 import { room, type Stereo } from '../audio/audio'
 import { Shepard, type Part } from '../dsp/shepard'
 import { Plucks } from '../dsp/pluck'
-import { ASCII, END, LEAD, WRAP } from './clock'
+import { END, LEAD, NOTHING, RA, RD, WRAP } from './clock'
 import { hash, mix, smooth } from './scene'
 
 const FALL = 9 // over the lip of the falls: silent before it
 const SPIN = LEAD // the whirlpool
 const TEXT = LEAD + WRAP // the text, and the drain under it
-export const LAND = TEXT + ASCII // the arrival: the dark of the cloud
+const DIVE = RD // down the drain through the worlds,
+const HOLE = RA - NOTHING // over the hole's horizon, and nothing
+export const LAND = RA // the arrival: the dark of the cloud
 export const SKY = LAND + 2.4 // out of the cloud's base into the sunrise, where the fall lands
 const GAIN = 0.25
 
@@ -35,9 +40,14 @@ const table = (A: Float64Array, r: (T: number) => number, T: number) => {
 }
 export const descent = (T: number) => table(S, rate, T)
 
-// The sung fall, far slower than the zoom until the drain, where the steps run, then slowing to nothing at the sky.
-// It is offset so that it stops just past a whole octave: on A.
-const sungRate = (T: number) => (0.07 + 0.08 * smooth(FALL, TEXT, T) + 0.75 * smooth(TEXT, LAND, T) ** 2) * (1 - smooth(LAND - 0.4, SKY, T))
+// The sung fall, far slower than the zoom until the drain, where the steps run, then three octaves a second by the
+// hole, then slowing to nothing at the sky. It is offset so that it stops just past a whole octave: on A.
+const sungRate = (T: number) =>
+  (0.07 + 0.08 * smooth(FALL, TEXT, T) + 0.5 * smooth(TEXT, DIVE, T) ** 2 + 2.4 * smooth(DIVE, HOLE, T) ** 2) * (1 - smooth(LAND - 0.4, SKY, T))
+// Read out in steps while the text is, and again in the cloud; a glide down the dive.
+const stepped = (T: number) => smooth(TEXT, TEXT + 0.6, T) * (1 - smooth(DIVE + 0.4, DIVE + 1.4, T)) + smooth(LAND - 0.3, LAND, T)
+// Past the horizon, nothing, until the cloud.
+const nothing = (T: number) => smooth(HOLE - 0.08, HOLE, T) * (1 - smooth(LAND, LAND + 0.8, T))
 const SUNG = new Float64Array(S.length)
 for (let i = 1; i < SUNG.length; i++) SUNG[i] = SUNG[i - 1] + sungRate(i * DT) * DT
 const OFF = (() => {
@@ -54,7 +64,7 @@ const stair = (s: number) => {
   return (st.s = o + STEPS[i] / 12), (st.k = 7 * o + i), st
 }
 // How far round the head the singers have gone: the whirlpool's turning, faster down the drain, gone in the cloud.
-const spin = (T: number) => 2.5 * smooth(SPIN - 1, SPIN + 1, T) + 4 * smooth(TEXT, LAND, T) - 6.5 * smooth(LAND, LAND + 1.5, T)
+const spin = (T: number) => 2.5 * smooth(SPIN - 1, SPIN + 1, T) + 2 * smooth(TEXT, DIVE, T) + 4 * smooth(DIVE, HOLE, T) - 8.5 * smooth(LAND, LAND + 1.5, T)
 const TURN = new Float64Array(S.length)
 for (let i = 1; i < TURN.length; i++) TURN[i] = TURN[i - 1] + spin(i * DT) * DT
 
@@ -66,19 +76,19 @@ const fade = (T: number) => smooth(FALL - 0.2, FALL + 2.8, T) * (1 - smooth(SKY 
 
 // The room, once a frame. A world's share w ∈ [0, 1] of it is left as the world set it.
 export function place(T: number, w = 0) {
-  const c = cloud(T), b = sky(T), k = 1 - w
-  room.rt = mix(room.rt, 3.2 + 0.8 * smooth(SPIN, TEXT, T) + 2.5 * c + 2 * b * (1 - smooth(SKY + 4, END, T)), k)
+  const c = cloud(T), b = sky(T), k = 1 - w, dv = smooth(DIVE, HOLE, T), z = nothing(T)
+  room.rt = mix(room.rt, (3.2 + 0.8 * smooth(SPIN, TEXT, T) + 2 * dv + 2.5 * c + 2 * b * (1 - smooth(SKY + 4, END, T))) * (1 - 0.97 * z), k) // its tail dies with it
   room.wet = mix(room.wet, 0.5 + 0.3 * c + 0.15 * b, k)
   room.tone = mix(room.tone, 6000 - 3000 * c + 3500 * b, k)
-  room.shimmer = mix(room.shimmer, 0.1 + 0.08 * smooth(SPIN, LAND, T) + 0.12 * c + 0.18 * b * (1 - smooth(SKY + 3, END, T)), k)
+  room.shimmer = mix(room.shimmer, 0.1 + 0.08 * smooth(SPIN, LAND, T) + 0.12 * dv * (1 - z) + 0.12 * c + 0.18 * b * (1 - smooth(SKY + 3, END, T)), k)
   room.chorus = mix(room.chorus, 0.5, k)
-  room.gain = mix(room.gain, 1, k)
+  room.gain = mix(room.gain, 1 - z, k)
 }
 
 // The pad, every millisecond.
 let at = -Infinity, sp = 0, stepAt = 0
 function set(T: number) {
-  const c = cloud(T), b = sky(T), text = smooth(TEXT, TEXT + 0.6, T)
+  const c = cloud(T), b = sky(T), text = stepped(T), dv = smooth(DIVE, HOLE, T) ** 2
   stair(sung(T))
   const s = mix(sung(T), st.s, text)
   // a step is a glide of a few milliseconds, so it never clicks; a seek is a jump
@@ -87,16 +97,16 @@ function set(T: number) {
   pad.turn = table(TURN, spin, T)
   // the filter sweeps, slowly over the falls and with the water's turning in the whirlpool, and shuts in the cloud
   const sweep = 2 ** ((0.7 - 0.5 * c) * Math.sin(0.8 * (T - FALL) + 0.5 * pad.turn))
-  pad.bright = (900 + 1600 * smooth(FALL, SPIN, T) + 1200 * smooth(SPIN, LAND, T)) * (1 - 0.82 * c) * sweep + 3200 * b * (1 - 0.4 * smooth(SKY + 3, END, T))
+  pad.bright = (900 + 1600 * smooth(FALL, SPIN, T) + 1200 * smooth(SPIN, DIVE, T) + 3000 * dv) * (1 - 0.82 * c) * sweep + 3200 * b * (1 - 0.4 * smooth(SKY + 3, END, T))
   pad.res = 0.9 * (1 - c) * (1 - 0.6 * b)
   pad.tone = 0.5 + 0.35 * smooth(SPIN, TEXT, T) - 0.3 * c + 0.2 * b
   pad.bloom = b
   pad.fifth = 0.7 + 0.3 * b
   pad.beat = 0.1 + 0.2 * smooth(SPIN, LAND, T) * (1 - c)
-  pad.width = 0.6 + 0.25 * smooth(SPIN - 1, SPIN, T) - 0.4 * c + 0.35 * b
-  pad.sub = 1.5 * smooth(FALL + 0.5, FALL + 4, T) * (1 - smooth(SKY + 4, END - 2, T))
-  pad.breath = 0.1 + 0.12 * smooth(SPIN, LAND, T) + 0.35 * c * (1 - smooth(SKY - 1, SKY + 0.5, T)) * smooth(LAND, SKY - 0.3, T) ** 0.5
-  pad.air = 700 + 900 * smooth(SPIN, LAND, T) + 3000 * b
+  pad.width = 0.6 + 0.25 * smooth(SPIN - 1, SPIN, T) + 0.3 * dv - 0.4 * c + 0.35 * b
+  pad.sub = 1.5 * (1 + 0.8 * dv) * smooth(FALL + 0.5, FALL + 4, T) * (1 - smooth(SKY + 4, END - 2, T))
+  pad.breath = 0.1 + 0.12 * smooth(SPIN, DIVE, T) + 0.3 * dv + 0.35 * c * (1 - smooth(SKY - 1, SKY + 0.5, T)) * smooth(LAND, SKY - 0.3, T) ** 0.5
+  pad.air = 700 + 900 * smooth(SPIN, DIVE, T) + 1500 * dv + 3000 * b
   // each step down the scale is struck: the new root where the bell is fullest, and its fifth over it
   if (text > 0.5 && st.k !== stepAt && T < SKY + 0.1) {
     const f = 220 * 2 ** -(((st.s % 1) + 1) % 1), a = 0.5 * (1 - 0.6 * c) * (T >= SKY - 0.05 ? 1.6 : 1)
@@ -139,7 +149,7 @@ export function sing(T: number, o: Stereo, gain = 1) {
   if (T !== last) {
     last = T
     out.l = out.r = out.m = 0
-    const e = fade(T)
+    const e = fade(T) * (1 - nothing(T)) * (1 + 0.5 * smooth(DIVE, HOLE, T) ** 2) // swelling into the hole, then nothing
     if (e > 0) {
       if (Math.abs(T - at) >= 1e-3) set(T), arpeggio(T)
       part.l = part.r = part.m = 0

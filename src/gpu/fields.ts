@@ -34,3 +34,6 @@ export const ARRIVE = FIELDS.push({ code: camera + cosmos + planet + arrive, dat
 // Inside the planet (world/sites/core.ts): the integers, sieved, factored and proven prime where they stand.
 import core from './fields/core.wgsl?raw'
 export const CORE = FIELDS.push({ code: camera + core, data: [1024, 2, 4] }) - 1
+// The dive (acts/dive.ts): down the drain's throat through a mountain of worlds to a black hole, the sky lensed round it.
+import dive from './fields/dive.wgsl?raw'
+export const DIVE = FIELDS.push({ code: camera + cosmos + dive }) - 1

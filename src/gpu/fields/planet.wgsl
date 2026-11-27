@@ -20,7 +20,7 @@
 //
 // p[4] centre (from the eye), radius   p[5] toward the sun, t   p[6] the spin axis, the spin angle
 // p[7] the storm, its eye's radius (rad), cloud cover, aurora
-// p[8] exposure, the night side's own light, how many places (up to 10), -
+// p[8] exposure, the night side's own light, how many places (up to 10), the arrival's (its tower's fade: arrive.wgsl)
 // p[9] how much is read out as text, the river's place (lat, lon; rad), its radii per unit of s (0: no river)
 // p[10..13] the places, two a slot (lat, lon, lat, lon; rad): each stands on land and is lit at night
 // p[13].zw the place marked (which, how much)
@@ -39,8 +39,6 @@ const SUN = vec3f(22.0, 21.1, 19.8);  // the sun's irradiance
 const CB = 0.0035;                    // the cloud base
 const HC = 0.006;                     // how deep a fair-weather cloud grows; and the storm's wall
 const HW = 0.025;
-const SIG = 1400.0;                   // a cloud's extinction, per radius
-const SOFT = 0.0012;                  // and how far in from its face it thickens
 const KS = 4.0;                       // the storm's arms: radians turned per e-fold drawn in, K = Γ/Q, pitch atan(1/K)
 const ZS = 0.09;                      // relief, as the light sees it from orbit
 const ZD = 0.025;                     // how the land stands: at ZD h (0.4 + 1.5 h) radii, plains under the cloud, ranges through it
@@ -475,11 +473,12 @@ fn cleared(n: vec3f, pl: vec2f) -> f32 {
   return smoothstep(0.25 * c, c, pl.x * (1.0 + 0.45 * uv.x * (uv.x * uv.x - 3.0 * uv.y * uv.y) / (r2 * sqrt(r2) + 1e-6)));
 }
 // The deck over unit n: the altitudes of its base and its top (no cloud where the top is not above the base), in
-// detail down to fp. Fair weather is cells of convection, as many as the weather allows. Round the pole the deck is the
-// storm, the plunge pool's vortex at the size of a world. Its air is drawn in along log spirals, θ + K ln φ constant,
-// and its cells are noise on the cylinder (θ, ln φ), where that inflow is a slide and a turn: so they fall in along the
-// arms whole, however far they wind, and are finer the nearer the eye. A clear eye; round it the wall, the tallest
-// cloud there is; the overcast sloping away from it in spiral ridges; then the arms.
+// detail down to fp, each finer octave fading in as the pixel shrinks past it, so nothing pops as the eye comes and
+// goes. Fair weather is cells of convection, as many as the weather allows, their tops heaped in billows. Round the
+// pole the deck is the storm, the plunge pool's vortex at the size of a world. Its air is drawn in along log spirals,
+// θ + K ln φ constant, and its cells are noise on the cylinder (θ, ln φ), where that inflow is a slide and a turn: so
+// they fall in along the arms whole, however far they wind, and are finer the nearer the eye. A clear eye; round it
+// the wall, the tallest cloud there is; the overcast sloping away from it in spiral ridges; then the arms.
 fn deck(n: vec3f, fp: f32) -> vec2f {
   let t = u.p[5].w;
   let s = u.p[7].x;
@@ -494,28 +493,34 @@ fn deck(n: vec3f, fp: f32) -> vec2f {
   if (m < 1.0) {
     var f = 12.0;
     var w = n;
-    for (var k = 0; k < 4 && f * fp < 0.25; k++) {
-      let v = noise(w * f + vec3f(0.0, 0.01 * t, 0.0));
-      c += a * select(1.0 - abs(2.0 * v - 1.0), v, k < 2);
+    var v = 0.5;
+    for (var k = 0; k < 6; k++) {
+      let fade = sat(2.0 - 4.0 * f * fp);
+      if (fade <= 0.0) { break; }
+      v = noise5(w * f + vec3f(0.9, 0.7, -0.8) * (v - 0.5) + vec3f(0.0, 0.01 * t, 0.0)); // each octave pushed about by the last, so no lattice shows
+      c += a * mix(0.5, select(sqrt((2.0 * v - 1.0) * (2.0 * v - 1.0) + 0.01), v, k < 2), fade); // the cells, then billows heaped on them
       w = ROT * w;
       f *= 2.8;
       a *= 0.5;
     }
-    c += a;
+    c += a; // what is finer than the pixel, as its mean
   }
   if (m > 0.0) {
     let lx = log(max(x, 0.2));
     let th = atan2(n.z, n.x);
     let psi = th + KS * lx;
     let v = vec3f(cos(th - KS * 0.02 * t), sin(th - KS * 0.02 * t), lx + 0.02 * t); // falling in along the arms
-    let big = noise(v * 1.1 + 9.0); // what bends the arms
+    let big = noise5(v * 1.1 + 9.0); // what bends the arms
+    let fs = fp / max(x * u.p[7].y, 1e-4); // the pixel, on the cylinder
     var cs = 0.0;
     var f = 3.0;
     var vr = ROT * v;
     a = 0.5;
-    for (var k = 0; k < 4 && f * fp < 0.25 * x * u.p[7].y; k++) {
-      let w = noise(vr * f + 3.7);
-      cs += a * select(1.0 - abs(2.0 * w - 1.0), w, k < 2);
+    for (var k = 0; k < 5; k++) {
+      let fade = sat(2.0 - 4.0 * f * fs);
+      if (fade <= 0.0) { break; }
+      let w = noise5(vr * f + 3.7);
+      cs += a * mix(0.5, select(1.0 - abs(2.0 * w - 1.0), w, k < 2), fade);
       vr = ROT * vr;
       f *= 2.6;
       a *= 0.5;
@@ -540,20 +545,33 @@ fn deck(n: vec3f, fp: f32) -> vec2f {
   return vec2f(CB, CB + max(H * sat(1.0 - (1.0 - c) / max(cov, 1e-3)) * (0.35 + 0.65 * sat(cov)) * open, an));
 }
 
+// The light a cloud's water takes out. As air rises from the base it cools and condenses, so the water in it grows
+// with the height over the base, and the extinction as that to the 2/3 (an adiabatic cloud): a column's optical depth
+// grows as its thickness to the 5/3, and a cloud thins out softly to nothing at its edges. Depth between heights a and
+// b over the base, radii; a full fair-weather cell (HC) is TAUC deep, a cumulus's.
+const TAUC = 40.0;
+fn depth(a: f32, b: f32) -> f32 { return TAUC * (pow(max(max(a, b), 0.0) / HC, 5.0 / 3.0) - pow(max(a, 0.0) / HC, 5.0 / 3.0)); }
+// What a layer that deep sends back: two streams, no absorption, its scattering forward as water's is (g = 0.85).
+fn albedo(tau: f32) -> f32 { let k = 0.15 * tau; return k / (2.0 + k); }
+
 // How much of the sun reaches p through the deck over it, met where the sun's ray leaves the low cloud and (round the
-// storm, the only place the deck stands that high) the high.
+// storm, the only place the deck stands that high) the high: the sun's own beam, and the light the cloud lets through
+// scattered, half of which comes down this way.
 fn veil(p: vec3f, L: vec3f, fp: f32) -> f32 {
   let r = length(p);
   let b = dot(p, L);
   if (b < -0.05 * r) { return 1.0; }
   let storm = p.y > r * cos(14.0 * u.p[7].y);
+  let mu = max(b / r, 0.08);
   var v = 1.0;
   if (wx > 0.1 || storm) {
     for (var j = 0; j < select(1, 2, storm); j++) {
       let alt = max(select(0.012, CB, j == 0), r - 0.9995 + 0.008 * f32(j));
       if (alt > CB + select(HC, HW, storm)) { break; }
       let d = deck(normalize(p + L * (sqrt(b * b - r * r + (1.0 + alt) * (1.0 + alt)) - b)), fp);
-      v *= exp(-SIG * 0.5 * max(d.y - alt, 0.0));
+      let tau = depth(alt - CB, d.y - CB) / mu;
+      let beam = exp(-tau);
+      v *= beam + 0.5 * max(1.0 - albedo(tau) - beam, 0.0);
     }
   }
   return v;
@@ -563,59 +581,85 @@ fn hg(mu: f32, g: f32) -> f32 { return (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g
 
 struct Sky { light: vec3f, through: f32, t: f32 }
 
-// The deck along ro + t rd, t in [t0, t1]: stepped down onto its top the way a height field is, lit where it is met,
-// then passed through.
+// The deck along ro + t rd, t in [t0, t1]: the ray's part of the layer between the deck's base and its tallest top,
+// walked in even steps against the deck's broad shape until it first passes under a top, then found exactly, in full
+// detail, by false position (and if the fine detail has a dip there, on). There it is lit as a layer as deep as its
+// column: the sun on the slope of its top, shadowed by the cells toward the sun; what the layer sends back, by its
+// depth; the sky; and, toward the sun, its thin edges silvered. What it sends back it does not let through.
+fn aloft(ro: vec3f, rd: vec3f, t: f32, fp: f32) -> vec2f { // how far over the deck's top, and the top
+  let p = ro + rd * t;
+  let r = length(p);
+  let d = deck(p / r, fp);
+  return vec2f(r - 1.0 - d.y, d.y);
+}
 fn clouds(ro: vec3f, rd: vec3f, t0: f32, t1: f32, L: vec3f) -> Sky {
   var s = Sky(vec3f(0.0), 1.0, t1);
-  var t = t0;
-  var shade = vec3f(0.0);
-  var lod = 0.0;
-  let mu = dot(rd, L);
-  let ph = 0.4 + 0.6 * mix(hg(mu, -0.2), hg(mu, 0.75), 0.5); // forward: the silver lining
-  for (var i = 0; i < 28 && t < t1 && s.through > 0.03; i++) {
-    let p = ro + rd * t;
-    let r = length(p);
-    let n = p / r;
-    let fall = -dot(rd, n);
-    if (r - 1.0 < CB && fall > 0.0) { break; }
-    let fp = cone() * t;
-    let d = deck(n, max(fp, lod));
-    let gap = max(r - 1.0 - d.y, d.x - r + 1.0);
-    if (gap > 0.0) {
-      // down onto its top, or, where a close look finds this column has none, past its base; and never far sideways
-      // in one stride. From far off its broad shape will do.
-      let down = select(0.85 * gap, r - 1.0 - CB + 1e-4, d.y <= d.x && lod <= fp) / max(abs(fall), 0.05);
-      lod = 0.25 * gap;
-      t += max(min(down, 0.004 / sqrt(max(1.0 - fall * fall, 1e-6))), 2.0 * fp) + 1e-5;
-      continue;
+  let bs = ball(ro, rd, 1.0 + CB);
+  var ta = t0;
+  var tb = t1;
+  if (dot(ro, ro) < (1.0 + CB) * (1.0 + CB)) { ta = max(ta, bs.y); } // from under it: from its base up
+  else if (bs.x > 0.0) { tb = min(tb, bs.x); } // from over it: down to its base
+  if (tb <= ta) { return s; }
+  let fp = cone() * ta;
+  let broad = max(fp, 0.004);
+  let n = clamp(i32((tb - ta) / 0.003) + 2, 4, 11);
+  let dt = (tb - ta) / f32(n);
+  let ofs = fract(sin(dot(rd, vec3f(127.1, 311.7, 74.7))) * 43758.5) * dt; // each pixel's steps a little apart from its neighbours', so a cloud's edge between them frays, not steps
+  var a = vec2f(ta, 1.0); // the last place the ray was over the deck, and by how much
+  var hit = false;
+  var d = vec2f(0.0);
+  var t = ta;
+  for (var i = 0; i <= n && !hit; i++) {
+    t = min(ta + dt * f32(i) + select(ofs, 0.0, i == 0), tb);
+    let g = aloft(ro, rd, t, broad).x;
+    if (g >= 0.0) { a = vec2f(t, g); continue; }
+    // under its broad top: where the ray crosses the top in full detail, twice by false position
+    var b = aloft(ro, rd, t, fp);
+    if (b.x >= 0.0) { a = vec2f(t, b.x); continue; } // a dip in the detail: on
+    var tb2 = t;
+    for (var j = 0; j < 2 && i > 0; j++) {
+      let c = a.x + (tb2 - a.x) * a.y / (a.y - b.x);
+      let o = aloft(ro, rd, c, fp);
+      if (o.x < 0.0) { b = o; tb2 = c; } else { a = vec2f(c, o.x); }
     }
-    lod = 0.0;
-    if (s.t == t1) {
-      s.t = t;
-      // the sun on it: Lambert on the slope its top turns to the sun, dimmed by whatever cloud the ray meets on its way
-      // out: a look close by, for the slope and the cell next door, and one far off, for the towers
-      let ms = dot(n, L);
-      let sz = sqrt(max(1.0 - ms * ms, 0.0));
-      let near = max(0.0012, 3.0 * fp);
-      let d1 = deck(normalize(n + normalize(L - n * ms + 1e-5) * near), 2.0 * fp);
-      let g = 2.5 * (d1.y - d.y) / near; // relief, as the light sees it
-      let lam = (ms - g * sz) / sqrt(1.0 + g * g);
-      let far = p + L * 0.5 * min((CB + HW - r + 1.0) / max(ms, 0.2), 0.12);
-      let d2 = deck(normalize(far), 0.004);
-      let od = SIG * (sat((d1.y - (r - 1.0 + near * ms / max(sz, 0.05))) / SOFT) * near / max(sz, 0.3)
-             + sat(min(d2.y - length(far) + 1.0, length(far) - 1.0 - d2.x) / SOFT) * length(far - p));
-      shade = SUN * (exp(-sunward(p, L)) * (0.1 * ph * exp(-od) + 0.4 * (d.y - d.x) / (d.y - d.x + 0.0025) * sat(lam) * exp(-0.2 * od)) + vec3f(0.035, 0.055, 0.09) * smoothstep(-0.2, 0.3, ms));
-    }
-    // through it, as one column: thickening in from its faces
-    let ds = max(0.0007, 2.0 * fp);
-    for (var j = 0; j < 6; j++) {
-      let alt = length(ro + rd * t) - 1.0;
-      let k = 1.0 - exp(-SIG * sat(min(d.y - alt, alt - d.x) / SOFT) * ds);
-      s.light += s.through * k * shade * (0.75 + 0.25 * sat((alt - CB) / HC));
-      s.through *= 1.0 - k;
-      t += ds;
-    }
+    t = tb2;
+    d = vec2f(CB, b.y);
+    hit = true;
   }
+  if (!hit) { return s; }
+  let p = ro + rd * t;
+  let r = length(p);
+  let nn = p / r;
+  let alt = r - 1.0;
+  let ms = dot(nn, L);
+  let mv = max(abs(dot(rd, nn)), 0.12);
+  let m0 = max(ms, 0.12);
+  // the column under the top here, as the eye and the sun cross it
+  let tau = depth(0.0, d.y - CB);
+  let back = albedo(tau * (0.5 / mv + 0.5 / m0));
+  s.t = t;
+  s.through = 1.0 - back;
+  // the sun on its top: Lambert on the slope its top turns toward the sun, and the shadow of the cells toward it, the
+  // one beside and (for the towers) one farther off; light scatters on into the shadows, so they are never black
+  let sz = sqrt(max(1.0 - ms * ms, 0.0));
+  let toward = normalize(L - nn * ms + 1e-5);
+  let near = max(0.0012, 3.0 * fp);
+  let d1 = deck(normalize(nn + toward * near), fp);
+  let g = 2.5 * (d1.y - d.y) / near; // relief, as the light sees it
+  let lam = (ms - g * sz) / sqrt(1.0 + g * g);
+  let rise = ms / max(sz, 0.05);
+  var od = 6.0 * sat((d1.y - alt - near * rise) / (0.15 * HC));
+  let fd = min((CB + HW - alt) / max(ms, 0.2), 0.06);
+  if (fd > 2.0 * near && (ms < 0.45 || d.y > CB + HC)) { // (only a low sun, or a tower, throws a long shadow)
+    let d2 = deck(normalize(nn + toward * fd), max(fp, 0.002));
+    od += 6.0 * sat((d2.y - alt - fd * rise) / (0.15 * HC));
+  }
+  let shade = 0.7 * exp(-od) + 0.3 * exp(-0.2 * od);
+  let mu = dot(rd, L);
+  let silver = 0.06 * hg(mu, 0.8) * tau / mv * exp(-tau / mv); // forward through its thin edges
+  let lit = SUN * exp(-sunward(p, L)) * (1.3 / PI * back * sat(lam) * shade + silver * sat(4.0 * ms + 0.2));
+  let sky = SUN * vec3f(0.035, 0.055, 0.09) * smoothstep(-0.2, 0.3, ms) * (0.35 + 0.65 * back);
+  s.light = lit + sky * back;
   return s;
 }
 
@@ -660,9 +704,9 @@ fn relief(ro: vec3f, rd: vec3f, t0: f32, t1: f32) -> f32 {
         continue;
       }
       if (gap > 0.0 || i == 0) { return t + gap / max(closing, 0.03); } // near enough: the rest by its slope
-      let c = a.x + (t - a.x) * a.y / (a.y - gap); // through it: back by false position, twice
+      let c = a.x + (t - a.x) * a.y / max(a.y - gap, 1e-9); // through it: back by false position, twice
       let gc = over(ro, rd, c, 0.0);
-      return select(c + (t - c) * gc / (gc - gap), a.x + (c - a.x) * a.y / (a.y - gc), gc < 0.0);
+      return select(c + (t - c) * gc / max(gc - gap, 1e-9), a.x + (c - a.x) * a.y / max(a.y - gc, 1e-9), gc < 0.0);
     }
     a = vec2f(t, gap);
     lod = 0.5 * gap;
@@ -710,7 +754,7 @@ fn ground(p: vec3f, rd: vec3f, L: vec3f, t: f32, near: f32) -> vec3f {
     let U = max(1.0 + 12.0 * pow(noise(m * 5.0 + 9.0), 2.0), u.p[7].x * 30.0 * select(pow(x, -0.6), x * x * x, x < 1.0));
     let s2 = 0.003 + 0.00512 * U;
     let H = normalize(L - rd);
-    let c2 = dot(m, H) * dot(m, H);
+    let c2 = max(dot(m, H) * dot(m, H), 1e-4);
     let F = 0.02 + 0.98 * pow(1.0 - max(dot(-rd, H), 0.0), 5.0);
     let glint = F * exp(-(1.0 - c2) / (c2 * s2)) / (PI * s2 * 4.0 * cv * c2 * c2) * step(0.0, mu);
     var alb = mix(vec3f(0.004, 0.02, 0.05), vec3f(0.42, 0.38, 0.27), exp(c.x * vec3f(500.0, 70.0, 25.0)));
@@ -776,13 +820,13 @@ fn aurora(ro: vec3f, rd: vec3f, b: f32, L: vec3f) -> vec3f {
       var p = ro + rd * t;
       let ct = dot(p, g) / length(p);
       let az = atan2(dot(p, e2), dot(p, e1)) * sign(ct) + 3.0 * f32(j);
-      let w = (dot(rd, g) - ct * dot(p, rd) / length(p)) / (length(p) * sqrt(1.0 - ct * ct)); // the colatitude's rate along the ray
+      let w = (dot(rd, g) - ct * dot(p, rd) / length(p)) / (length(p) * sqrt(max(1.0 - ct * ct, 0.0))); // the colatitude's rate along the ray
       t += clamp((0.025 * sin(5.0 * az + 0.3 * time) + 0.01 * sin(17.0 * az - 0.7 * time)) / w, -0.08, 0.08) * sign(ct);
       p = ro + rd * t;
       let x = (length(p) - 1.012) / 0.03;
       if (t < 0.0 || t > b || x < 0.0) { continue; }
       let rays = (0.3 + noise(vec3f(az * 3.0, 0.2 * time, 4.0))) * (0.5 + noise(vec3f(az * 30.0, 0.5 * time, 9.0)));
-      let glow = vec3f(0.1, 1.0, 0.3) * exp(-2.5 * x) * sat(12.0 * x) + vec3f(1.0, 0.08, 0.12) * 0.2 * smoothstep(0.1, 0.6, x) * exp(-1.5 * x) + vec3f(0.45, 0.15, 1.0) * exp(-30.0 * x);
+      let glow = vec3f(0.3, 1.0, 0.5) * exp(-2.5 * x) * sat(12.0 * x) + vec3f(1.0, 0.08, 0.12) * 0.2 * smoothstep(0.1, 0.6, x) * exp(-1.5 * x) + vec3f(0.45, 0.15, 1.0) * exp(-30.0 * x);
       c += glow * rays * smoothstep(0.12, -0.12, dot(normalize(p), L)) * min(0.004 / abs(w), 0.06);
     }
   }
@@ -792,9 +836,9 @@ fn aurora(ro: vec3f, rd: vec3f, b: f32, L: vec3f) -> vec3f {
   if (t > 0.0 && t < b) {
     let p = (ro + rd * t) / 1.02;
     let w = (acos(abs(dot(p, g))) - 0.385) / 0.06;
-    c += vec3f(0.1, 1.0, 0.3) * 0.0025 * exp(-w * w) * smoothstep(0.12, -0.12, dot(p, L));
+    c += vec3f(0.3, 1.0, 0.5) * 0.0012 * exp(-w * w) * smoothstep(0.12, -0.12, dot(p, L));
   }
-  return c * lvl * 150.0;
+  return c * lvl * 70.0; // faint, as from orbit it is: a veil over the night, not a lamp
 }
 
 // ---- beyond ---------------------------------------------------------------------------------------------------------

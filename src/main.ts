@@ -10,10 +10,11 @@ import { meander } from './acts/meander'
 import { valley } from './acts/valley'
 import { wrap } from './acts/wrap'
 import { ascii, CHARS } from './acts/ascii'
+import { dive } from './acts/dive'
 import { arrive } from './acts/arrive'
 import { load } from './beam/font'
 import { edit } from './acts/edit'
-import { ARRIVE, ASCII, VALLEY, WRAP } from './acts/clock'
+import { ARRIVE, ASCII, DIVE, VALLEY, WRAP } from './acts/clock'
 import { r01 } from './world/r01'
 import { attach, planet } from './world/planet'
 import { deep } from './world/pages'
@@ -22,11 +23,11 @@ const canvas = document.querySelector('canvas')!
 const q = new URLSearchParams(location.search)
 const beam = new Beam()
 const audio = new Audio()
-// The transmission: the scope's opening, the valley and its falls, the whirlpool and its text, the arrival out of the
-// drain's dark into the planet's own air, and the planet, which is the portfolio. ?fall plays it from the lip of the
-// falls on (the pool needs their history); ?arrive from the arrival. A deep link to a place (/<project>) skips it all
-// and lands there.
-const FILM = [hook, meander, valley, wrap, ascii, arrive, planet]
+// The transmission: the scope's opening, the valley and its falls, the whirlpool and its text, the dive down its drain
+// through the worlds into a black hole, the arrival out of the hole's dark into the planet's own air, and the planet,
+// which is the portfolio. ?fall plays it from the lip of the falls on (the pool needs their history); ?dive from the
+// drain's throat; ?arrive from the arrival. A deep link to a place (/<project>) skips it all and lands there.
+const FILM = [hook, meander, valley, wrap, ascii, dive, arrive, planet]
 // ?short: the transmission in about half the time, each scene cut to its best stretch and played a little faster
 const SHORT = [
   edit(hook, [[0.45, 3.6, 1.6]]),
@@ -34,6 +35,7 @@ const SHORT = [
   edit(valley, [[0, 7, 2], [7, VALLEY, 1.3]]), // the valley quickly, the falls nearly as they are
   edit(wrap, [[0, WRAP, 1.3]]),
   edit(ascii, [[0, ASCII, 1.6]]),
+  edit(dive, [[0, DIVE, 1.25]]),
   edit(arrive, [[0, ARRIVE, 1.2]]),
   planet,
 ]
@@ -46,11 +48,13 @@ const scenes = q.has('specimen')
       ? [planet]
       : q.has('fall')
         ? from(valley)
-        : q.has('arrive')
-          ? from(arrive)
-          : q.has('short')
-            ? SHORT
-            : FILM
+        : q.has('dive')
+          ? from(dive)
+          : q.has('arrive')
+            ? from(arrive)
+            : q.has('short')
+              ? SHORT
+              : FILM
 const timeline = new Timeline(scenes)
 const frame: Frame = { ch: [] }
 const look = { ...LOOK }

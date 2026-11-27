@@ -17,6 +17,7 @@ struct R {
   focus: f32,  // the lens: where it is focused, world units
   aper: f32,   // its blur at infinity, px (0: a pinhole)
   spin: f32,   // this frame's turn of the lens's sampling pattern
+  tint: f32,   // how far a glyph takes the colour of the light it reads
 }
 
 @group(0) @binding(0) var<uniform> r: R;
@@ -135,5 +136,9 @@ const SHARP = 1.8;
     ink += textureSampleLevel(atlas, smp, o + (vec2f(f32(i & 1), f32(i >> 1)) - 0.5) * 0.5 * scale, 0.0).r;
   }
   let lit = mix(r.dim, 1.0, g.y) + 1.5 * pow(g.y, 6.0); // the fullest cells burn past white
-  return light + vec4f(r.ink * (0.25 * ink * lit * r.gain), 0.0);
+  // in the colour of the light it reads, at the ink's brightness, if it is tinted
+  let s = textureSampleLevel(src, smp, (r.off + (c + 0.5) * r.cell) / r.res, 0.0).rgb;
+  let hue = s / max(dot(s, Y), 1e-6);
+  let col = mix(r.ink, dot(r.ink, Y) * min(hue, vec3f(4.0)), r.tint * smoothstep(0.0, 1e-4, dot(s, Y)));
+  return light + vec4f(col * (0.25 * ink * lit * r.gain), 0.0);
 }

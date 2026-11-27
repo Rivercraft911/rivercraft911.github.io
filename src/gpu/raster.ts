@@ -17,6 +17,7 @@ export type Field = {
   cell?: number // read out as text, in cells this many CSS px tall (3:5); where the field says it is not text, light
   fine?: number // read out as text, the field's pixels across each of a cell's 6 × 10
   ink?: readonly number[] // the glyphs' colour, linear
+  tint?: number // read out as text, how far each glyph takes the colour of the light it reads (0: all ink)
   lift?: number // how much light makes a cell full
   rows?: { data: Uint8Array; at: number; n: number } // new rows for the shader's data texture, ring row `at`
   read?: Uint8Array // filled, a frame or two late, with the centre row of text
@@ -202,7 +203,7 @@ export class Raster {
     uf[8] = ink[0], uf[9] = ink[1], uf[10] = ink[2], uf[11] = gain * f.k
     uf[12] = TILE[0], uf[13] = TILE[1], uf[14] = ATLAS_COLS, uf[15] = this.chars.length
     uf[16] = f.lift ?? 2, uf[17] = 0.2, uf[18] = fine
-    uf[19] = f.solids?.focus ?? 1, uf[20] = text ? 0 : (f.solids?.aperture ?? 0), uf[21] = (this.turn = (this.turn + 2.3999632 * 0.618) % 6.2831853)
+    uf[19] = f.solids?.focus ?? 1, uf[20] = text ? 0 : (f.solids?.aperture ?? 0), uf[21] = (this.turn = (this.turn + 2.3999632 * 0.618) % 6.2831853), uf[22] = f.tint ?? 0
     d.queue.writeBuffer(this.u, 0, uf)
 
     sweep(f, this.views[0], this.views[2], fw, fh, aspect)
