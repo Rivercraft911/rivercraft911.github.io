@@ -44,6 +44,9 @@ export class Bed {
   private lfo = 0
   private dlfo: number
   private ms: number
+  private wet = room.wet // the room's levels, followed every sample so that a scene setting them once a frame never steps
+  private gain = room.gain
+  private ease: number
   constructor(sr: number) {
     this.hall = new Hall(sr)
     this.att = 1 - Math.exp(-1 / (0.005 * sr))
@@ -53,6 +56,7 @@ export class Bed {
     this.dlfo = 0.5 / sr
     this.chp = 1 - Math.exp((-2 * Math.PI * 250) / sr)
     this.ms = sr / 1000
+    this.ease = 1 - Math.exp(-1 / (0.02 * sr))
   }
 
   clear() {
@@ -83,7 +87,8 @@ export class Bed {
     }
     const lo = this.lo, k = this.hp
     h.run(a + c - (lo[0] += k * (a + c - lo[0])), b + c - (lo[1] += k * (b + c - lo[1])), room.rt, room.tone, room.shimmer)
-    const l = this.block(0, room.gain * (a + 0.5 * c + room.wet * h.l)), r = this.block(1, room.gain * (b + 0.5 * c + room.wet * h.r))
+    const wet = (this.wet += (room.wet - this.wet) * this.ease), gain = (this.gain += (room.gain - this.gain) * this.ease)
+    const l = this.block(0, gain * (a + 0.5 * c + wet * h.l)), r = this.block(1, gain * (b + 0.5 * c + wet * h.r))
     const p = Math.max(Math.abs(l), Math.abs(r))
     this.env += (p > this.env ? this.att : this.rel) * (p - this.env)
     const g = this.env > KNEE ? Math.sqrt(KNEE / this.env) : 1

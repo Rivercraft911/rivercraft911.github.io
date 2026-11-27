@@ -15,12 +15,15 @@
 //   faster down the drain.
 // - Down the dive, as the real world eats the text, the steps melt back into the glide, and it falls faster and
 //   faster, the zoom's own acceleration, swelling, opening and widening, its singers whirling round the head with
-//   the eye, into the hole; and at the horizon, nothing, its hall and all.
+//   the eye, into the hole. Out in the hollow the hole's disk sings with it: A, the orbit of its inner edge (disk).
+// - At the horizon its fall runs on into the horizon's redshift, window and all, and it sinks out of hearing like a
+//   tape stopping, while its hall's tail is drawn out long and dark. The disk, outside, sings on through the dark.
 // - In the dark of the cloud below it comes back, still falling, and slows, step by step, while everything but the
-//   sub and the wind goes dim, so that the last step lands on A as we come out under the cloud into the sunrise. There it resolves:
+//   sub and the wind goes dim, so that the last step lands on the disk's A as we come out under the cloud into the
+//   sunrise, and the disk's voice is taken into it. There it resolves:
 //   the filter opens, the fifth harmonics bloom (A sus2 becomes A major nine), the hall shimmers, and the light
 //   is struck in high strings. Then it thins away as we climb, and the world (world/sound.ts) takes over.
-import { room, type Stereo } from '../audio/audio'
+import { heard, room, type Stereo } from '../audio/audio'
 import { Shepard, type Part } from '../dsp/shepard'
 import { Plucks } from '../dsp/pluck'
 import { END, LEAD, NOTHING, RA, RD, WRAP } from './clock'
@@ -30,10 +33,10 @@ export const FALL = 9 // over the lip of the falls
 const SPIN = LEAD // the whirlpool
 const TEXT = LEAD + WRAP // the text, and the drain under it
 const DIVE = RD // down the drain through the worlds,
-const HOLE = RA - NOTHING // over the hole's horizon, and nothing
+const HOLE = RA - NOTHING // over the hole's horizon
 export const LAND = RA // the arrival: the dark of the cloud
 export const SKY = LAND + 2.4 // out of the cloud's base into the sunrise, where the fall lands
-const GAIN = 0.25
+const GAIN = 0.25, DISK = 1
 
 // The zoom's fall in octaves per second, and its integral, the descent: the whirlpool's printer reads it (wrap.ts).
 export const rate = (T: number) => 0.12 + 0.42 * smooth(0, 10, T) + 0.5 * smooth(END - 15, END, T)
@@ -53,9 +56,16 @@ export const descent = (T: number) => table(S, rate, T)
 const shape = (T: number) =>
   (0.07 * smooth(FALL - 0.3, FALL + 2, T) + 0.08 * smooth(FALL, TEXT, T) + 0.5 * smooth(TEXT, DIVE, T) ** 2 + 2.4 * smooth(DIVE, HOLE, T) ** 2) * (1 - smooth(LAND - 0.4, SKY, T))
 // Read out in steps while the text is, and again in the cloud; a glide down the dive.
-const stepped = (T: number) => smooth(TEXT, TEXT + 0.6, T) * (1 - smooth(DIVE + 0.4, DIVE + 1.4, T)) + smooth(LAND - 0.3, LAND, T)
-// Past the horizon, nothing, until the cloud.
-const nothing = (T: number) => smooth(HOLE - 0.08, HOLE, T) * (1 - smooth(LAND, LAND + 0.8, T))
+const stepped = (T: number) => smooth(TEXT, TEXT + 0.6, T) * (1 - smooth(DIVE + 0.4, DIVE + 1.4, T)) + smooth(BACK - 0.3, BACK, T)
+// Over the horizon. Seen from outside, as the dive's picture holds the eye there, light from what falls in is reddened
+// as e^(t/4M): at the dive's 20 M a second, 7.2 octaves a second. The choir's own fall runs on into that (Shepard.red),
+// coming up to it over 0.6 s, dimming as (1 + z)⁻¹, until nothing of it is left; in the cloud it sings again from BACK.
+const BACK = LAND + 0.6
+const ramp = (x: number) => (x < 0 ? 0 : x < 1 ? x * x * x - (x * x * x * x) / 2 : x - 0.5) // ∫ smooth
+const red = (T: number) => (T < BACK ? 7.2 * 0.6 * ramp((T - HOLE + 0.35) / 0.6) : 0)
+const audible = (T: number) => (T < BACK ? 2 ** -red(T) * (1 - smooth(HOLE + 0.3, BACK, T)) : smooth(BACK, BACK + 1, T))
+// The dark, from the horizon until the choir is back: the hall's tail drawn out long and dark through it.
+const dark = (T: number) => smooth(HOLE - 0.4, HOLE + 0.2, T) * (1 - smooth(LAND, BACK + 0.4, T))
 const SUNG = new Float64Array(S.length)
 for (let i = 1; i < SUNG.length; i++) SUNG[i] = SUNG[i - 1] + shape(i * DT) * DT
 const K = (Math.round(table(SUNG, shape, SKY)) + 0.01) / table(SUNG, shape, SKY)
@@ -90,13 +100,13 @@ const open = (T: number) => 1 - smooth(FALL, FALL + 2.5, T) // as bright as the 
 
 // The room, once a frame. A world's share w ∈ [0, 1] of it is left as the world set it.
 export function place(T: number, w = 0) {
-  const c = cloud(T), b = sky(T), k = 1 - w, dv = smooth(DIVE, HOLE, T), z = nothing(T)
-  room.rt = mix(room.rt, (3.2 + 0.8 * smooth(SPIN, TEXT, T) + 2 * dv + 2.5 * c + 2 * b * (1 - smooth(SKY + 4, END, T))) * (1 - 0.97 * z), k) // its tail dies with it
-  room.wet = mix(room.wet, 0.5 + 0.3 * c + 0.15 * b, k)
-  room.tone = mix(room.tone, 6000 - 3000 * c + 3500 * b, k)
-  room.shimmer = mix(room.shimmer, 0.1 + 0.08 * smooth(SPIN, LAND, T) + 0.12 * dv * (1 - z) + 0.12 * c + 0.18 * b * (1 - smooth(SKY + 3, END, T)), k)
+  const c = cloud(T), b = sky(T), k = 1 - w, dv = smooth(DIVE, HOLE, T), z = dark(T)
+  room.rt = mix(room.rt, 3.2 + 0.8 * smooth(SPIN, TEXT, T) + 2 * dv + 2.5 * c + 2 * b * (1 - smooth(SKY + 4, END, T)) + 5 * z, k) // drawn out in the dark
+  room.wet = mix(room.wet, 0.5 + 0.3 * c + 0.15 * b - 0.3 * z, k) // and quieter: the dark is a hush
+  room.tone = mix(room.tone, 6000 - 3000 * c + 3500 * b - 3500 * z * (1 - c), k)
+  room.shimmer = mix(room.shimmer, (0.1 + 0.08 * smooth(SPIN, LAND, T) + 0.12 * dv + 0.12 * c + 0.18 * b * (1 - smooth(SKY + 3, END, T))) * (1 - z), k) // it climbs: not as all falls
   room.chorus = mix(room.chorus, 0.5, k)
-  room.gain = mix(room.gain, 1 - z, k)
+  room.gain = mix(room.gain, 1, k)
 }
 
 // The pad, every millisecond.
@@ -108,6 +118,7 @@ function set(T: number) {
   // a step is a glide of a few milliseconds, so it never clicks; a seek is a jump
   sp = Math.abs(s - sp) > 0.5 ? s : sp + (s - sp) * 0.06
   pad.s = sp
+  pad.red = red(T)
   pad.turn = table(TURN, spin, T)
   // the filter: open as the scope until the lip, closing over it; then it sweeps, slowly over the falls and with the
   // water's turning in the whirlpool, and shuts in the cloud
@@ -156,6 +167,31 @@ function arpeggio(T: number) {
   if (T < SKY) lightN = 0
 }
 
+// The disk. The hole is as heavy as Cygnus X-1's, twenty suns, so the inner edge of its disk (6M) goes round 110 times a
+// second, c³ / (2π 6^{3/2} G M): an A. (The picture shows it a five-hundredth as fast: dive.ts's 20 M a second.) A hot
+// spot there is seen Doppler-beamed, its brightness D³, D = 1 / γ(1 − β cos φ), β half the speed of light there and seen
+// 67° off the disk's axis: it flares each time it comes round toward the eye, a pulse at the orbit's own frequency whose
+// harmonics are A's chord. It comes in as the eye comes out into the hollow (dive.ts sets hollow.T), swells as the eye
+// falls, and sings on through the dark (it is outside the horizon), darkening, a low A that the choir lands on.
+export const hollow = { T: RD + 6 }
+const ORBIT = 110, NB = 1024, BEAM = (() => {
+  const b = Float64Array.from({ length: NB + 1 }, (_, i) => (1 - 0.46 * Math.cos((2 * Math.PI * i) / NB)) ** -3)
+  const m = b.reduce((s, v, i) => (i < NB ? s + v / NB : s), 0), top = Math.max(...b) - m
+  return b.map((v) => (v - m) / top)
+})()
+let dph = 0, d1 = 0, d2 = 0, dk = 0, don = 0, dAt = -Infinity
+function disk(T: number) {
+  if (Math.abs(T - dAt) >= 1e-3) {
+    dAt = T
+    don = smooth(hollow.T - 0.5, hollow.T + 2, T) * (0.4 + 0.6 * smooth(hollow.T, HOLE, T)) * (1 - smooth(SKY - 0.5, SKY + 2, T))
+    dk = 1 - Math.exp((-2 * Math.PI * (2400 - 2100 * smooth(HOLE - 0.4, LAND + 0.4, T))) / heard.sr) // its light dims to a glow
+  }
+  if (don < 1e-4) return 0
+  const u = (dph = (dph + ORBIT / heard.sr) % 1) * NB, i = u | 0, x = BEAM[i] + (BEAM[i + 1] - BEAM[i]) * (u - i)
+  ;(d1 += dk * (x - d1)), (d2 += dk * (d1 - d2))
+  return don * d2
+}
+
 // Every sample: the pad and the strings into the bed, voices 0 and 1 its left and right, 2 the sub in the middle; or,
 // before the lip, into the spatial voices 3, 4 and 5 that the valley places on the shaft ahead.
 // A second call at the same T (two scenes crossfading) sings the same sample.
@@ -165,7 +201,8 @@ export function sing(T: number, o: Stereo, gain = 1) {
   if (T !== last) {
     last = T
     out.l = out.r = out.m = 0
-    const e = fade(T) * (1 - nothing(T)) * (1 + 0.5 * smooth(DIVE, HOLE, T) ** 2) // swelling into the hole, then nothing
+    const e = fade(T) * audible(T) * (1 + 0.5 * smooth(DIVE, HOLE, T) ** 2) // swelling into the hole, reddened away, and back
+    out.m = DISK * disk(T)
     if (e > 0) {
       if (Math.abs(T - at) >= 1e-3) set(T), arpeggio(T)
       part.l = part.r = part.m = 0
@@ -174,7 +211,7 @@ export function sing(T: number, o: Stereo, gain = 1) {
       const g = GAIN * e
       out.l = g * part.l
       out.r = g * part.r
-      out.m = g * part.m
+      out.m += g * part.m
       out.a = ahead(T)
     }
   }

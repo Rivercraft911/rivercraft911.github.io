@@ -10,7 +10,7 @@
 import { DIVE as SHADER } from '../gpu/fields'
 import type { Field } from '../gpu/raster'
 import type { Voice } from '../audio/audio'
-import { place, sing } from './choir'
+import { hollow, place, sing } from './choir'
 import { ASCII, DIVE as DUR, NOTHING, RD, WRAP } from './clock'
 import { aim } from './reality'
 import { pool, poolAt, ride, surface } from './wrap'
@@ -62,6 +62,7 @@ function plan() {
   for (let i = 1; i < U.length; i++) U[i] = U[i - 1] + (k0((i - 0.5) * DT) + amp * k1((i - 0.5) * DT)) * DT
   OUT = 0
   while (lnr(OUT) > UW) OUT += DT
+  hollow.T = RD + OUT // the disk's song comes in with the disk
   for (let i = 1; i < ROLL.length; i++) ROLL[i] = ROLL[i - 1] + spin((i - 0.5) * DT) * DT
   const at = ROLL[Math.round(OUT / DT)]
   LEVEL = Math.round(at / (2 * Math.PI)) * 2 * Math.PI - at

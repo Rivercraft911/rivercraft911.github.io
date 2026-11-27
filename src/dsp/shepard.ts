@@ -32,7 +32,9 @@ export class Shepard {
   // How it sings, read once a block. s: descent in octaves (an integer puts every root on an A). fifth: the fifth's
   // level. bright: the lowpass's corner, Hz, and res its peak there. tone: harmonics 2–4 against the fundamental.
   // bloom: the fifth harmonics. beat: Hz between a pair. width: how far apart a pair stands. turn: radians the
-  // layers have gone round the head (the whirlpool). sub, breath, air: levels, and the breath's centre in Hz.
+  // layers have gone round the head (the whirlpool). sub, breath, air: levels, and the breath's centre in Hz. red:
+  // octaves the whole of it is shifted down, bell, filter and all, as light from something falling into a black hole
+  // is reddened, so that it does sink out of hearing.
   s = 0
   fifth = 1
   bright = 1500
@@ -45,6 +47,7 @@ export class Shepard {
   sub = 0
   breath = 0
   air = 800
+  red = 0
   private ph = new Float64Array(4 * L) // per singer (layer, tone, pair): phase in cycles
   private inc = new Float64Array(4 * L) // cycles a sample
   private gl = new Float64Array(4 * L)
@@ -80,7 +83,7 @@ export class Shepard {
 
   // Sets every singer and band for the next block.
   private control() {
-    const { w } = this, sr = heard.sr, nyq = 0.45 * sr, b4 = this.bright ** 4
+    const { w } = this, sr = heard.sr, nyq = 0.45 * sr, b4 = this.bright ** 4, z = 2 ** -this.red
     this.live = this.nb = this.ns = 0
     for (let j = 0; j < L; j++) {
       const x = (((j - this.s) % L) + L) % L // this layer's place in the span, sliding down
@@ -105,7 +108,7 @@ export class Shepard {
         const pan = this.width * Math.sin(this.turn + j * 2.4 + k * 1.3)
         for (let m = 2 - this.pairs; m < 2; m++) {
           const i = 2 * (2 * j + k) + m, a = (Math.PI / 4) * (1 + (m ? pan : -pan))
-          this.inc[i] = (f + (m ? 0.5 : -0.5) * this.beat) / sr
+          this.inc[i] = ((f + (m ? 0.5 : -0.5) * this.beat) * z) / sr
           this.gl[i] = Math.cos(a)
           this.gr[i] = Math.sin(a)
           this.on[this.live++] = i
@@ -113,9 +116,9 @@ export class Shepard {
       }
       // the sub: this layer again, pure, if it is between 27.5 and 110 Hz
       const f = F0 * 2 ** x, u = Math.log2(f / 27.5) / 2
-      if (this.sub > 0 && u > 0 && u < 1) (this.sinc[j] = f / sr), (this.sg[j] = this.sub * rcos(u)), (this.subs[this.ns++] = j)
+      if (this.sub > 0 && u > 0 && u < 1) (this.sinc[j] = (f * z) / sr), (this.sg[j] = this.sub * rcos(u)), (this.subs[this.ns++] = j)
       // the breath, two octaves up: its gain makes white noise of variance 1/3 come out of the band at unit RMS
-      const fb = 4 * f, bw = this.breath * rcos(x / L) * Math.exp(-(Math.log2(fb / this.air) ** 2))
+      const bw = this.breath * rcos(x / L) * Math.exp(-(Math.log2((4 * f) / this.air) ** 2)), fb = 4 * f * z
       if (bw < 3e-3 || fb > 0.4 * sr) continue
       const tg = Math.tan((Math.PI * fb) / sr), a1 = 1 / (1 + tg * (tg + 1 / Q)), sv = this.sv, i = 4 * j
       sv[i] = a1
