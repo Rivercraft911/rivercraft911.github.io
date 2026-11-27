@@ -9,6 +9,7 @@ import { NORMAL as BLEPS, draw as bleps, where as cube } from './sites/bleps'
 import { core } from './sites/core'
 import { RISE as BROW, about as strobe, draw as glasses, steer as look } from './sites/glasses'
 import { draw as hearts } from './sites/hearts'
+import { about as r01, draw as lighthouse, steer as projector } from './sites/lighthouse'
 import { RISE as DESK, about as peep, draw as bench, steer as plug } from './sites/bench'
 import { about as dvAbout, draw as dvbs2, steer as dvSteer } from './sites/dvbs2'
 
@@ -44,7 +45,7 @@ export const PLACES: Place[] = [
   { id: 'launch', slugs: ['pigeon-vision', 'yapogee'], lat: 34, lon: -38, monuments: [], view: [0.13, 0.75, -0.5], ink: [1, 0.7, 0.35], draw: launch, where: rocket },
   { id: 'valley', slugs: ['esp-dvbs2'], lat: 18, lon: 8, monuments: [], view: [0.36, 0.4, -0.7], ink: [0.5, 0.78, 1], draw: dvbs2, steer: dvSteer, about: dvAbout },
   { id: 'receiver', slugs: ['ephemeris', 'driftwood'], lat: 8, lon: 82, monuments: [], view: [0.26, 0.42, -0.3], ink: [0.6, 0.9, 1], draw: receiver, steer: rxSteer, about: rxAbout },
-  { id: 'lighthouse', slugs: ['r-01'], lat: -13.732, lon: 53.734, monuments: [{ id: 'r01-chassis', size: 0.13, turn: 1.41 }, { id: 'r01-polygon', size: 0.052, at: [-0.0592, 0.0096], lift: 0.084, turn: 1.41 }, { id: 'laserbrain', size: 0.0715, at: [-0.0026, -0.0158], lift: 0.039, turn: 1.41 }, { id: 'laserdriver', size: 0.0358, at: [0.0291, 0.0166], lift: 0.047, turn: 1.41 }], view: [0.42, 0.6, 2.2], ink: [1, 0.35, 0.3] },
+  { id: 'lighthouse', slugs: ['r-01'], lat: -13.732, lon: 53.734, monuments: [], view: [0.75, 0.38, 3.84], ink: [1, 0.35, 0.3], draw: lighthouse, steer: projector, about: r01 },
   { id: 'bench', slugs: ['peep', 'infiniterecon'], lat: 2, lon: -16, monuments: [], view: [0.25, 0.36, -0.15], ink: [0.45, 1, 0.62], draw: bench, rise: DESK, steer: plug, about: peep },
   { id: 'glasses', slugs: ['strobeglasses'], lat: -20, lon: 18, monuments: [], view: [0.36, 0.1, 0.05], ink: [0.95, 0.95, 0.55], draw: glasses, rise: BROW, steer: look, about: strobe },
   { id: 'hearts', slugs: ['rava-heart'], lat: 46, lon: 28, monuments: [], view: [0.22, 0.55, -1.05], ink: [1, 0.4, 0.55], draw: hearts },

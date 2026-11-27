@@ -18,12 +18,17 @@ const PV = IREC + 'Pigeon_Vision/PigeonVision/hardware/'
 const ink = (silk, mask) => ({ 'Top Silk Screen': silk, 'Bottom Silk Screen': silk, 'Top Solder Mask': mask, 'Bottom Solder Mask': mask })
 const BLACK = ink('White', 'Black'), WHITE = ink('#101010FF', '#F6F6F1F4') // the heart's, as bake-boards paints it
 // Mesh materials, [r, g, b, metallic, roughness], linear.
-const ACRYLIC = [0.8, 0.8, 0.78, 0, 0.25], SMOKED = [0.02, 0.02, 0.022, 0, 0.25], PLA = [0.75, 0.74, 0.7, 0, 0.6]
 const PETG = [0.035, 0.037, 0.04, 0, 0.6], PETG2 = [0.05, 0.052, 0.056, 0, 0.55]
 // A model is a `pcb`, with `skip` the parts' 3D models left out; a `step`, with `keep` the nodes kept and their
-// materials, or `drop` the nodes left out, by a pattern of their names; or `parts`, [file, material, place], place
-// { yup: an Onshape STL exported y up, scale }.
-const YUP = { scale: 0.001, yup: true }
+// materials (bake-models.py), or `drop` the nodes left out, by a pattern of their names, and a `box` to cut by; or
+// `parts`, [file, material, place], place { yup: an Onshape STL exported y up, scale }.
+const has = (v, ...nodes) => Object.fromEntries(nodes.map((n) => [n, v]))
+// R-01, River's Onshape assembly of it, in the pieces that move: the box it stands on (base, fan, posts, switch and the
+// MangoPi), the acrylic air duct, the deck with its optics (lasers and dichroics, the polygon's motor and facet sensor,
+// the galvo, their supply and fans), the lid, and the two mirrors that turn. River's own two boards are KiCad's, above.
+const R01 = DL + 'R-01-Laser.step', LID = [21, 22, 23, 24, 25, 26].map((n) => `ChassisAssembly <1>/Part ${n}`)
+const PADDLE = [[38, 6.5, -137.4], [47.6, 16, -135.8]] // the galvo's mirror, where the assembly has it (mm)
+const MIRROR = [0.92, 0.92, 0.93, 1, 0.06] // first-surface aluminium
 const MODELS = [
   { id: 'peep', project: 'PEEP', note: 'IR-triggered keystroke injector, 12.06 × 8 mm, STM32F042', pcb: GH + 'PEEP/PCB/peep/peep.kicad_pcb', stackup: BLACK },
   { id: 'heart', project: 'Rava Heart', note: 'heart of 144 LEDs that beats in sync with its twin over ESP-NOW', pcb: GH + 'rava-heart/hardware/HeartArray.kicad_pcb', stackup: WHITE },
@@ -37,11 +42,16 @@ const MODELS = [
   { id: 'picohat', project: 'SAMWISE', note: 'ground station debug hat for a Pico, S-band and UHF LoRa', pcb: GH + 'samwise-groundstation/SoftwareDebugPicoHat/SoftwareDebugPicoHat.kicad_pcb' },
   // the STLs lie as printed; the assembly STEP has the cover on the frame
   { id: 'strobe-frame', project: 'strobeGlasses', note: 'MK1 frame and brow cover, as assembled', step: GH + 'strobeGlasses/mechanical/strobe-glasses-mk1.step', keep: { Frame: PETG, 'Brow cover': PETG2 } },
-  { id: 'r01-chassis', project: 'R-01', note: 'base box and deck, colours after the CAD render', parts: [
-    [DL + 'MainBody - BasePlate/MainBody - BasePlate.obj', ACRYLIC], [DL + 'MainBody - Part 8.stl', SMOKED, YUP], [DL + 'MainBody - Part 9.stl', SMOKED, YUP],
-    [DL + 'Top Panel.stl', ACRYLIC, YUP], [DL + 'MainBody - Part 12.stl', PLA, YUP], [DL + 'MainBody - Part 16.stl', ACRYLIC, YUP]] },
-  { id: 'r01-polygon', project: 'R-01', note: 'polygon mirror mount and spinner', parts: [[DL + 'LaserPolygon123/LaserPolygon.obj']] },
-  { id: 'r01-laser-plate', project: 'R-01', note: 'laser mounting plate', parts: [[DL + 'LaserAssemblyFRFR.stl', PLA, YUP]] },
+  { id: 'r01-base', project: 'R-01', note: 'base, intake fan, posts, switch and the MangoPi', step: R01, keep: {
+    ...has(null, 'R-01-Laser/Part 1', 'rubberFeet <1>', 'rubberFeet <2>', 'rubberFeet <3>', 'rubberFeet <4>', '140MMFan <1>', 'OPENSWITCH <1>', 'MangoPiStandIn <1>', 'ChassisAssembly <1>'),
+    ...has(false, ...LID, 'ChassisAssembly <1>/Part 16', 'ChassisAssembly <1>/CoolingTube') } },
+  { id: 'r01-duct', project: 'R-01', note: 'the acrylic air duct round the boards', step: R01, keep: has(null, 'ChassisAssembly <1>/CoolingTube') },
+  { id: 'r01-deck', project: 'R-01', note: 'the optics deck: lasers, dichroics, polygon motor, galvo, their supply and fans', step: R01, box: [...PADDLE, false], keep: {
+    ...has(null, 'ChassisAssembly <1>/Part 16', 'LaserA^2 <1>', 'Polygon <1>', 'GalvoScannerX <1>', 'GalvoPSU <1>', '40mmFan <1>', '40mmFan <2>'), 'Polygon <1>/Part 3': false,
+    'GalvoDriver <1>': [0.03, 0.09, 0.035, 0, 0.5] } }, // (the bought galvo driver, a stand-in board in the CAD)
+  { id: 'r01-lid', project: 'R-01', note: 'the tinted lid', step: R01, keep: has(null, ...LID, '60mmFan <1>') },
+  { id: 'r01-galvo-mirror', project: 'R-01', note: 'the galvo’s mirror', step: R01, box: [...PADDLE, true], keep: has(MIRROR, 'GalvoScannerX <1>/Part 1') },
+  { id: 'r01-polygon-mirror', project: 'R-01', note: 'the polygon: four facets, 14.2 mm', step: R01, keep: has(MIRROR, 'Polygon <1>/Part 3') },
   { id: 'pigeon-tube', project: 'Pigeon Vision', note: 'camera section: 6 in tube and two camera cradles, as assembled', step: IREC + '3dModels/pigeon-camera-section/output/pigeon_camera_section.step' },
   // Faulhaber lets its motor model go only whole and unaltered, and the bake decimates, so the motor stays out.
   { id: 'finertia', project: 'BLEPS', note: 'Finertia, BLEPS’s reaction wheel controller, 26 × 26 mm (its Faulhaber 2610 motor left out)',
@@ -123,7 +133,7 @@ try {
     }
     const raw = join(tmp, 'raw.glb'), out = new URL(`${m.id}.glb`, MEDIA).pathname, t0 = Date.now()
     const missing = m.pcb ? pcb(m, tmp, raw) : m.step ? step(m, tmp, raw) : []
-    const parts = m.parts ? m.parts.map(([file, mat, place]) => ({ file, mat, ...place })) : [{ file: raw, keep: m.keep, drop: m.drop?.source }]
+    const parts = m.parts ? m.parts.map(([file, mat, place]) => ({ file, mat, ...place })) : [{ file: raw, keep: m.keep, drop: m.drop?.source, box: m.box }]
     const job = { id: m.id, kind: m.pcb ? 'board' : 'mesh', parts, out, ...BUDGET[m.pcb ? 'board' : 'mesh'] }
     const log = execFileSync(BLENDER, ['-b', '--factory-startup', '--python-exit-code', '1', '--python', PY, '--', JSON.stringify(job)], { maxBuffer: 1 << 28, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] })
     const s = JSON.parse(log.match(/^MODEL (.*)$/m)[1]), bytes = statSync(out).size

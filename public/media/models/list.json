@@ -198,58 +198,112 @@
   "note": "MK1 frame and brow cover, as assembled"
  },
  {
-  "id": "r01-chassis",
-  "file": "r01-chassis.glb",
-  "bytes": 1476408,
-  "tris": 50228,
+  "id": "r01-base",
+  "file": "r01-base.glb",
+  "bytes": 2953892,
+  "tris": 92744,
   "bounds": [
    -0.09102,
-   -0.05859,
-   -0.09102,
+   -0.11109,
+   -0.06818,
    0.09102,
-   0.05859,
-   0.09102
+   0.11109,
+   0.06818
   ],
   "up": "y",
-  "materials": 3,
+  "materials": 12,
   "project": "R-01",
-  "note": "base box and deck, colours after the CAD render"
+  "note": "base, intake fan, posts, switch and the MangoPi"
  },
  {
-  "id": "r01-polygon",
-  "file": "r01-polygon.glb",
-  "bytes": 144588,
-  "tris": 5734,
+  "id": "r01-duct",
+  "file": "r01-duct.glb",
+  "bytes": 19108,
+  "tris": 600,
   "bounds": [
-   -0.02636,
-   -0.009,
-   -0.0368,
-   0.02636,
-   0.009,
-   0.0368
-  ],
-  "up": "y",
-  "materials": 2,
-  "project": "R-01",
-  "note": "polygon mirror mount and spinner"
- },
- {
-  "id": "r01-laser-plate",
-  "file": "r01-laser-plate.glb",
-  "bytes": 77880,
-  "tris": 2584,
-  "bounds": [
-   -0.02,
-   -0.001,
-   -0.05,
-   0.02,
-   0.001,
-   0.05
+   -0.08,
+   -0.08,
+   -0.045,
+   0.08,
+   0.08,
+   0.045
   ],
   "up": "y",
   "materials": 1,
   "project": "R-01",
-  "note": "laser mounting plate"
+  "note": "the acrylic air duct round the boards"
+ },
+ {
+  "id": "r01-deck",
+  "file": "r01-deck.glb",
+  "bytes": 1134848,
+  "tris": 40028,
+  "bounds": [
+   -0.09,
+   -0.09,
+   -0.0511,
+   0.09,
+   0.09,
+   0.0511
+  ],
+  "up": "y",
+  "materials": 12,
+  "project": "R-01",
+  "note": "the optics deck: lasers, dichroics, polygon motor, galvo, their supply and fans"
+ },
+ {
+  "id": "r01-lid",
+  "file": "r01-lid.glb",
+  "bytes": 296320,
+  "tris": 10722,
+  "bounds": [
+   -0.08841,
+   -0.09,
+   -0.0275,
+   0.08841,
+   0.09,
+   0.0275
+  ],
+  "up": "y",
+  "materials": 3,
+  "project": "R-01",
+  "note": "the tinted lid"
+ },
+ {
+  "id": "r01-galvo-mirror",
+  "file": "r01-galvo-mirror.glb",
+  "bytes": 1956,
+  "tris": 20,
+  "bounds": [
+   -0.00606,
+   -0.00606,
+   -0.0005,
+   0.00606,
+   0.00606,
+   0.0005
+  ],
+  "up": "y",
+  "materials": 1,
+  "project": "R-01",
+  "note": "the galvo’s mirror"
+ },
+ {
+  "id": "r01-polygon-mirror",
+  "file": "r01-polygon-mirror.glb",
+  "bytes": 4672,
+  "tris": 112,
+  "bounds": [
+   -0.01004,
+   -0.01004,
+   -0.001,
+   0.01004,
+   0.01004,
+   0.001
+  ],
+  "up": "y",
+  "materials": 1,
+  "project": "R-01",
+  "note": "the polygon: four facets, 14.2 mm"
  },
  {
   "id": "pigeon-tube",

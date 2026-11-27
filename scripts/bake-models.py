@@ -39,16 +39,21 @@ def load():
         elif f.endswith('.stl'): bpy.ops.wm.stl_import(filepath=f)
         else: bpy.ops.wm.obj_import(filepath=f, forward_axis='Y', up_axis='Z')  # Onshape's OBJ is z up, as Blender is
         place = Matrix.Scale(part.get('scale', 1), 4) @ (Matrix.Rotation(math.pi / 2, 4, 'X') if part.get('yup') else Matrix())
-        keep = part.get('keep')  # {node name: material}, the only nodes kept; else mat paints the whole file
+        # keep: {node: material}, the only nodes kept, each named alone or under its parent ('parent/node'), the nearest
+        # the mesh deciding; a material of null keeps the file's own, and false leaves that node out. Else mat paints
+        # the whole file. box: [lo, hi, inside], of what is kept only the faces whose middles are inside (or outside) it.
+        keep, box = part.get('keep'), part.get('box')
         drop = re.compile(part['drop']) if part.get('drop') else None  # nodes left out, by a pattern of their names
         for o in [o for o in bpy.data.objects if o not in before and o.type == 'MESH']:
             names = [re.sub(r'\.\d+$', '', a.name) for a in chain(o)]
-            hit = next((n for n in names if n in keep), None) if keep is not None else f.split('/')[-1]
-            if hit is None or drop and any(drop.search(n) for n in names): continue
+            near = [k for i, n in enumerate(names) for k in ((names[i + 1] + '/' + n) if i + 1 < len(names) else n, n)]
+            hit = next((n for n in near if n in keep), None) if keep is not None else f.split('/')[-1]
+            if hit is None or (keep is not None and keep[hit] is False) or drop and any(drop.search(n) for n in names): continue
             mw = place @ o.matrix_world
             o.parent, o.matrix_world = None, Matrix()
             o.data = o.data.copy()
             o.data.transform(mw)
+            if box: crop(o, *box)
             ref = next((n for n in names if re.match(r'^[A-Z]+\d+$', n)), '')
             o['layer'] = LAYER.match(o.data.name)[1] if LAYER.match(o.data.name) else ''
             o['class'] = 'board' if o['layer'] else 'passive' if PASSIVE.match(ref) else 'part'
@@ -60,6 +65,15 @@ def load():
     for o in list(bpy.data.objects):
         if o not in objs: bpy.data.objects.remove(o)
     return objs
+
+
+def crop(o, lo, hi, inside):  # the box in mm, in the file's own frame (y up)
+    bm = bmesh.new()
+    bm.from_mesh(o.data)
+    within = lambda c: all(lo[i] <= v <= hi[i] for i, v in enumerate((c.x * 1e3, c.z * 1e3, -c.y * 1e3)))
+    bmesh.ops.delete(bm, geom=[f for f in bm.faces if within(f.calc_center_median()) != inside], context='FACES')
+    bm.to_mesh(o.data)
+    bm.free()
 
 
 def chain(o):
@@ -164,7 +178,7 @@ def palette(objs, cap=12):
         reps.remove(m)
         to = {k: r if v is m else v for k, v in to.items()}
     for o in objs:
-        for i, m in enumerate(o.data.materials): o.data.materials[i] = to[m]
+        for i, m in enumerate(o.data.materials): o.data.materials[i] = to.get(m, m)  # (a crop may leave one unused)
 
 
 def smooth(o, angle=math.radians(30)):
