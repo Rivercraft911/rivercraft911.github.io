@@ -5,7 +5,7 @@
 
 export const SING = -1.2 // on the valley's clock: T = 0, where the choirs begin to sing
 // how long each scene runs
-export const VALLEY = 16.8, WRAP = 2.5, ASCII = 3.5, DIVE = 10, ARRIVE = 24.8
+export const VALLEY = 14.2, WRAP = 2.5, ASCII = 3.5, DIVE = 10, ARRIVE = 24.8
 export const NOTHING = 0.35 // the dive's last: past the horizon, nothing
 
 // Where each begins on the choir's clock: the wrap (after LEAD seconds of falling; the ASCII follows it), the dive (RD)

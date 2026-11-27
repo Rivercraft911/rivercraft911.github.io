@@ -26,9 +26,13 @@ const DB = 56.0 * 0.33219281; // the rows' range, 56 dB, in doublings of power
 const ROWS = 4096.0;
 const LIG = 420.0; // ligaments round the rim (drops.wgsl)
 const AIR = vec3f(0.0008, 0.0016, 0.0032); // what light there is in the shaft besides the moon's: the sky through its mouth
-// The plot's tilt, as an audio analyser's display has one: 22 dB across the band (3.4 dB an octave), level at 400 Hz,
-// so the soundtrack's falling slope (the roar and the bass under it) does not drown the partials over it.
+// The foam's tilt, as an audio analyser's display has one: 22 dB across the band (3.4 dB an octave), level at 400 Hz,
+// so the soundtrack's falling slope (the roar and the bass under it) does not smother the partials' lace in foam.
 const TILT = 0.4;
+// The plot's display: the reference level (the loudest rows of the last second or two) reads TOP, and SPAN dB under
+// it reads black, as an SDR's waterfall sets its range.
+const TOP = 0.95;
+const SPAN = 36.0;
 
 // A row's level is dB over the floor, in 16 bits as two bytes (filtering is linear, so it filters them
 // apart and they add back exactly); power and back again, with the floor as zero.
@@ -37,7 +41,20 @@ fn power(s: f32) -> f32 { return exp2(DB * clamp(s - u.p[6].y, 0.0, 1.0)) - 1.0;
 fn level(p: f32) -> f32 { return log2(1.0 + p) / DB; }
 fn hot(lv: f32) -> f32 { return pow(min(lv / 0.8, 1.25), 4.0); } // a display's contrast: 10 dB under the loudest is a third of it
 
-// Frequency as colour, the way a prism lays the band out: 80 Hz red, through gold and green, to 8 kHz violet.
+// An SDR's waterfall palette (the kind GQRX and SDR# show): the noise floor dark blue, rising through blue and cyan
+// and green to yellow, red for the strong, white for the strongest. Display colours, squared into linear light.
+fn sdr(x: f32) -> vec3f {
+  var c = array(vec3f(0.0, 0.0, 0.05), vec3f(0.0, 0.04, 0.32), vec3f(0.0, 0.28, 0.85), vec3f(0.0, 0.78, 0.95),
+                vec3f(0.45, 1.0, 0.45), vec3f(1.0, 0.92, 0.1), vec3f(1.0, 0.3, 0.0), vec3f(1.0, 0.95, 0.9));
+  let y = clamp(x, 0.0, 1.0) * 7.0;
+  let i = min(u32(y), 6u);
+  let k = mix(c[i], c[i + 1u], y - f32(i));
+  return k * k;
+}
+// Where on the display a level falls (the rows' units, over the reference's offset).
+fn shown(lv: f32) -> f32 { return TOP + (lv - 0.8) * 56.0 / SPAN; }
+
+// Frequency as colour, the way a prism lays the band out (the moonbow's): 80 Hz red, through gold and green, to 8 kHz violet.
 fn hue(b: f32) -> vec3f {
   var c = array(vec3f(1.0, 0.08, 0.04), vec3f(1.0, 0.35, 0.05), vec3f(1.0, 0.75, 0.15), vec3f(0.3, 1.0, 0.35),
                 vec3f(0.1, 0.75, 1.0), vec3f(0.2, 0.3, 1.0), vec3f(0.55, 0.2, 1.0));
@@ -206,8 +223,9 @@ fn curtain(C: vec3f, rd: vec3f, fp: f32) -> vec4f {
   // over the lip the sheet is glass, and its flow lines catch the moon: the ink's streamlines, in the water's own light
   let lines = pow(1.0 - abs(2.0 * noise(vec2f(l * 3.0, tb * 0.7), vec2f(LIG * 3.0, 65536.0)) - 1.0), 5.0);
   let lip = mix(lines, 0.03, smoothstep(0.1, 0.4, fp * 3.0)) * (1.0 - smoothstep(0.05, 0.45, f)) * 1.2;
-  // at its foot the white water takes its band's colour: the plot it is about to become
-  let dyed = mix(vec3f(1.0), hue(lane(th)) * 1.4, u.p[10].y * smoothstep(0.5, 1.0, f) * (0.35 + 0.4 * min(heavy, 1.0)));
+  // at its foot the white water takes its band's colour on the display: the plot it is about to become
+  let tone = sdr(shown(band(lane(th), u.p[5].w * f)));
+  let dyed = mix(vec3f(1.0), tone / (max(max(tone.r, tone.g), tone.b) + 0.05), u.p[10].y * smoothstep(0.5, 1.0, f) * 0.7);
   let col = moonlight() * sun * (white * 0.3 * (0.4 + 0.6 * abs(dot(n, L))) * dyed + glint * (0.3 + 0.7 * streak) + lip) + white * AIR * 2.0 * dyed;
   return vec4f(col * cov, cov * (0.08 + 0.9 * min(white, 1.0)));
 }
@@ -351,16 +369,22 @@ fn field(q: vec2f) -> vec3f {
   let fx = min(max(abs(fa.x), abs(fa.y)) / u.p[4].z * u.p[7].w * size.x, 64.0);
   let fy = min(max(abs(fr.x), abs(fr.y)), 256.0);
 
-  // The rows' power over that footprint, a tap every three bins or so (each filtered over two), evenly spread. Fewer,
+  // The rows' power over that footprint, a tap every two bins and rows (each filtered over two), evenly spread. Fewer,
   // or dithered, and where a pixel spans dozens of bins (down the funnel) or a partial's edge falls in it, one pixel
   // catches it and the next misses it: the spiral's arms would glitter as it turns.
-  let ny = i32(clamp(ceil(fy / 3.0), 1.0, 6.0));
-  let nx = i32(clamp(ceil(fx / 3.0), 1.0, 8.0));
+  // Where a bin or a row is wider than a pixel it is drawn as a display draws it, a crisp cell, its edge
+  // antialiased over the pixel: the sample is held at the cell's middle but for the last pixel's width of it.
+  let ny = i32(clamp(ceil(fy / 2.0), 1.0, 6.0));
+  let nx = i32(clamp(ceil(fx / 2.0), 1.0, 8.0));
+  let X = (u.p[7].z + b * u.p[7].w) * size.x;
+  let Y = row + 0.5;
+  let Xc = floor(X) + 0.5 + clamp((fract(X) - 0.5) / max(fx, 1e-3), -0.5, 0.5);
+  let Yc = floor(Y) + 0.5 + clamp((fract(Y) - 0.5) / max(fy, 1e-3), -0.5, 0.5);
   var pw = 0.0;
   for (var j = 0; j < ny; j++) {
-    let v = (row + 0.5 + ((f32(j) + 0.5) / f32(ny) - 0.5) * fy) / size.y;
+    let v = (Yc + ((f32(j) + 0.5) / f32(ny) - 0.5) * fy) / size.y;
     for (var i = 0; i < nx; i++) {
-      pw += power(at(vec2f(u.p[7].z + b * u.p[7].w + ((f32(i) + 0.5) / f32(nx) - 0.5) * fx / size.x, v)));
+      pw += power(at(vec2f((Xc + ((f32(i) + 0.5) / f32(nx) - 0.5) * fx) / size.x, v)));
     }
   }
   pw /= f32(nx * ny);
@@ -385,7 +409,7 @@ fn field(q: vec2f) -> vec3f {
   let wf = fwidth(warp);
   let f1 = 1.0 - smoothstep(0.1, 0.35, max(cpx.x * 512.0 + 30.0 * wf, cpx.y / 90.0));
   let f2 = 1.0 - smoothstep(0.15, 0.5, max(cpx.x * 1400.0 + 70.0 * wf, cpx.y / 36.0));
-  let dens = clamp(1.6 * hot(lv) + 0.9 * clump - 0.35, 0.0, 1.0) * exp(-(0.2 + 0.8 * u.p[10].x) * age) * (0.4 + 0.6 * wet); // thinning, once it blossoms, so the plot shows through its lace
+  let dens = clamp(1.6 * hot(lv) + 0.9 * clump - 0.35, 0.0, 1.0) * exp(-(0.2 + 1.6 * u.p[10].x) * age) * (0.4 + 0.6 * wet); // thinning, once it blossoms, so the plot shows through its lace
   let threads = dens * mix(0.3, 0.06 + 1.1 * pow(fil, 6.0), f1) * mix(0.8, 0.4 + 0.9 * fil2 * fil2, f2);
   let boil = noise(vec2f(w * 160.0 + 8.0 * warp, ring / 12.0 - T * 3.0), vec2f(160.0, ROWS / 12.0));
   var froths = 0.6; // bubbles, where the falls land and they are big enough to see
@@ -435,17 +459,26 @@ fn field(q: vec2f) -> vec3f {
   let dz = (rho - R) / 0.22;
   let fizz = exp(-dz * dz) * (0.5 + boil) + 0.3 * plunge; // the bubbles under the water
   let body = vec3f(0.0, 0.0012, 0.0018) * (0.3 + sun) + vec3f(0.18, 0.5, 0.46) * 0.03 * fizz * (0.2 + 0.8 * sun);
-  // The plot, in the water: the spectrum each parcel fell with is a dye in it, frequency its hue and power its light,
-  // the loudest burning through to white, held most in its foam, which takes the colour it carries. Where the falls
-  // land it is white water; the colour blossoms as it winds in, and the funnel drawing the water together makes it glow
-  // brighter down it, until deep in the eye, where a pixel spans more rows and bins than its taps can tell apart, it
-  // gives way to the throat's own dark rather than glittering.
-  let bloom = u.p[10].x * smoothstep(0.02, 0.45, age) * (1.0 - smoothstep(1.0, 2.5, max(fx / 24.0, fy / 18.0)));
-  let l3 = hot(lv);
-  let dye = (hue(b) * (0.004 + 0.5 * l3) + vec3f(1.0, 0.96, 0.9) * 0.6 * pow(max(lv - 0.8, 0.0) / 0.2, 2.0)) * (1.0 + 1.5 * depth / max(H, 1e-3)) * bloom;
-  let tint = mix(vec3f(1.0), hue(b) * 1.4, bloom * (0.6 + 0.4 * min(l3, 1.0)));
+  // The plot, in the water: an SDR's waterfall display. Each ring is a row, the spectrum of a moment of the
+  // soundtrack, the newest landing at the rim and the older winding in; each angle is a bin, frequency; each cell
+  // glows in the display's palette, the noise floor dark blue, the partials bright traces spiralling in. Faint
+  // gridlines mark 100, 200 and 500 Hz, 1, 2 and 5 kHz. Where the falls land it is white water; the display
+  // blossoms as it winds in, glowing brighter as the funnel draws the water together, until deep in the eye, where a
+  // pixel spans more rows and bins than its taps can tell apart, it gives way to the throat's own dark rather than
+  // glittering. The foam takes the colour it carries.
+  let bloom = u.p[10].x * smoothstep(0.02, 0.45, age) * (1.0 - smoothstep(1.0, 2.5, max(fx / 16.0, fy / 12.0)));
+  var grid = 0.0;
+  var lines = array(100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0);
+  for (var g = 0; g < 6; g++) {
+    let f = lines[g];
+    let px = abs(b - log2(f / 80.0) / 6.6438562) * u.p[7].w * size.x / max(fx, 1e-3); // pixels from it
+    grid += 1.0 - smoothstep(0.35, 1.1, px);
+  }
+  let tone = sdr(shown(lv0));
+  let dye = (tone + vec3f(0.5, 0.6, 0.7) * 0.03 * grid * (1.0 - smoothstep(6.0, 16.0, fx))) * 0.7 * (1.0 + 0.8 * depth / max(H, 1e-3)) * bloom;
+  let tint = mix(vec3f(1.0), tone / (max(max(tone.r, tone.g), tone.b) + 0.05), 0.7 * bloom);
   let froth = (moonlight() * sun * (0.14 + 0.26 * max(dot(n, L), 0.0)) + AIR * 3.0) * (1.0 + 0.3 * plunge) * tint;
-  var c = mix(((body + dye) * (1.0 - fres) + mirrored(P, reflect(rd, n)) * fres + spec * (1.0 - foam)), froth + dye, foam);
+  var c = mix(((body + dye) * (1.0 - fres) + mirrored(P, reflect(rd, n)) * fres + spec * (1.0 - foam) * (1.0 - 0.6 * bloom)), froth + dye, foam); // the display under the glitter, which it outshines
   var text_ = 1.0; // what is read out as text: the water's light, not the curtain's
 
   // Behind: the rock, or the sky through the mouth.

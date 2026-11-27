@@ -19,6 +19,7 @@ import { TAU, clamp, mix, smooth, type Frame, type Scene } from './scene'
 const PER = 360 // rows printed per octave of the choir's descent
 const MAX = 256 // most rows printed in a frame
 const FRESH = 48 // history a fresh sheet back-fills at once: more costs a visible hitch
+const LINES = 48 // the display's rows a second: each a spectrum of its own moment, so the rows show as rows
 
 // The shaft, in units of 11 m (M), the drain at the origin, x across, y downstream, z up, the pool's still
 // water at z = 0. The river leaves the rim (radius RIM, HF up) inward at V and falls under GF, a slowed
@@ -42,7 +43,8 @@ function when(D: number, T: number) {
   return T
 }
 
-// The printer: a row for every 1/PER octave the choir falls, each read at the moment the choir was there.
+// The printer: a row for every 1/PER octave the choir falls, each read at the moment the choir was there, to the
+// display's 1/LINES of a second, so a run of them is one line of the display.
 // A fresh sheet starts with as much history as the speakers still remember. Like a receiver's display it
 // sets its own reference level: the loudest rows of the last second or two read just under white.
 const water = new Waterfall()
@@ -63,7 +65,7 @@ function print(T: number, now: number, f: Field) {
   const n = top - pr.k
   let hi = 0
   for (let i = 0; i < n; i++) {
-    hi = Math.max(hi, water.row(now - (T - when((pr.k + 1 + i) / PER, T)), rows, 2 * i * BINS))
+    hi = Math.max(hi, water.row(Math.floor((now - (T - when((pr.k + 1 + i) / PER, T))) * LINES) / LINES, rows, 2 * i * BINS))
     for (let l = 0, w = water.last; l < LANES; l++) {
       const a = Math.round((U0 + ((l - 0.5) * DU) / (LANES - 1)) * BINS), b = Math.round((U0 + ((l + 0.5) * DU) / (LANES - 1)) * BINS)
       let v = 0
@@ -97,9 +99,9 @@ export const pool: Pool = { wet: 0, beta: 0, gamma: 0, H: 0, K: 0, k: RC * RC, R
 // The free surface, and how fast the water at r is turning, rad/s (clockwise seen from above).
 export const surface = (r: number, p = pool) => (-p.H * p.k) / (r * r + p.k)
 export const swirl = (r: number, p = pool) => p.gamma / (TAU * (r * r + p.k))
-// The plot's palette: frequency as colour, 80 Hz to 8 kHz in seven even stops, linear light (wrap.wgsl and
-// drops.wgsl hue()), its levels shown tilted 22 dB across the band (wrap.wgsl TILT).
-export const HUE = [[1, 0.08, 0.04], [1, 0.35, 0.05], [1, 0.75, 0.15], [0.3, 1, 0.35], [0.1, 0.75, 1], [0.2, 0.3, 1], [0.55, 0.2, 1]]
+// The plot's palette, an SDR waterfall's: level as colour, from the noise floor to the strongest in eight even stops,
+// display colours to be squared into linear light (wrap.wgsl sdr(); the reference level reads 0.93, 50 dB under it 0).
+export const SDR = [[0, 0, 0.05], [0, 0.04, 0.32], [0, 0.28, 0.85], [0, 0.78, 0.95], [0.45, 1, 0.45], [1, 0.92, 0.1], [1, 0.3, 0], [1, 0.95, 0.9]]
 // The moon, high over the mouth behind us as we come to the lip: the way toward it, and its light.
 const MOON = [0.25, -0.33, 0.91].map((v, _, a) => v / Math.hypot(...a))
 const MOONLIGHT = 1.1
@@ -121,6 +123,9 @@ const S5 = (a: number, b: number, x: number) => {
 // As the whirlpool ends it is on the axis at ZE, over the funnel's floor, sinking at SINK units/s; it turns with the
 // water a third as fast, but never faster than TURN rad/s besides its own slow circling.
 const ZE = -0.42, SINK = 0.3, TURN = 1.15
+// When the plot is happening: the pool blossomed into it, and the camera come down over it, two and a half seconds
+// after the lip (VALLEY places the lip).
+export const PLOT = -4, ZP = 0.95
 let T0 = 0, ctl = new Float64Array(0), n = 0
 // The run's three last moments (eye, target, lens at T − 2ε, T − ε, T), as channels.
 function channels(k: ArrayLike<number>, o: number[]) {
@@ -143,29 +148,39 @@ export function join(T: number, run: ArrayLike<number>[], eps: number) {
     ctl[CH + i] = c1
     ctl[2 * CH + i] = c1 + (acc[i] * STEP * STEP) / 2 + v[i] * STEP
   }
-  // the design, integrated finely: q the e-folds the circle has been drawn in, φ how far round
+  // the design, integrated finely: q the e-folds the circle has been drawn in, φ how far round. What the run carries
+  // over the lip (how far out, how high, how far it looks down, how fast and how hard each is changing) settles onto
+  // the design as a critically damped step, (A + Bs + Cs²)e^(−s/τ), so the dive starts just as the run left off.
   const st = poolAt(T0, { ...pool }), d = new Array(CH).fill(0), dt = STEP / 20, R0 = 1.12, alpha0 = p[1] - Math.PI - p[3]
+  const settle = (i: number, to: number, slope: number, tau: number, s: number) => {
+    const A = p[i] - to, B = v[i] - slope + A / tau, C = (acc[i] + (2 * B) / tau - A / (tau * tau)) / 2
+    return (A + (B + C * s) * s) * Math.exp(-s / tau)
+  }
+  // the line it sinks by: out over the pool at ZP as the plot blossoms, onto the axis's line by T = 1.5, and down it
+  const line = (t: number) => ZE - SINK * (t - DUR) - 0.45 * Math.max(0, t - DROP) ** 2 + (ZP - ZE + SINK * (PLOT - DUR)) * (1 - S5(PLOT, 1.5, t))
+  const r0 = R0 * (1 - S5(-0.6, 1.5, T0))
   let q = 0, ph = p[1]
   for (let k = 3, i = 0; k < n; i++) {
     const t = T0 + i * dt, s = t - T0
     poolAt(t, st)
-    const r = R0 * Math.exp(-q) * (1 - S5(-0.6, 1.5, t)) + (p[0] - R0) * Math.exp(-1.3 * s)
+    const r = R0 * Math.exp(-q) * (1 - S5(-0.6, 1.5, t)) + settle(0, r0, -0.03 * r0, 0.55, s)
     if (t > T0 + (k - 1) * STEP - 1e-9) {
-      const skim = surface(r, st) + 0.07 + 0.3 * r, fall = mix(p[2], skim, S5(T0 + 0.3, -4.6, t))
-      const axis = ZE - SINK * (t - DUR) - 0.45 * Math.max(0, t - DROP) ** 2
+      // over the lip it dives with the water, carrying the run's speed down the shaft, out over the pool as the plot
+      // blossoms; then sinks on, onto the line it sinks down the axis by, and down the drain once it opens
       const alpha = alpha0 + (0.3 - alpha0) * S5(T0, T0 + 1.5, t) + 0.4 * S5(-5, -1, t) // how far ahead of the axis it looks
-      d[0] = r, d[1] = ph, d[2] = mix(Math.max(fall, axis), axis, S5(2, 3, t)) // on the axis it sinks on, down the drain once it opens
+      d[0] = r, d[1] = ph, d[2] = line(t) + settle(2, line(T0), -SINK, 0.42, s)
       d[3] = ph - Math.PI - alpha
-      d[4] = p[4] + (-0.66 - p[4]) * S5(T0, T0 + 1.1, t) - 0.12 * S5(-8, -4.5, t) - 0.3 * S5(-4.5, -1, t) - (Math.PI / 2 - 1.08) * S5(-1.5, 1.4, t)
+      d[4] = -0.9 + settle(4, -0.9, 0, 0.35, s) - 0.25 * S5(-4.5, -1, t) - (Math.PI / 2 - 1.15) * S5(-1.5, 1.4, t) // down into the shaft as we dive, then on down to the axis
       d[5] = 0
-      d[6] = p[6] + (1.2 - p[6]) * S5(T0, T0 + 0.9, t) - 0.05 * S5(-7, -4, t) + 0.3 * S5(-3, 1.5, t)
+      d[6] = p[6] + (1.2 - p[6]) * S5(T0, T0 + 0.9, t) - 0.05 * S5(T0 + 0.5, PLOT, t) + 0.3 * S5(-3, 1.5, t)
       // leaving the run: from its own course, carried on, into the design
-      const w = S5(T0, T0 + 1.2, t)
+      const w = S5(T0, T0 + 0.6, t)
       for (let j = 0; j < CH; j++) ctl[k * CH + j] = mix(p[j] + v[j] * s + 0.5 * acc[j] * s * s, d[j], w)
       k++
     }
     q += (0.03 + 0.5 * S5(-5.5, -0.5, t)) * dt
-    ph += (0.16 + 0.2 * (1 - S5(-6, -3, t)) + TURN * Math.tanh((0.35 * swirl(r, st)) / TURN)) * dt // round the shaft as we come down it, then with the water
+    // round the shaft as we come down it (from the run's straight line, gathering), then with the water
+    ph += ((0.16 + 0.2 * (1 - S5(-6, -3, t))) * S5(T0, T0 + 1.2, t) + TURN * Math.tanh((0.35 * swirl(r, st)) / TURN)) * dt
   }
   // how it ends
   const e = 1e-3, a0 = [...ride(DUR - e).eye], y0 = ch[3], b1 = [...ride(DUR + e).eye], y1 = ch[3], end = ride(DUR)
@@ -192,8 +207,8 @@ export function ride(T: number) {
   return pose
 }
 
-// How far the pool has blossomed into the plot: as we come down inside the curtain toward it.
-const bloom = (T: number) => smooth(-7.6, -4, T)
+// How far the pool has blossomed into the plot: as we dive down the shaft toward it.
+const bloom = (T: number) => smooth(PLOT - 1.8, PLOT, T)
 
 // A raster is a fresh picture each frame: under the beam's slow phosphor a moving one would leave a
 // ghost of itself every frame behind, strobing echoes, not a blur. Its light fades within the frame.

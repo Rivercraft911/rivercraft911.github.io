@@ -756,7 +756,7 @@ export const valley: Scene = {
       const hush = 1 - 0.35 * smooth(OVER - 0.2, OVER + 0.2, tt) * (1 - smooth(OVER + 0.4, OVER + 1, tt))
       if (tt > 3) { // on through the crossfade: the whirlpool takes the choir over smoothly (sing caches a repeated t)
         lp += (hash(tt * 48_000) - lp) * 0.04
-        const roar = 0.5 * lp * smooth(5.1, 6.9, tt) * hush * (1 - 0.6 * smooth(9.3, 13.3, tt)) * (1 - smooth(13.5, DUR, tt)), a = ahead(tt - SING)
+        const roar = 0.5 * lp * smooth(5.1, 6.9, tt) * hush * (1 - 0.6 * smooth(OVER + 1.5, DUR - 3.5, tt)) * (1 - smooth(DUR - 3.3, DUR, tt)), a = ahead(tt - SING)
         ;(o.l += (1 - a) * roar), (o.r += (1 - a) * roar), (o.s[5] += a * roar)
         if (tt > SING) sing(tt - SING, o) // silent until the run for the lip, then rising from the shaft; on past the end, as the speakers run ahead
       }

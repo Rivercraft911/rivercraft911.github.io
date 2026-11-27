@@ -70,8 +70,20 @@ fn at(b: f32, row: f32) -> f32 { return textureSampleLevel(data, smp, vec2f((b *
 // A display's contrast: the loudest just under full, 10 dB under it a third of that, 20 dB a tenth.
 fn hot(lv: f32) -> f32 { return pow(min(lv / 0.8, 1.25), 4.0); }
 
+// The plot's palette, an SDR waterfall's (wrap.wgsl sdr(), shown()): the noise floor dark blue, through blue, cyan
+// and green to yellow, red, white; a level in the rows' units, over the reference's offset, to where it shows.
+fn sdr(x: f32) -> vec3f {
+  var c = array(vec3f(0.0, 0.0, 0.05), vec3f(0.0, 0.04, 0.32), vec3f(0.0, 0.28, 0.85), vec3f(0.0, 0.78, 0.95),
+                vec3f(0.45, 1.0, 0.45), vec3f(1.0, 0.92, 0.1), vec3f(1.0, 0.3, 0.0), vec3f(1.0, 0.95, 0.9));
+  let y = clamp(x, 0.0, 1.0) * 7.0;
+  let i = min(u32(y), 6u);
+  let k = mix(c[i], c[i + 1u], y - f32(i));
+  return k * k;
+}
+fn shown(lv: f32) -> f32 { return 0.95 + (lv - 0.8) * 56.0 / 36.0; }
+
 // Frequency as colour, the way a prism lays the band out (wrap.wgsl has the same): 80 Hz red, through gold and
-// green, to 8 kHz violet. Linear light.
+// green, to 8 kHz violet. Linear light: the moonbow's.
 fn hue(b: f32) -> vec3f {
   var c = array(vec3f(1.0, 0.08, 0.04), vec3f(1.0, 0.35, 0.05), vec3f(1.0, 0.75, 0.15), vec3f(0.3, 1.0, 0.35),
                 vec3f(0.1, 0.75, 1.0), vec3f(0.2, 0.3, 1.0), vec3f(0.55, 0.2, 1.0));
@@ -219,16 +231,17 @@ fn project(P: vec3f, e: vec4f, r: vec3f, up: vec3f, f: vec3f) -> vec3f { // px, 
   let psi = degrees(acos(clamp(dot(normalize(d.p - e), -L), -1.0, 1.0)));
   let bb = (42.4 - psi) / 1.8;
   let bow = hue(bb) * smoothstep(-0.3, 0.1, bb) * smoothstep(1.3, 0.9, bb) * (0.3 + 1.6 * hot(clamp(at(clamp(bb, 0.0, 1.0), (u.p[6].x - u.p[6].z + 0.5) / ROWS) - u.p[6].w, 0.0, 1.0)));
-  // the plot's colour: at the curtain's foot a drop begins to take its band's hue, and in the pool it is a fleck of the
-  // dyed foam, frequency its hue and power its light
+  // the plot's colour: at the curtain's foot a drop begins to take its band's colour on the display, and in the pool
+  // it is a fleck of the foam riding the display in, lit by it
   let plot = u.p[5].z;
-  let dye = hue(d.b) * 1.3;
+  let tone = sdr(shown(lv0));
+  let dye = tone / (max(max(tone.r, tone.g), tone.b) + 0.05);
   var c = (moon * (0.1 * spark * mix(vec3f(1.0), dye, plot * 0.5 * smoothstep(-0.4, 0.0, d.x)) + 0.4 * bow) + air * 3.0) * (0.45 + 0.9 * loud) * d.w;
   var area = u.p[9].x / u.n;
   if (d.x >= 0.0) {
     // in the pool, flecks of foam riding the surface in, drawn together as r²
     let bloom = plot * smoothstep(0.02, 0.45, d.x);
-    c = (moon * (0.008 + 0.2 * loud) * mix(vec3f(1.0), dye, bloom * (0.35 + 0.5 * min(loud, 1.0))) + hue(d.b) * 0.5 * loud * bloom + air) * u.p[10].y; // a quarter of them, so four times the light
+    c = (moon * (0.008 + 0.2 * loud) * mix(vec3f(1.0), dye, 0.7 * bloom) + tone * 0.25 * bloom + air) * u.p[10].y; // a quarter of them, so four times the light
     area *= exp(-1.1 * d.x);
   } else if (d.x < -1.5) {
     // spray, thrown up where it lands
