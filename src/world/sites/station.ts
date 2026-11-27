@@ -72,8 +72,10 @@ function step(u: number, h: number) {
 }
 
 // Where the bus is now: what a camera that rides with it looks at. Its orbit's normal: the camera rides in its frame.
-let u = 0, rate = RATE
-export const where = (o: V) => orbit(A, RAAN, INC, u, o)
+let u = 0, rate = RATE, tu = NaN // its argument of latitude (at planet time tu, once drawn), and how fast that goes
+// (At planet time t: the camera asks before draw() has moved it on, so it is carried forward to when it is asked,
+// or the two would stand a frame apart and it would shake as the frames' lengths do.)
+export const where = (o: V, t = tu) => orbit(A, RAAN, INC, u + rate * ((t - tu) || 0), o)
 export const NORMAL = cross(orbit(1, RAAN, INC, 0, [0, 0, 0]), orbit(1, RAAN, INC, Math.PI / 2, [0, 0, 0]))
 
 // ---- River's boards ------------------------------------------------------------------------------------------
@@ -132,7 +134,7 @@ const at: V = [0, 0, 0], ax: V = [0, 0, 0], ay: V = [0, 0, 0], az: V = [0, 0, 0]
 export function draw(k: number) {
   const dt = ctx.dt, here = ctx.focus === k, rest = here && ctx.since >= 0, u0 = u
   rate *= Math.exp(clamp(Math.log((here ? HERE : RATE) / rate), -1, 1) * (1 - Math.exp(-2.5 * dt)))
-  u += rate * dt
+  u += rate * dt, tu = ctx.t
   if (rest && !settled) (w[0] = KICK[0]), (w[1] = KICK[1]), (w[2] = KICK[2]), (fresh = true), (go = 0), (cam.yaw = 0), (cam.pitch = VIEW[1]), (cam.zoom = 1) // off the deployer, as we arrive
   settled = rest
   const lapse = (dt * rate) / N0, n = Math.max(1, Math.ceil(lapse / 1.5)) // real seconds this frame, in steps of 1.5

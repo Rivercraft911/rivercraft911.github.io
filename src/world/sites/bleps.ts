@@ -27,19 +27,21 @@ export const NORMAL = cross(orbit(1, RAAN, INC, 0, [0, 0, 0]), orbit(1, RAAN, IN
 const BOX = 315.5, MID = 70.4
 
 // ---- the orbit and the pointing ------------------------------------------------------------------------------------
-let u = 1.3, rate = RATE // its argument of latitude, and how fast that goes
+let u = 1.3, rate = RATE, tu = NaN // its argument of latitude (at planet time tu, once drawn), and how fast that goes
 const B: V = orbit(A, RAAN, INC, u, [0, 0, 0]), r: V = [0, 0, 0], look: V = [0, -1, 0], want: V = [0, 0, 0]
 const X: V = [1, 0, 0], Y: V = [0, 1, 0], Z: V = [0, 0, 1], c: V = [0, 0, 0], e: V = [0, 0, 0], N: V = [0, 0, 0]
 let LAND: V[] = [] // River's places on the ground (when first drawn: places.ts imports this)
 export const sight = [0, 0, 0, 0, 0] // where the main camera looks, on the ground (a unit vector), how surely, and its picture's up (rad east of north)
 
 // Where the spacecraft is now: what a camera that rides with it looks at.
-export const where = (o: V) => ((o[0] = B[0]), (o[1] = B[1]), (o[2] = B[2]), o)
+// (At planet time t: the camera asks before draw() has moved it on, so it is carried forward to when it is asked,
+// or the two would stand a frame apart and it would shake as the frames' lengths do.)
+export const where = (o: V, t = tu) => orbit(A, RAAN, INC, u + rate * ((t - tu) || 0), o)
 
 export function draw(k: number) {
   const dt = ctx.dt, here = ctx.focus === k
   rate *= Math.exp(clamp(Math.log((here ? HERE : RATE) / rate), -1, 1) * (1 - Math.exp(-2.5 * dt)))
-  u += rate * dt
+  u += rate * dt, tu = ctx.t
   orbit(A, RAAN, INC, u, B)
   for (let i = 0; i < 3; i++) r[i] = B[i] / A
   // the nearest of River's places in reach, or straight down
