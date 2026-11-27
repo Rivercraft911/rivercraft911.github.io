@@ -50,5 +50,5 @@ export const PLACES: Place[] = [
   { id: 'glasses', slugs: ['strobeglasses'], lat: -20, lon: 18, monuments: [], view: [0.36, 0.1, 0.05], ink: [0.95, 0.95, 0.55], draw: glasses, rise: BROW, steer: look, about: strobe },
   { id: 'hearts', slugs: ['rava-heart'], lat: 46, lon: 28, monuments: [], view: [0.22, 0.55, -1.05], ink: [1, 0.4, 0.55], draw: hearts },
   { id: 'station', slugs: ['samwise'], lat: -30, lon: -70, monuments: [], view: SAT, ink: [0.75, 0.6, 1], draw: station, where: bus, orbit: SSO, steer: detumble, about: SAMWISE },
-  { id: 'core', slugs: ['primesf', 'autoprime'], lat: 89, lon: 0, monuments: [], view: [0.5, 1.2, 0], ink: [1, 0.85, 0.4], draw: core, where: well, steer: descend, about: primes },
+  { id: 'core', slugs: ['primesf', 'autoprime'], lat: 89, lon: 0, monuments: [], view: [0.22, 1.4, 0], ink: [1, 0.85, 0.4], draw: core, where: well, steer: descend, about: primes },
 ]

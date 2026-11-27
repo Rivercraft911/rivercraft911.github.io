@@ -1,14 +1,14 @@
 // The core: Primorial's world, inside River's planet. In the eye of the polar storm a well goes through the crust,
-// and under it the planet is hollow, a dome over a floor, with the primes at work in it, everything at once and all
-// of it computed where it is seen (planet.wgsl's well, core.wgsl): Sacks' spiral as beads of light across the well;
-// Pritchard's wheels turning under it; on the floor Ulam's spiral, Eratosthenes' sieve run over it in waves of
-// colour and what is left proven prime by Miller–Rabin; and round the dome the search itself, 2^p − 1 for the first
-// thousand prime exponents from 149 500 003 on, trial factored as PrimesF does it (q = 2kp + 1, q ≡ ±1 mod 8), every
-// candidate in view tested on the GPU every frame while this file runs the same hunt on its own, a row of k at a
-// time, by different arithmetic, and says which exponents are dead.
-// From the planet the well is lit. Coming to it, the camera goes over its mouth, down through the spiral, and out
-// under the dome (steer; the place's point goes down with it: where). Its parts can be clicked. ?core=<s> holds the
-// way in at s seconds.
+// and under it the planet is hollow: a ball of dark air with the primes standing in it as light (planet.wgsl's well,
+// core.wgsl). Across the well, Sacks' spiral as beads. Across the hall's middle the integers, on Ulam's spiral, each
+// a shaft of light, and Eratosthenes' sieve run over them in waves: a prime's multiples fall through the level and
+// hang under it in its colour, and what is left standing is prime, as tall as the gap to the next. The Mersenne
+// primes among them stand to the roof. Over them Pritchard's wheels turn, a hoop to each primorial. And round the
+// wall the search itself, 2^p − 1 for the first thousand prime exponents from 149 500 003 on, trial factored as
+// PrimesF does it (q = 2kp + 1, q ≡ ±1 mod 8), a row of k at a time, here.
+// From the planet the well is lit. Coming to it, the camera is over its mouth and goes straight down it, through the
+// spiral, and out under the roof in three seconds (steer; the place's point goes down with it: where). Its parts can
+// be clicked. ?core=<s> holds the way in at s seconds.
 import { CORE } from '../../gpu/fields'
 import type { Solids } from '../../gpu/mesh'
 import type { Field } from '../../gpu/raster'
@@ -17,7 +17,7 @@ import { ctx, len, part } from '../ctx'
 import type { About, Steer } from '../places'
 
 const HELD = +(new URLSearchParams(location.search).get('core') ?? -1)
-const WF = 0.485, WW = 0.62 // the floor and the wheels, as planet.wgsl has them
+const WF = 0.485 // the level the integers lie on, as planet.wgsl has it
 const RIBS = 1024, KS = 512
 const TURN = KS / 30 + 5 // seconds a thousand exponents are up: tested at thirty k a second, then held
 
@@ -47,12 +47,33 @@ const SMALL = (() => { // the primes below √(3.4 · 10^8)
   return out
 })()
 // The field's data: the planet's noise, as fields.ts makes it (r, g), and beside it (b, a: 16 bits a texel) each rib's
-// exponent less the base, the k of its first factor, and in the ninth row the base, the front and the dome's light.
+// exponent less the base, the k of its first factor, and in the ninth row the base, the front and the wall's light;
+// and in its lower half the level's cells (below).
 const tex = new Uint8Array(4 << 16)
 for (let i = 0, s = 1; i < 1 << 16; i++) tex[4 * i + 1] = (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) >>> 24
 for (let i = 0; i < 1 << 16; i++) tex[4 * i] = tex[4 * (((((i >> 8) + 17) & 255) << 8) | ((i + 37) & 255)) + 1]
 const put = (i: number, v: number) => ((tex[4 * i + 2] = v & 255), (tex[4 * i + 3] = v >> 8))
 const whole = { data: tex, at: 0, n: 256 }, head = { data: tex, at: 0, n: 9 }
+// The level: Eratosthenes' sieve, run once to 130² for every integer's least prime factor, and each cell of Ulam's
+// spiral told what its integer is: which of the fifteen primes to 47 strikes it (15: none), whether it is prime, a
+// twin, 1 mod 4, and half the gap to the next prime. The Mersenne primes' cells go in the ninth row.
+const LEAST = new Uint16Array(16900), FIFTEEN = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]
+for (let i = 2; i < LEAST.length; i++) if (!LEAST[i]) for (let j = i; j < LEAST.length; j += i) LEAST[j] ||= i
+const prime = (n: number) => n > 1 && LEAST[n] === n
+// Ulam's cell (x, y) holds this integer: 1 at the origin, 2 to its east, winding anticlockwise
+function ulam(x: number, y: number) {
+  const m = Math.max(Math.abs(x), Math.abs(y)), b = (2 * m - 1) ** 2
+  return !m ? 1 : x === m && y > -m ? b + y + m : y === m ? b + 3 * m - x : x === -m ? b + 5 * m - y : b + 7 * m + x
+}
+for (let y = -64; y < 64; y++)
+  for (let x = -64; x < 64; x++) {
+    const n = ulam(x, y), j = FIFTEEN.indexOf(LEAST[n])
+    let gap = 1
+    while (prime(n) && !prime(n + gap)) gap++
+    put(((y + 192) << 8) + x + 64, prime(n) ? 15 | 16 | (prime(n - 2) || prime(n + 2) ? 32 : 0) | ((gap >> 1) << 6) | (n % 4 === 1 ? 4096 : 0) : j < 0 ? 15 : j)
+    const m = [3, 7, 31, 127, 8191].indexOf(n)
+    if (m >= 0) put(2 * RIBS + 4 + m, (x + 64) | ((y + 64) << 8))
+  }
 const seg = new Uint8Array(32768), exps = new Float64Array(RIBS), first = new Uint16Array(RIBS)
 // Past the record, where Primorial's first region is: the ribs are the primes from 149 500 003 on
 let next = 149500003, base = 0, front = 0, age = 0, owed = 0, sent = false
@@ -87,14 +108,15 @@ function row() {
 
 // ---- the way in ------------------------------------------------------------------------------------------------
 // The camera looks at a point on the planet's axis (a hair off it, so east is still east) from a distance and an
-// elevation: [seconds at the place, the point's height, from how far, how steeply]. Over the well's mouth; down
-// it, through the spiral, to hang over the wheels; then out to the side under the dome, and there it is the visitor's.
-const TOP = 1.004, TILT = 0.004
+// elevation: [seconds at the place, the point's height, from how far, how steeply]. It comes to rest over the well's
+// mouth (the place's own view, in places.ts) and does not wait there: down the well, through the spiral, and out to
+// the side over the level, and there it is the visitor's.
 // (Never straight down: the camera's up is the planet's, and looking past a page would roll it.)
-const WAY = [[0, TOP, 0.5, 1.2], [2.2, 1, 0.2, 1.4], [3.9, 0.8, 0.18, 1.42], [5, 0.7, 0.2, 1.25], [7.8, 0.6, 0.4, 0.55]]
-const END = 7.8, REST = WAY[4]
-// and where it goes to look at each part: [height, distance, elevation] (the search's: at the dome's foot, across from the eye)
-const VIEWS: Record<string, number[]> = { spiral: [1, 0.11, 1.25], wheels: [WW, 0.16, 0.95], sieve: [WF, 0.09, 0.8], hunt: [WF + 0.07, 0.3, 0.3] }
+const TOP = 1.004, TILT = 0.004
+const WAY = [[0, TOP, 0.22, 1.4], [0.9, 0.84, 0.16, 1.42], [1.5, 0.72, 0.2, 1.3], [3, WF + 0.03, 0.55, 0.56]]
+const END = 3, REST = WAY[3]
+// and where it goes to look at each part: [height, distance, elevation] (the search's: at the wall, across from the eye)
+const VIEWS: Record<string, number[]> = { spiral: [1, 0.11, 1.25], wheels: [WF + 0.1, 0.24, 0.45], sieve: [WF + 0.01, 0.1, 0.35], hunt: [WF - 0.12, 0.3, 0.3] }
 const g = [0, 0, 0], c3 = [0, 0, 0]
 let h = TOP, yaw = 0, done = false, freed = -9, had = '', lev = 0, was = false, ghost = 0, side = 0
 export const where = (o: number[]) => ((o[0] = 0), (o[1] = h), (o[2] = h * TILT), o)
@@ -102,7 +124,7 @@ export function steer(since: number, picked: string, o: Steer) {
   const v = VIEWS[picked], s = HELD >= 0 ? HELD : since
   o.at[0] = o.at[1] = o.at[2] = 0
   if (v) {
-    if (picked === 'hunt') (o.at[0] = -0.45 * Math.sin(yaw)), (o.at[2] = 0.45 * Math.cos(yaw))
+    if (picked === 'hunt') (o.at[0] = -0.42 * Math.sin(yaw)), (o.at[2] = 0.42 * Math.cos(yaw))
     return (o.d = v[1]), (o.pitch = v[2]), (o.yaw = yaw), true
   }
   if (!done) return glide(WAY, s, g), (o.d = g[1]), (o.pitch = g[2]), (o.yaw = 0.05 * s), true
@@ -111,9 +133,9 @@ export function steer(since: number, picked: string, o: Steer) {
 }
 export const about: Record<string, About> = {
   spiral: { name: 'Sacks’ spiral', does: 'Every whole number on one winding line, n at radius √n, so the squares lie along one ray. A bead of light at each prime below 1024: gold if it is 1 more than a multiple of 4 (a sum of two squares), blue if it is 3 more.' },
-  wheels: { name: 'The wheel sieve', does: 'Pritchard’s sieve as clockwork. Each ring is the wheel of a primorial, 2, 6, 30, 210, 2310, a cell to every residue, lit where it shares no factor with the wheel: 1 spoke, 2, 8, 48, 480. Each ring is the one inside it rolled out p times with p’s multiples struck, in p’s colour. They roll along the integers together, two a second, and the pointer turns gold when the integer under it is prime.' },
-  sieve: { name: 'Eratosthenes on Ulam’s spiral', does: 'The integers wound out square from 1. Every 26 s the sieve runs over them: a wave for each prime, 2, 3, 5 … 47, strikes its multiples in its own colour, and a last wave proves what is left, each cell tested where it stands, every frame (Miller–Rabin, to bases that make it a proof). The primes fall along diagonals; twins burn white. Closer, the same floor holds every integer below 2³².' },
-  hunt: { name: 'The search', does: 'Trial factoring, as PrimesF does it before the long test. Each rib of the dome is one Mersenne number 2ᵖ − 1, p a prime from 149 500 003 up, past the record (3 250 exponents there were untested on 21 Nov 2026). Up the rib are the only numbers that could divide it, q = 2kp + 1 with q ≡ ±1 mod 8, each tested where it stands. A factor blazes and its rib goes dark; a rib that stands to the top would take 8.49 days to test in full on one M4 Pro, 149 500 003 squarings at 4.907 ms each.' },
+  wheels: { name: 'The wheel sieve', does: 'Pritchard’s sieve as machinery. Each hoop is the wheel of a primorial, 2, 6, 30, 210, 2310, with a bar of light hanging at every residue that shares no factor with it: 1 bar, 2, 8, 48, 480. Each hoop is the one inside it rolled out p times with p’s multiples struck, left as stubs in p’s colour. They roll along the integers together, one a second.' },
+  sieve: { name: 'The sieve of Eratosthenes', does: 'The integers lie across the hall on Ulam’s spiral, 1 on the axis, each a shaft of light. Every 26 s the sieve runs: a wave for each prime, 2, 3, 5 … 47, and its multiples fall through the level and hang under it in its colour. What is left standing is prime, and grows as tall as the gap to the next prime: gold or blue by its remainder mod 4, twins white. They stand along diagonals. The five shafts that reach the roof are the Mersenne primes 3, 7, 31, 127 and 8191.' },
+  hunt: { name: 'The search', does: 'Trial factoring, as PrimesF does it before the long test. Each rib of the wall is one Mersenne number 2ᵖ − 1, p a prime from 149 500 003 up, past the record (3 250 exponents there were untested on 21 Nov 2026). Up the rib are the only numbers that could divide it, q = 2kp + 1 with q ≡ ±1 mod 8, tried a row at a time: the line of light climbing the wall. A factor blazes and its rib goes dark above it; a rib that stands to the top would take 8.49 days to test in full on one M4 Pro, 149 500 003 squarings at 4.907 ms each.' },
 }
 
 // ---- the eye ---------------------------------------------------------------------------------------------------
@@ -146,10 +168,10 @@ export function core(k: number) {
     const turn = Math.atan2(E[0], h * TILT - E[2]) - yaw
     if (had !== 'hunt' && ctx.t - freed > 1.6) yaw += Math.atan2(Math.sin(turn), Math.cos(turn))
     part('spiral', ((c3[0] = 0), (c3[1] = 1), (c3[2] = 0), c3), 0.045)
-    part('wheels', ((c3[1] = WW), c3), 0.1)
-    // (the floor on the eye's side of the wheels, the dome across from it)
-    part('sieve', ((c3[0] = 0.2 * Math.sin(yaw)), (c3[1] = WF), (c3[2] = -0.2 * Math.cos(yaw)), c3), 0.16)
-    part('hunt', ((c3[0] = -0.46 * Math.sin(yaw)), (c3[1] = WF + 0.14), (c3[2] = 0.46 * Math.cos(yaw)), c3), 0.18)
+    part('wheels', ((c3[1] = WF + 0.1), c3), 0.1)
+    // (the level on the eye's side of the axis, the wall across from it)
+    part('sieve', ((c3[0] = 0.16 * Math.sin(yaw)), (c3[1] = WF), (c3[2] = -0.16 * Math.cos(yaw)), c3), 0.12)
+    part('hunt', ((c3[0] = -0.44 * Math.sin(yaw)), (c3[1] = WF - 0.1), (c3[2] = 0.44 * Math.cos(yaw)), c3), 0.16)
   }
   // This field: under the ground, and over the well's mouth when it is what we have come to. A flight away goes
   // straight out through the rock: the hollow stays in sight as it does, and fades over half a second in the open.
@@ -163,9 +185,9 @@ export function core(k: number) {
   age += dt
   for (owed = Math.min(owed + 30 * dt, 4); owed >= 1 && front < KS; owed--) row()
   if (front >= KS && age > TURN) batch()
-  // and for the world's music: a prime under the wheels' pointer, its place on the wheel of 30 a degree of A's
-  // pentatonic; a wave leaving the floor's middle, its prime as a harmonic of A; a factor found, its k as one
-  const N = Math.floor((ctx.t / 1155 - Math.floor(ctx.t / 1155)) * 2310), wave = Math.floor(((ctx.t / 26 - Math.floor(ctx.t / 26)) * 26) / 0.9)
+  // and for the world's music: a prime the wheels roll to, its place on the wheel of 30 a degree of A's
+  // pentatonic; a wave leaving the level's middle, its prime as a harmonic of A; a factor found, its k as one
+  const N = Math.floor((ctx.t / 2310 - Math.floor(ctx.t / 2310)) * 2310), wave = Math.floor(((ctx.t / 26 - Math.floor(ctx.t / 26)) * 26) / 0.9)
   if (N !== heard[0] && prime((heard[0] = N))) ring(220 * 2 ** (DEGREE[Math.floor(((N % 30) * 8) / 30)] / 12))
   if (wave !== heard[1] && (heard[1] = wave) >= 1 && wave <= 15) ring(fold(55 * PRIMES[wave - 1], 220))
   if (tally.dead !== heard[2] && (heard[2] = tally.dead)) ring(fold(110 * front, 440))
@@ -182,31 +204,17 @@ export function core(k: number) {
 }
 
 // What it sounds like, from inside.
-// The sieve, as a spectrum: every prime whose wave has gone out over the floor sounds as that harmonic of a low A
+// The sieve, as a spectrum: every prime whose wave has gone out over the level sounds as that harmonic of a low A
 // (55 Hz), as loud as 1/p^0.7: an octave, then a twelfth joins, a seventeenth (the major third), the seventh
 // harmonic's flat seventh, the eleventh's sharp fourth, and wave by wave the chord grows richer and stranger, the
-// primes' own timbre, with the A they all stand on never sounded; and the floor made new, it falls silent.
-// The dome: a bell for every row of k that kills an exponent, its pitch k's place in the harmonic series over a low
+// primes' own timbre, with the A they all stand on never sounded; and the level made new, it falls silent.
+// The wall: a bell for every row of k that kills an exponent, its pitch k's place in the harmonic series over a low
 // A (folded under 1760 Hz), as loud as the root of how many died. Most factors are small, so a thousand exponents
 // begin as a peal up the series and thin to single strokes.
-// The wheels: when the integer under their pointer is prime (Miller and Rabin's test again) it plucks a string tuned
+// The wheels: when the integer they have rolled to is prime it plucks a string tuned
 // to its gap from the last: the gap's odd part as a harmonic of A3, folded into one octave.
-const BELLS = 32, SIEVED = [2, 3, 5, 7, 11, 13, 61], BASES = [2, 7, 61]
-const PRIMES = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47], LOUD = PRIMES.map((p) => p ** -0.7)
-function prime(n: number) {
-  if (n < 2) return false
-  for (const s of SIEVED) if (n % s === 0) return n === s
-  let d = n - 1, r = 0
-  while (d % 2 === 0) (d /= 2), r++
-  next: for (const a of BASES) {
-    let x = 1
-    for (let b = a, e = d; e > 0; e = Math.floor(e / 2), b = mulmod(b, b, n)) if (e % 2) x = mulmod(x, b, n)
-    if (x === 1 || x === n - 1) continue
-    for (let i = 1; i < r; i++) if ((x = mulmod(x, x, n)) === n - 1) continue next
-    return false
-  }
-  return true
-}
+const BELLS = 32
+const PRIMES = FIFTEEN, LOUD = PRIMES.map((p) => p ** -0.7)
 const y1 = new Float64Array(BELLS), y2 = new Float64Array(BELLS), c1 = new Float64Array(BELLS), c2 = new Float64Array(BELLS)
 const organ = new Float64Array(PRIMES.length), turns = new Float64Array(PRIMES.length)
 const STRINGS = 8, s1 = new Float64Array(STRINGS), s2 = new Float64Array(STRINGS), k1 = new Float64Array(STRINGS), k2 = new Float64Array(STRINGS), ks = new Float64Array(STRINGS)
@@ -228,7 +236,7 @@ export function voice(t: number, dt: number) {
       const hm = 2 * m + 1, w = 2 * Math.PI * ((220 * hm) / 2 ** Math.floor(Math.log2(hm))) * (tuned = dt)
       ;(k1[m] = 2 * r * Math.cos(w)), (k2[m] = r * r), (ks[m] = Math.sin(w))
     }
-  const N = Math.floor((t / 1155 - Math.floor(t / 1155)) * 2310) // the integer under the wheels' pointer
+  const N = Math.floor((t / 2310 - Math.floor(t / 2310)) * 2310) // the integer the wheels have rolled to
   if (N !== under) {
     if (prime((under = N))) {
       let gap = N - last
