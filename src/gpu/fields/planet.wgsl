@@ -877,7 +877,7 @@ fn hash(v: vec3u) -> vec3f {
   return vec3f(x >> vec3u(8u)) / 16777216.0;
 }
 fn beyond(rd: vec3f, L: vec3f) -> vec3f {
-  let ax = u.p[6].xyz;
+  let ax = vec3f(0.0, 1.0, 0.0); // the pole: the planet holds still and the sky turns with its sun
   let e1 = normalize(L - ax * dot(ax, L));
   let d = vec3f(dot(rd, e1), dot(rd, ax), dot(rd, cross(ax, e1)));
   let sl = vec2f(dot(L, e1), dot(L, ax));

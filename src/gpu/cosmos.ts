@@ -2,7 +2,7 @@
 // while the opening plays (universe.wgsl), and only read after (fields/cosmos.wgsl: any field may call cosmos(rd)).
 // The whole sky is a cube; each marvel in it, a fractal the size of a nebula or a galaxy, is its own patch of sky at
 // four times the cube's sharpness, laid over it with its own transmittance. Everything is baked coarse first, so a deep
-// link that lands straight on the planet has a sky at once, and sharp a few seconds later.
+// link that lands straight on the planet has a sky in a moment, faded in out of black, and sharp a few seconds later.
 //
 // 8 bits a channel, sRGB, so the hardware filters it in linear light, its steps below the display's own wherever the
 // cosmos is dim. The cube is 6 × 1024² with three mips, 34 MB; each marvel 2048² with three, 22 MB.
@@ -13,6 +13,7 @@ const N = 1024, M = 2048, LEVELS = 4, PREVIEW = 2
 const TILE = 64
 const BUDGET = 2400 // µs of GPU time a frame (an M4 Pro's), by the costs below
 const LAG = 8 // ms: the GPU busier than this with the frames before, and the bake waits
+const FADE = 2500, SHARPEN = 1500 // ms each comes in out of the dark over, once it is first baked; and sharpens over, once its finest level is
 const SKY = 0.075 // µs a sample of the sky
 // The marvels, in the stars' frame (planet.wgsl's beyond: y the planet's pole, x where its sun stands): where each stands
 // (longitude, latitude), how wide it is, and its turn about its own middle, in degrees; drawn in this order, so the
@@ -43,6 +44,10 @@ export class Cosmos {
   private base = [LEVELS, LEVELS] // the finest level each may be read at; LEVELS: none yet
   private lag = 0
   private probing = false
+  private shown = [0, 0] // when the sky and the marvels were first there to read, and sharp (performance.now()), 0 not yet
+  private sharp = [0, 0]
+  private faded = [0, 0] // how far each has come in, as last written
+  private one = new Float32Array(1)
 
   constructor(readonly device: GPUDevice) {
     const d = device, usage = GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT
@@ -106,6 +111,7 @@ export class Cosmos {
   // it was given before this frame says how busy it is. When a level of a texture is whole, it is read from then on; when
   // the sharp level is, the coarser ones are filtered down from it first.
   bake(enc: GPUCommandEncoder) {
+    this.fade()
     const J = this.jobs[0]
     if (!J || !this.bakePipe) return
     if (!this.probing) {
@@ -130,7 +136,22 @@ export class Cosmos {
     if (this.jobs.some((j) => j.tex === J.tex && j.level === J.level)) return // the rest of this level is still to come
     if (J.level === 0) this.filter(enc, J.tex)
     this.base[+(J.tex === this.marvels)] = J.level
+    const i = +(J.tex === this.marvels)
+    this.shown[i] ||= performance.now()
+    if (J.level === 0) this.sharp[i] = Math.max(performance.now(), this.shown[i] + FADE)
     this.bind()
+  }
+
+  // Each comes in out of the dark over FADE once it is first there, coarse, and sharpens over SHARPEN once its finest
+  // level is: how far, 0 to 1 and then to 3, in the first marvel's up.w and middle.w (cosmos.wgsl).
+  private fade() {
+    const now = performance.now(), ease = (s: number) => (s = Math.min(1, Math.max(0, s))) * s * (3 - 2 * s)
+    for (let i = 0; i < 2; i++) {
+      const v = (this.shown[i] ? ease((now - this.shown[i]) / FADE) : 0) + (this.sharp[i] ? 2 * ease((now - this.sharp[i]) / SHARPEN) : 0)
+      if (v === this.faded[i]) continue
+      this.one[0] = this.faded[i] = v
+      this.device.queue.writeBuffer(this.where, 28 + 16 * i, this.one)
+    }
   }
 
   private level(t: GPUTexture, layer: number, level: number) {
