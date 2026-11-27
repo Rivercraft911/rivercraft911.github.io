@@ -21,7 +21,7 @@ struct Cam {
   tr: vec4f,    // the traced light (trace.ts): its size, px; .z how much of it to take (0: there is none)
 }
 
-struct Inst { r0: vec4f, r1: vec4f, r2: vec4f, k: vec4f, lamp: vec4f } // model → world rows; k: brightness, glow, how much of its light is traced, -; its lamps' light
+struct Inst { r0: vec4f, r1: vec4f, r2: vec4f, k: vec4f, lamp: vec4f, sun: vec4f } // model → world rows; k: brightness, glow, how much of its light is traced, how much of it is there; its lamps' light; the sun where it stands, if .w (else the scene's)
 
 @group(0) @binding(0) var<uniform> c: Cam;
 @group(0) @binding(1) var<storage, read> inst: array<Inst>;
@@ -40,6 +40,7 @@ struct O {
   @location(3) pbr: vec4f,
   @location(4) @interpolate(flat) k: vec4f,
   @location(5) @interpolate(flat) lamp: vec4f,
+  @location(6) @interpolate(flat) sun: vec4f,
 }
 
 fn place(m: Inst, p: vec3f) -> vec3f { return vec3f(dot(m.r0, vec4f(p, 1.0)), dot(m.r1, vec4f(p, 1.0)), dot(m.r2, vec4f(p, 1.0))); }
@@ -53,7 +54,7 @@ fn project(w: vec3f) -> vec4f {
   let m = inst[i];
   let w = place(m, v.p);
   let n = vec3f(dot(m.r0.xyz, v.n), dot(m.r1.xyz, v.n), dot(m.r2.xyz, v.n));
-  return O(project(w), w, n, v.col, v.pbr, m.k, m.lamp);
+  return O(project(w), w, n, v.col, v.pbr, m.k, m.lamp, m.sun);
 }
 
 @vertex fn shadowVS(v: V, @builtin(instance_index) i: u32) -> @builtin(position) vec4f {
@@ -180,7 +181,7 @@ fn shade(i: O) -> vec4f {
   let t = light(i.pos.xy, i.w, N, metal, i.k.z);
   var seen = t.v; // of the sun: traced, or while that is unsure, the sun's map
   if (t.cv < 0.99) { seen = mix(lit(i.w, N), t.v, t.cv); }
-  let sun = (diff + spec) * c.sunc.rgb * c.sun.w * nl * seen;
+  let sun = (diff + spec) * select(c.sunc.rgb * c.sun.w, i.sun.rgb, i.sun.w > 0.0) * nl * seen;
   let Fa = F0 + (max(vec3f(1.0 - rough), F0) - F0) * pow(1.0 - nv, 5.0); // Fresnel, for the whole sky
   let up = dot(N, c.zen.xyz) * 0.5 + 0.5;
   // What arrives from everywhere else. Untraced: the sky's mean over the half it faces, and the sky a mirror would
@@ -201,10 +202,11 @@ fn shade(i: O) -> vec4f {
   return vec4f(col * c.sunc.w, i.col.a);
 }
 
-// and how far along its ray it is, for the lens's depth of field (raster.wgsl)
+// and how far along its ray it is, for the lens's depth of field (raster.wgsl); each as much as the thing is there yet
+// (k.w: a model fades in as it arrives), which the composite reads as how much of the pixel it covers
 struct S { @location(0) c: vec4f, @location(1) d: f32 }
-@fragment fn solidFS(i: O) -> S { return S(vec4f(shade(i).rgb, 1.0), length(i.w)); }
+@fragment fn solidFS(i: O) -> S { return S(vec4f(shade(i).rgb, 1.0) * i.k.w, length(i.w) * i.k.w); }
 @fragment fn clearFS(i: O) -> @location(0) vec4f {
   let s = shade(i);
-  return vec4f(s.rgb * s.a, s.a);
+  return vec4f(s.rgb * s.a, s.a) * i.k.w;
 }

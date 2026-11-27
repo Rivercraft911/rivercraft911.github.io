@@ -36,21 +36,28 @@ const DEBUG = ['d', 'pitch', 'yaw', 'at'].some((k) => dbg.has(k))
 
 // ---- models: River's hardware, as baked (scripts/bake-models.mjs) --------------------------------------------
 // They come in one at a time, in the list's order, but what the place looked at asks for (ctx.want) is fetched at once,
-// and the rest waits for it: so a place flown or linked to is never left waiting on all 40 MB of everything else.
+// and the rest waits for it: so a place flown or linked to is never left waiting on everything else. (They are packed
+// small for the wire: scripts/pack-models.mjs.)
 const models = ctx.models
 const LAMPS: Record<string, string> = { heart: 'mat_2' } // which of a model's materials are its LEDs (bvh.worker.ts)
 const queue = new Map<string, string>() // what list.json names that has not been fetched: id → url
-let device: GPUDevice, coming = 0, behind = false // wanted ones on their way; whether the list's own is
+const loading = new Set<string>() // and what is on its way
+let device: GPUDevice, coming = 0, behind = false, listed = false // wanted ones on their way; whether the list's own is; whether the list is in
 function fetchModel(id: string) {
   const url = queue.get(id)!
-  queue.delete(id)
-  return model(device, url).then((g) => (models[id] = g))
+  queue.delete(id), loading.add(id)
+  return model(device, url).then((g) => (models[id] = g)).finally(() => loading.delete(id))
 }
 function background() {
   const id = queue.keys().next().value
   if (behind || coming || id === undefined) return
   behind = true
   fetchModel(id).finally(() => ((behind = false), background()))
+}
+// whether the place looked at still waits for any of its hardware
+function pending() {
+  for (const id of ctx.want) if (!listed || queue.has(id) || loading.has(id)) return true
+  return false
 }
 export function attach(d: GPUDevice) {
   mount((k) => go(k, lastBuild), () => active) // the words: the index, a deep link's place, the history
@@ -63,6 +70,7 @@ export function attach(d: GPUDevice) {
       background()
     })
     .catch(() => {})
+    .finally(() => (listed = true))
   for (const [id, url] of made()) model(d, url).then((g) => (models[id] = g)) // and what is not in CAD yet (make.ts)
 }
 
@@ -85,7 +93,7 @@ const steer = { d: 0, pitch: 0, yaw: 0, at: [0, 0, 0] }, gaze = [0, 0, 0] // wha
 // how long the place's choreography has been held (while the visitor holds the camera or has a part picked).
 const toward = [0, 0, 0], anchor = [0, 0, 0], back = { d: 0, pitch: 0, yaw: 0, at: [0, 0, 0] }
 let paused = 0
-let flight = -1, fstart = 0, flen = 1 // flying from `from` toward `focus` since fstart, for flen seconds
+let flight = -1, fstart = 0, flen = 1, waited = 0 // flying from `from` toward `focus` since fstart, for flen seconds; held back so long
 export const HOME = { d: 5.2, pitch: 0.38, yaw: 0.6 } // where the arrival leaves the eye, and Escape takes it
 const rest = { ...HOME } // where the eye is about what it looks at
 const want = { ...HOME } // and where the pointer has asked it to be
@@ -150,8 +158,10 @@ export function go(k: number, t: number, quiet = false) {
   want.d = rest.d = d, want.pitch = rest.pitch = pitch, want.yaw = rest.yaw = yaw
   restAt(k, to)
   const arc = Math.acos(clamp(dot(unit([...from.eye]), unit([...to.eye])), -1, 1))
-  flight = 0, fstart = t, flen = 1.4 + 1.1 * arc + 0.5 * Math.abs(Math.log(len(from.eye) / len(to.eye)))
+  flight = 0, fstart = t, flen = 1.4 + 1.1 * arc + 0.5 * Math.abs(Math.log(len(from.eye) / len(to.eye))), waited = 0
   sky[0] = day, sky[1] = tilt
+  if (len(L) > 0.5) for (let i = 0; i < 3; i++) sun0[i] = L[i] // the sun as the flight leaves it
+  else sunAt(t, day, tilt, sun0)
   light(k, t + flen)
   page(k, flen) // its page comes in as the camera arrives
   if (!quiet) route(k) // a visitor's flight is their history; the world showing itself is not
@@ -174,6 +184,23 @@ export function sunAt(pt: number, d: number, a: number, o: V) {
   o[0] = Math.cos(de) * Math.sin(h), o[1] = Math.sin(de), o[2] = Math.cos(de) * Math.cos(h)
   return o
 }
+// The world's sun at planet time t: its day and year; in flight, the sun the flight left (turning on with the day) and the
+// one it will arrive in, each as it stands to the eye at its own end, carried round the planet with the eye: so the land
+// below keeps its light all the way, and a flight never passes through a night that neither end is in.
+const sun0: V = [0, 0, 0], S1: V = [0, 0, 0], ax: V = [0, 0, 0], wa: V = [0, 0, 0], wb: V = [0, 0, 0]
+function world(t: number, o: V) {
+  if (flight < 0) return sunAt(t, day, tilt, o)
+  const ph = DAY * (t - fstart), c = Math.cos(ph), s = Math.sin(ph), k = ease(flight)
+  o[0] = sun0[0] * c - sun0[2] * s, o[1] = sun0[1], o[2] = sun0[2] * c + sun0[0] * s
+  sunAt(t, sky[2], sky[3], S1)
+  for (let i = 0; i < 3; i++) (wa[i] = from.eye[i]), (wb[i] = to.eye[i])
+  cross(unit(wa), unit(wb), ax)
+  const sn = len(ax), arc = Math.atan2(sn, dot(wa, wb))
+  if (sn < 1e-9) return slerp([...o], S1, k, o)
+  unit(ax), turn(S1, ax, -arc, S1) // the sun arrived in, as it stands to the eye the flight left from
+  return turn(slerp(o, S1, k, wa), ax, k * arc, o)
+}
+
 // The day and year for reaching place k at time ta (restAt has just left its frame in n0, e0, N0): of every hour and
 // every declination the year allows, the one nearest what is wanted there, and nearest the day as it is.
 const S: V = [0, 0, 0]
@@ -367,7 +394,7 @@ export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number
   }
   cam.set(p.subarray(0, 16))
   if (dbg.has('at')) L.splice(0, 3, ...L0)
-  else if (marked) sunAt(t, day, tilt, L) // the world's day and year
+  else if (marked) world(t, L) // the world's day and year
   else clock(t, L)
   air(p, E, L, t, EXPOSE)
   // which place the pointer, or the index, is on: it is marked on the ground (planet.wgsl), by its slot among those
@@ -406,6 +433,19 @@ export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number
   up[0] = near_[0], up[1] = near_[1], up[2] = near_[2]
   sun[0] = L[0], sun[1] = L[1], sun[2] = L[2], sun[3] = 22 * clamp(dot(near_, L) * 6 + 0.5, 0, 1)
   tint(near_, L, solids.sunc as number[])
+  // and the sun where each thing stands, through the air, over its own horizon: one place's dusk is not every place's,
+  // nor is the night of a place flown to the night of the one left (the arrival lights its own)
+  for (const it of ctx.items) {
+    if (!marked) {
+      it.sun = undefined
+      continue
+    }
+    const M = it.model, m = it.m, s = (it.sun ??= [0, 0, 0]) as number[]
+    for (let r = 0; r < 3; r++) wa[r] = E[r] + m[r * 4 + 3] + (m[r * 4] * (M.lo[0] + M.hi[0]) + m[r * 4 + 1] * (M.lo[1] + M.hi[1]) + m[r * 4 + 2] * (M.lo[2] + M.hi[2])) / 2
+    tint(unit(wa), L, s)
+    const e = 22 * clamp(dot(wa, L) * 6 + 0.5, 0, 1)
+    s[0] *= e, s[1] *= e, s[2] *= e
+  }
   F.res = lens > 0 ? 1.2 : 2 // under the lens the world behind is a blur: its sky and clouds need not be swept at full size
 }
 const mark = [0, 0] // the place marked, and how much
@@ -447,6 +487,12 @@ export const planet: Scene = {
     for (let i = 0; i < 3; i++) gaze[i] += (toward[i] - gaze[i]) * fol
     rest.d += (want.d - rest.d) * fol, rest.pitch += (want.pitch - rest.pitch) * fol, rest.yaw += (want.yaw - rest.yaw) * fol
     restAt(focus, to)
+    // a flight lands no sooner than what it flies to: over its last stretch it slows to wait (a few seconds at most) for
+    // the hardware the place still asks for, which fades in as the camera settles
+    if (flight > 0.8 && waited < 5 && pending()) {
+      const w = dt * clamp((flight - 0.8) / 0.15)
+      fstart += w, waited += w
+    }
     if (flight >= 0 && (flight = (t - fstart) / flen) >= 1) flight = -1
     if (flight >= 0) {
       if (PLACES[focus]?.orbit) light(focus, fstart + flen) // what moves is lit for where it will be

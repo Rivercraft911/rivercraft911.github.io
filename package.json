@@ -9,6 +9,7 @@
     "boards": "node scripts/bake-boards.mjs",
     "schematics": "node scripts/bake-schematics.mjs",
     "models": "node scripts/bake-models.mjs",
+    "pack": "node scripts/pack-models.mjs",
     "shot": "node scripts/shot.mjs",
     "fps": "node scripts/fps.mjs",
     "clip": "node scripts/clip.mjs",

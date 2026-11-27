@@ -35,6 +35,7 @@ struct Inst {
   hi: vec4f,                       // .w where its triangles start
   k: vec4f,                        // brightness, glow, which of the scene's things it is (from 1)
   lamp: vec4f,                     // its lamps' light (bvh.worker.ts)
+  sun: vec4f,                      // the sunlight where it stands, if .w (else the scene's)
 }
 
 @group(0) @binding(0) var<uniform> u: U;
@@ -201,7 +202,7 @@ fn ball(o: vec3f, d: vec3f) -> f32 {
 }
 
 // ---- what a ray lands on ------------------------------------------------------------------------------------
-struct Surf { x: vec3f, n: vec3f, ng: vec3f, base: vec3f, metal: f32, rough: f32, k: f32, glow: vec3f }
+struct Surf { x: vec3f, n: vec3f, ng: vec3f, base: vec3f, metal: f32, rough: f32, k: f32, glow: vec3f, sun: vec3f }
 
 fn surf(h: Hit, o: vec3f, d: vec3f) -> Surf {
   let m = inst[h.i];
@@ -213,7 +214,7 @@ fn surf(h: Hit, o: vec3f, d: vec3f) -> Surf {
   if (dot(n, ng) < 0.0) { n = -n; }
   let c = unpack4x8unorm(mt.x);
   let glow = c.rgb * c.rgb * m.k.y + m.lamp.rgb * f32(mt.y >> 24u) / 255.0; // its own light, and a lamp's
-  return Surf(o + d * h.t, n, ng, c.rgb * c.rgb, f32(mt.y & 0xffu) / 255.0, max(f32((mt.y >> 8u) & 0xffu) / 255.0, 0.045), m.k.x, glow);
+  return Surf(o + d * h.t, n, ng, c.rgb * c.rgb, f32(mt.y & 0xffu) / 255.0, max(f32((mt.y >> 8u) & 0xffu) / 255.0, 0.045), m.k.x, glow, select(sunlight(), m.sun.rgb, m.sun.w > 0.0));
 }
 // Off the surface, so a ray leaving does not meet it again: by a few of the floats' own steps at that distance.
 fn lift(s: Surf) -> vec3f { return s.x + s.ng * (3e-5 * max(length(s.x), 0.01)); }
@@ -278,7 +279,7 @@ fn radiance(o0: vec3f, d0: vec3f) -> vec3f {
     let x = lift(s);
     var e = s.glow;
     let l = toSun();
-    if (u.sun.w > 0.0 && dot(s.n, l) > 0.0 && dot(s.ng, l) > 0.0 && !dark(x, l)) { e += brdf(s, -d, l) * sunlight() * dot(s.n, l) * s.k; }
+    if (any(s.sun > vec3f(0.0)) && dot(s.n, l) > 0.0 && dot(s.ng, l) > 0.0 && !dark(x, l)) { e += brdf(s, -d, l) * s.sun * dot(s.n, l) * s.k; }
     L += thr * e;
     let p = clamp(max(s.base.r, max(s.base.g, s.base.b)), 0.1, 0.9);
     if (b == 2) { L += thr * s.base * s.k * mix(u.gnd.rgb, open(), 0.5 + 0.5 * dot(s.n, u.zen.xyz)) * 0.5; break; }
@@ -439,7 +440,7 @@ fn history(was: vec3f, n: vec3f, key: f32) -> Old {
   if (kind != GROUND) {
     let o = lift(s);
     V = select(0.0, 1.0, dot(s.ng, l) > 0.0);
-    if (u.sun.w > 0.0 && dot(n, l) > 0.0 && V > 0.0 && dark(o, l)) { V = 0.0; }
+    if (any(s.sun > vec3f(0.0)) && dot(n, l) > 0.0 && V > 0.0 && dark(o, l)) { V = 0.0; }
     var d = cosine(n);
     if (kind == METAL) { d = glance(n, -rd, s.rough); }
     if (dot(d, s.ng) > 0.0) { L = radiance(o, d); }

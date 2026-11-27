@@ -6,12 +6,14 @@
 import meshWGSL from './mesh.wgsl?raw'
 import { Trace, keep, type Traced } from './trace'
 
-export type Model = { vb: GPUBuffer; solid: number; clear: number; lo: number[]; hi: number[]; traced?: Traced }
+export type Model = { vb: GPUBuffer; solid: number; clear: number; lo: number[]; hi: number[]; traced?: Traced; born: number } // born: when it arrived, ms
 
 // One model in the scene: m is three rows of its transform, model → world, the world being the eye's: the eye at the
 // origin, so the scene keeps its own positions in doubles and subtracts the eye before it hands them over.
-// k: how bright its light is; glow: its own light, as a share of its colour; lamp: the light of its lamps (bvh.worker.ts), rgb.
-export type Placed = { model: Model; m: ArrayLike<number>; k?: number; glow?: number; lamp?: ArrayLike<number> }
+// k: how bright its light is; glow: its own light, as a share of its colour; lamp: the light of its lamps (bvh.worker.ts), rgb;
+// sun: the sunlight where it stands (rgb irradiance, its colour through the air), if not the scene's; fade: how much of it
+// is there (a model fades in as it arrives).
+export type Placed = { model: Model; m: ArrayLike<number>; k?: number; glow?: number; lamp?: ArrayLike<number>; sun?: ArrayLike<number>; fade?: number }
 
 export type Solids = {
   cam: Float32Array // reality.aim's p: 1/tan(fov/2) in p[3], right, up, forward; the eye's place is ignored (it is the origin)
@@ -29,7 +31,7 @@ export type Solids = {
 }
 
 const STRIDE = 32 // position, normal (f32 × 3 each), colour and (metal, rough, lamp) as unorm8 × 4
-const INST = 20 // floats an instance: three rows of its transform, (k, glow, traced, -), its lamps' light
+const INST = 24 // floats an instance: three rows of its transform, (k, glow, traced, fade), its lamps' light, its sun (w: its own)
 const SHADOW = 2048
 const MAX = 256 // models placed in a frame
 
@@ -169,12 +171,14 @@ export class Mesh {
     this.write(s!, w, h, traced)
     const n = Math.min(MAX, items.length), c = s!.cam, sh = s!.shadow, L = s!.sun, tx = w / h / c[3], ty = 1 / c[3]
     for (let i = 0; i < n; i++) {
-      const M = items[i].model, m = items[i].m, o = i * INST, lamp = items[i].lamp
+      const M = items[i].model, m = items[i].m, o = i * INST, lamp = items[i].lamp, sun = items[i].sun
       for (let j = 0; j < 12; j++) this.ii[o + j] = m[j]
       this.ii[o + 12] = items[i].k ?? 1
       this.ii[o + 13] = items[i].glow ?? 0
       this.ii[o + 14] = traced ? T.fades[i] : 0
-      for (let j = 0; j < 3; j++) this.ii[o + 16 + j] = lamp ? lamp[j] : 0
+      this.ii[o + 15] = items[i].fade ?? 1
+      for (let j = 0; j < 3; j++) (this.ii[o + 16 + j] = lamp ? lamp[j] : 0), (this.ii[o + 20 + j] = sun ? sun[j] : 0)
+      this.ii[o + 23] = +!!sun
       // Only what the camera can see is drawn, and only what stands in the sun's map is drawn into it: the sphere
       // round the model against the view's four sides, and against the column of sunlight through what casts.
       const cx = (M.lo[0] + M.hi[0]) / 2, cy = (M.lo[1] + M.hi[1]) / 2, cz = (M.lo[2] + M.hi[2]) / 2
@@ -184,7 +188,7 @@ export class Mesh {
       this.seen[i] = +(f > -r && Math.abs(u) - f * tx < r * Math.hypot(1, tx) && Math.abs(v) - f * ty < r * Math.hypot(1, ty))
       if (sh) {
         const dx = x - sh[0], dy = y - sh[1], dz = z - sh[2], along = dx * L[0] + dy * L[1] + dz * L[2], R = sh[3] + r
-        this.casts[i] = +(Math.abs(along) < R && dx * dx + dy * dy + dz * dz - along * along < R * R)
+        this.casts[i] = +(Math.abs(along) < R && dx * dx + dy * dy + dz * dz - along * along < R * R && (items[i].fade ?? 1) > 0.5) // (its shadow comes as it is half there)
       }
     }
     d.queue.writeBuffer(this.inst, 0, this.ii, 0, n * INST)
@@ -251,7 +255,7 @@ export function model(device: GPUDevice, url: string) {
   cache.set(url, (m = new Promise<Read>((ok, no) => (waiting.set(id, [ok, no]), worker!.postMessage({ id, url: new URL(url, location.href).href }))).then((r) => {
     const vb = device.createBuffer({ size: r.vb.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST })
     device.queue.writeBuffer(vb, 0, r.vb)
-    return { vb, solid: r.solid, clear: r.clear, lo: r.lo, hi: r.hi, traced: keep(device, r.nodes, r.tris, r.mats) }
+    return { vb, solid: r.solid, clear: r.clear, lo: r.lo, hi: r.hi, traced: keep(device, r.nodes, r.tris, r.mats), born: performance.now() }
   })))
   return m
 }

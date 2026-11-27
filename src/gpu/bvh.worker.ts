@@ -13,19 +13,19 @@ const BINS = 12, LEAF = 4
 type Prim = { M: number[]; P: Float32Array; N?: Float32Array; I: Uint32Array; col: number[]; metal: number; rough: number; lamp: boolean }
 
 // `lamps`: the materials, by name, that are a light (an LED's lens): the scene says how bright each frame.
+const SIZE: Record<number, number> = { 5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4 }
+const NORM: Record<number, number> = { 5120: 127, 5121: 255, 5122: 32767, 5123: 65535 } // a normalized integer's 1
 function read(buf: ArrayBuffer, lamps: string[]) {
-  const v = new DataView(buf), jl = v.getUint32(12, true)
+  const jl = new DataView(buf).getUint32(12, true)
   const j = JSON.parse(new TextDecoder().decode(new Uint8Array(buf, 20, jl)))
-  const bin = 28 + jl
-  const acc = (i: number) => {
+  const packed = j.extensionsUsed?.includes('RIVER_delta'), bin = packed ? 0 : 28 + jl
+  const v = packed ? new DataView(unpack(j.bufferViews, new Uint8Array(buf, 28 + jl)).buffer) : new DataView(buf)
+  const acc = (i: number, ints = false) => {
     const a = j.accessors[i], bv = j.bufferViews[a.bufferView], n = ({ SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4 } as Record<string, number>)[a.type]
-    const size = a.componentType === 5123 ? 2 : a.componentType === 5121 ? 1 : 4, stride = bv.byteStride ?? n * size
-    const o = bin + (bv.byteOffset ?? 0) + (a.byteOffset ?? 0), out = a.componentType === 5126 ? new Float32Array(a.count * n) : new Uint32Array(a.count * n)
-    for (let k = 0; k < a.count; k++)
-      for (let c = 0; c < n; c++) {
-        const at = o + k * stride + c * size
-        out[k * n + c] = a.componentType === 5126 ? v.getFloat32(at, true) : size === 4 ? v.getUint32(at, true) : size === 2 ? v.getUint16(at, true) : v.getUint8(at)
-      }
+    const t = a.componentType, size = SIZE[t], stride = bv.byteStride ?? n * size, k1 = a.normalized ? 1 / NORM[t] : 1
+    const o = bin + (bv.byteOffset ?? 0) + (a.byteOffset ?? 0), out = ints ? new Uint32Array(a.count * n) : new Float32Array(a.count * n)
+    const get = t === 5126 ? v.getFloat32 : t === 5125 ? v.getUint32 : t === 5123 ? v.getUint16 : t === 5122 ? v.getInt16 : t === 5121 ? v.getUint8 : v.getInt8
+    for (let k = 0; k < a.count; k++) for (let c = 0; c < n; c++) out[k * n + c] = get.call(v, o + k * stride + c * size, true) * k1
     return out
   }
   const prims: Prim[] = []
@@ -34,7 +34,7 @@ function read(buf: ArrayBuffer, lamps: string[]) {
     for (const p of n.mesh != null ? j.meshes[n.mesh].primitives : []) {
       if ((p.mode ?? 4) !== 4) continue
       const P = acc(p.attributes.POSITION) as Float32Array, pb = j.materials?.[p.material]?.pbrMetallicRoughness
-      const I = p.indices != null ? (acc(p.indices) as Uint32Array) : Uint32Array.from({ length: P.length / 3 }, (_, i) => i)
+      const I = p.indices != null ? (acc(p.indices, true) as Uint32Array) : Uint32Array.from({ length: P.length / 3 }, (_, i) => i)
       // glTF's defaults: a factor left off is 1, and the bake (bake-models.py) leaves metal off exactly its metals:
       // gold, tin, pins. A material with no factors at all is a plastic.
       prims.push({ M, P, N: p.attributes.NORMAL != null ? (acc(p.attributes.NORMAL) as Float32Array) : undefined, I, col: pb?.baseColorFactor ?? [0.8, 0.8, 0.8, 1], metal: pb ? (pb.metallicFactor ?? 1) : 0, rough: pb ? (pb.roughnessFactor ?? 1) : 0.5, lamp: lamps.includes(j.materials?.[p.material]?.name) })
@@ -77,6 +77,41 @@ function read(buf: ArrayBuffer, lamps: string[]) {
       }
     }
   return { vb: out, solid: ns, clear: nc, lo, hi }
+}
+
+// A model packed for the wire (scripts/pack-models.mjs: RIVER_delta), its buffer views as they were: an attribute's
+// byte planes of each component's difference from the vertex before, added back up; an index from how far it fell short
+// of the next vertex not yet used. The views are moved to where they now lie.
+type View = { byteOffset?: number; byteLength: number; extensions?: { RIVER_delta?: { count: number; size: number; byteStride?: number; indices?: boolean } } }
+function unpack(views: View[], src: Uint8Array) {
+  const sizes = views.map((bv) => {
+    const x = bv.extensions?.RIVER_delta
+    return x ? x.count * (x.indices ? x.size : x.byteStride!) : bv.byteLength
+  })
+  const out = new Uint8Array(sizes.reduce((a, s) => a + ((s + 3) & ~3), 0))
+  let at = 0
+  views.forEach((bv, i) => {
+    const x = bv.extensions?.RIVER_delta, s = src.subarray(bv.byteOffset ?? 0, (bv.byteOffset ?? 0) + bv.byteLength), o = out.subarray(at, at + sizes[i])
+    if (!x) o.set(s)
+    else if (x.indices)
+      for (let t = 0, r = 0, next = 0; t < x.count; t++) {
+        let z = 0
+        for (let sh = 0, b = 128; b & 128; sh += 7) (b = s[r++]), (z |= (b & 127) << sh)
+        const q = next - z
+        if (!z) next++
+        for (let y = 0; y < x.size; y++) o[t * x.size + y] = q >> (8 * y)
+      }
+    else
+      for (let k = 0, n = x.count, w = x.byteStride!; k < w / x.size; k++)
+        for (let r = 0, prev = 0; r < n; r++) {
+          let d = 0
+          for (let y = 0; y < x.size; y++) d |= s[(k * x.size + y) * n + r] << (8 * y)
+          prev = (prev + d) | 0
+          for (let y = 0; y < x.size; y++) o[r * w + k * x.size + y] = prev >> (8 * y)
+        }
+    ;(bv.byteOffset = at), (bv.byteLength = sizes[i]), (at += (sizes[i] + 3) & ~3)
+  })
+  return out
 }
 
 // glTF's node transforms: a column-major matrix, or translation · rotation · scale.

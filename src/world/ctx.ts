@@ -94,7 +94,7 @@ export { seen }
 // Model `id` (if it has loaded) at world point c, its own x, y, z axes laid along the unit vectors ax, ay, az,
 // `size` radii across its widest, centred: one more solid this frame, its lamps (if it has any) lit `lit` of colour
 // `lamp`. Returns whether it was there to draw.
-const pool: Placed[] = [], LAMP = 60 // a lamp's light at full brightness, against the sun's 22
+const pool: Placed[] = [], LAMP = 60, ARRIVE = 800 // a lamp's light at full brightness, against the sun's 22; how long a model takes to fade in, ms
 export function solid(id: string, c: ArrayLike<number>, ax: ArrayLike<number>, ay: ArrayLike<number>, az: ArrayLike<number>, size: number, k = 1, glow = 0, lamp?: ArrayLike<number>, lit = 0) {
   const m = ctx.models[id]
   if (!m) return false
@@ -113,6 +113,8 @@ export function solid(id: string, c: ArrayLike<number>, ax: ArrayLike<number>, a
     r[q * 4 + 3] = c[q] - ctx.E[q] - (R0 * mc[0] + R1 * mc[1] + R2 * mc[2])
   }
   it.model = m, it.k = k, it.glow = glow
+  const a = Math.min(1, (performance.now() - m.born) / ARRIVE)
+  it.fade = a * a * (3 - 2 * a) // (as it arrives, it fades in)
   for (let q = 0; q < 3; q++) (it.lamp as number[])[q] = lamp ? lamp[q] * lit * LAMP : 0
   ctx.items.push(it)
   return true

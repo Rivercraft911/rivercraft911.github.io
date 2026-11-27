@@ -170,3 +170,4 @@ try {
 } finally {
   rmSync(tmp, { recursive: true, force: true })
 }
+execFileSync(process.execPath, [new URL('pack-models.mjs', import.meta.url).pathname], { stdio: 'inherit' }) // and packed for the wire
