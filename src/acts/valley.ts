@@ -4,16 +4,15 @@
 // carved into a valley that climbs toward the peaks in cascades, and it is drawn as the pulsar plot was,
 // cross-section after cross-section, front to back, each hidden behind the ones before it (a floating
 // horizon, recomputed every frame). Firs are triangle waves under a tapering envelope; the far peaks are
-// spectra; the stones in the shallows are 16APSK. What is being seeded is the hero: the speakers trace it
-// and its equation is written live beneath the scene.
+// spectra. The speakers trace what the beam draws, simplified to what they can (beam/scope.ts), so a scope
+// on the jack draws the valley too, and every equation it is made of is written live above it.
 import { Path, STRIDE } from '../beam/path'
+import { GX, GY, Scope, tune } from '../beam/scope'
 import { load, use } from '../beam/font'
 import { fft, hann } from '../dsp/fft'
 import { Field } from '../dsp/terrain'
 import { place, sing } from './choir'
 import { VALLEY as DUR, SING } from './clock' // the choirs begin to sing at SING
-import { Kind } from '../dsp/dvbs2'
-import { ON, RS, STEPS, STONES, chase, decision, esn0, offset, order, rain, sig, sigma, signal, stone, turn } from './modem'
 import { A0, GF, HF, KEYS as POOL, M, R, RIM, TAU_RASTER, V as VR, loud, say as tell, sight, surface, turned, turning, vortex as whirl } from './wrap'
 import { LOOK } from '../gpu/phosphor'
 import { Board, Say } from './say'
@@ -194,7 +193,7 @@ function peaks(seed: number, x: number, z0: number, z1: number, base: number, H:
 // Round the shaft and beyond it: firs, and the moat's current, running round from where the river comes in
 // and quickening to the rim (critical there: Fr = 1), then the first of its fall. All of it rises at FAR,
 // as we leave the pool and it comes into sight: until then it costs the beam nothing.
-const FAR = 8.5
+const FAR = 5
 for (let i = 0; i < 300; i++) {
   const a = TAU * rnd(i * 3 + 7000), r = RR + 5.5 + 30 * rnd(i * 5 + 7001) ** 1.3, x = SX + r * Math.cos(a), z = SZ + r * Math.sin(a), h = height(x, z) - YL
   if (x < 58 || x > X1 - 3 || h > 7 || h < 0.25) continue
@@ -226,17 +225,14 @@ const LAND = L('T(x, z) = \\sum_k |k|^{-1.05} \\cos(k \\cdot r + \\phi_k),\; x_i
 const WALL = L('y = y_r + (6 + 3 \\sin(0.05 x + 1) + 2 \\sin(0.13 x))\\, S(d)^{1.4} + T', INK, 2.2)
 const FLOWS = L('u = 1.2 (1 - d^2)\\, s + \\sum_j \\Gamma_j \\frac{y \\times r_j}{|r_j|^2} + 0.5\\, \\nabla \\times T', WATER, 0.6)
 const WAVES = L('\\eta = 0.035 \\sin(3.1 x + 1.7 z + \\num{0}{0.00}) + 0.025 \\sin(3.7 z - 2.3 x + \\num{1}{0.00})', WATER, 3)
-const FIRS = L('x(y) = 0.3 H (1 - y / H)^{0.9}\\, tri(\\pi n y / H),\; N = \\num{0}{000}', PINE, 4)
-const PEAKS = L('h(z) = 20 \\log_{10} |S(e^{i \\omega})|', INK, 6)
+const FIRS = L('x(y) = 0.3 H (1 - y / H)^{0.9}\\, tri(\\pi n y / H),\; N = \\num{0}{000}', PINE, 3.2)
+const PEAKS = L('h(z) = 20 \\log_{10} |S(e^{i \\omega})|', INK, 5)
 const SPRAY = L('(x, y) = (x_0 + v_x \\tau,\; y_0 + v_y \\tau - 3.5 \\tau^2)', WHITE, 2)
-const EYE = L('eye = (\\num{0}{-00.0}, \\num{1}{-00.0}, \\num{2}{-00.0})', WHITE, 5.2)
+const EYE = L('eye = (\\num{0}{-00.0}, \\num{1}{-00.0}, \\num{2}{-00.0})', WHITE, 4.2)
 // From the lip on one equation is told at a time, each growing out of the last (wrap.ts say): the lip's
 // critical flow, the fall, the plot the falling water is, and then the vortex's own.
 const FROUDE = 'Fr^2 = \\frac{v^2}{g h}', BALLISTIC = 'y = y_l - \\frac{1}{2} g \\tau^2', STFT = 'S(f, t) = |\\sum_n x[n]\\, w[n - t H]\\, e^{-i 2 \\pi f n / N}|'
-const STONE = [1, 0.8, 0.45] as const
-const MODEM = L('E_s / N_0 = \\num{0}{-00.0}\\,dB,\; M = \\num{1}{00},\; \\Delta f = \\num{2}{-000}\\,Hz', STONE, ON)
-const RAIN = L('A = 0.0239\\, R^{1.18} L,\; R = \\num{0}{00.0}\\,mm/h', INK, 6)
-const board = new Board([RIVER, OPEN, FLOWS, LAND, WALL, WAVES, SPRAY, FIRS, MODEM, EYE, PEAKS, RAIN])
+const board = new Board([RIVER, OPEN, FLOWS, LAND, WALL, WAVES, SPRAY, FIRS, EYE, PEAKS])
 const say = new Say()
 export const RIVER_EQ = '\\theta(s) = \\omega_1 \\sin(2\\pi s / M_1) + \\omega_2 \\sin(2\\pi s / M_2 + \\phi)'
 let ceil = 1 // nothing of the land is drawn above this: the board's room
@@ -249,25 +245,23 @@ const HB = 1024, horizon = new Float32Array(HB)
 const p3 = { x: 0, y: 0, z: 0 }, q3 = { x: 0, y: 0, z: 0 }
 const sx = new Float32Array(NC), sy = new Float32Array(NC), sz = new Float32Array(NC), ok = new Uint8Array(NC)
 const ink = new Path(), line = new Path()
-const HERO = 4096, hx = new Float32Array(HERO), hy = new Float32Array(HERO)
-let heroN = 0, heroGain = 0.7, occlude = 1, landK = 1, lp = 0, hl = 0, hr = 0 // lp: the roar's low-pass state; hl, hr: the hero's
+let occlude = 1, landK = 1, lp = 0, hl = 0, hr = 0, hl2 = 0, hr2 = 0 // lp: the roar's low-pass state; hl, hr: the scope's, twice
 
 // The flight: one continuous path, eye, target and lens gliding through these without stopping. Straight
-// down on the map the meander drew; a crane up and back as the valley rises; downstream over the firs;
-// down to the pool as its stones lock, low over it through the rain and up as the sky clears; low and
-// fast down the river to the lip; over it and round in an arc to face the falls, held there on the plot
-// they have become; then up and over as it pours down into the plunge pool below (wrap.ts).
+// down on the map the meander drew; a crane up and back as the valley rises; down over the firs to skim the
+// pool turning in its bend, and up and on downstream; low and fast down the river to the lip; over it and
+// round in an arc to face the falls, held there on the plot they have become; then up and over as it pours
+// down into the plunge pool below (wrap.ts).
 const MAP_FOV = 1.1
+export const RUN = 7 // the run for the lip: from half a second on, the falls' own stretch
 const on = (x: number, h: number, dz: number, tx: number, fov: number) => [x, riverY(x) + h, riverZ(x) + dz, tx, riverY(tx), riverZ(tx), fov]
 const KEYS: number[][] = [
   [0, 0, 0, 0, 0, 0, 0, 0], // the map, framed each frame to the screen
   [1.2, 0, 0, 0, 0, 0, 0, 0], // held while the line opens into a river
   [3.6, X0 - 5, riverY(0) + 15, riverZ(0) - 9, 22, riverY(22), riverZ(22), 1],
-  [5.6, ...on(2, 7.5, 6, SC, 0.95)], // down toward the pool as the carrier locks
-  [7, ...on(SC - 5.5, 2.8, -2.5, SC + 1, 1.05)], // low over the water, in the worst of the rain
-  [8.4, ...on(SC - 4, 6, 3.5, SC + 3, 1.05)], // up over the stones as the sky clears and they multiply
-  [9.3, ...on(SC + 9, 8, 3, 42, 1)],
-  [10.5, ...on(43, 6.5, 0, 57, 1)],
+  [5, ...on(SC - 4, 3.6, -2, SC + 5, 1.05)], // down over the firs, low over the pool
+  [6.1, ...on(SC + 11, 7.5, 2.5, 42, 1)], // and up, on downstream
+  [RUN, ...on(43, 6.5, 0, 57, 1)],
   // low and fast to the lip, the shaft opening ahead; over it with the water, looking down the fall at the
   // pool; down inside the curtain as fast as it falls, so the plot hangs still round us; out over the pool
   // at its foot to see it lip to foot; and up, to look down on the disc the spectrum makes (wrap.ts flies on)
@@ -364,11 +358,84 @@ function items_(t: number, upto: number, next: { i: number }) {
       }
       ink.color(it.c[0], it.c[1], it.c[2], fog(p3.z) * g * landK)
       if (it.kind === TREE && it.n > 2 && !v && k >= 1) grown++
+      if (!v && (it.kind === TREE || it.kind === FIR2) && it.n > 2) heard(next.i, k * fog(p3.z), p3.z)
+      if (!v && it.kind === PEAK) far = next.i
       pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
       pen = true
     }
   }
 }
+
+// ── what the speakers trace ─────────────────────────────────────────────────────────────────────────
+// The beam's own picture, thinned to what 48 kHz can draw at a note (beam/scope.ts): every AR-th of the
+// cross-sections, every AC-th point of each, and where the beam hides a point behind the land in front, the
+// speakers lay it on that land's horizon instead, so the stroke stays whole and only retraces what is lit;
+// the line and the contours the meander left, while they last; the banks; the firs nearest the eye; the far
+// peaks; the rim of the shaft ahead. Each stretch is worth its drawn length times its brightness, so what
+// fades in or out on the screen grows or shrinks in the speakers' time instead of popping. Traced forth and
+// back, there is no flyback to hear.
+const AR = 10, AC = 5, FIRS_HEARD = 6
+const sc = new Scope(), shore = new Float32Array(2 * 2 * NR) // the banks' points, left then right
+let flip = false, far = -1, banks = 0
+const firs: number[] = [], near: number[] = [] // the nearest firs drawn this frame: item, closeness
+function heard(i: number, k: number, z: number) {
+  if (k < 0.3) return
+  let j = firs.length
+  if (j === FIRS_HEARD && z >= near[j - 1]) return
+  if (j === FIRS_HEARD) j--
+  while (j > 0 && near[j - 1] > z) (firs[j] = firs[j - 1]), (near[j] = near[j - 1]), j--
+  ;(firs[j] = i), (near[j] = z)
+}
+const into = (x: number, y: number) => Math.abs(x) < view.a && y > -1 && y < ceil
+// A cross-section, from the screen arrays, as the speakers draw it, every other one backwards.
+function section(o: number, w: number) {
+  let pen = false
+  sc.weight = w
+  for (let k = 0; k < NC; k += AC) {
+    const j = flip ? NC - 1 - k : k, y = occlude < 0.5 ? sy[j] : Math.max(sy[j], horizon[col(sx[j])])
+    if (!ok[j] || RK[o + j] > 1 || !into(sx[j], y)) pen = false
+    else pen ? sc.lineTo(sx[j], y) : ((pen = true), sc.moveTo(sx[j], y))
+  }
+  flip = !flip
+}
+// A world-space polyline of items' vertices, every `every`-th, as it is drawn.
+function traced(it: Item, w: number, every: number, t: number) {
+  const k = clamp(lock([[0, 0], [it.t0, 1]], t, 7, 0.45), 0, 1.3)
+  let pen = false
+  sc.weight = w
+  for (let v = 0; v < it.n; v += Math.min(every, Math.max(1, it.n - 1 - v))) {
+    const o = 3 * (it.a + v)
+    if (!cam.project(VX[o], it.base + (VX[o + 1] - it.base) * k, VX[o + 2], p3) || !visible(p3.x, p3.y) || !into(p3.x, p3.y)) pen = false
+    else pen ? sc.lineTo(p3.x, p3.y) : ((pen = true), sc.moveTo(p3.x, p3.y))
+    if (v === it.n - 1) break
+  }
+}
+function bank(side: number, w: number) {
+  let pen = false
+  sc.weight = w
+  for (let b = 0; b < banks; b++) {
+    const i = side > 0 ? banks - 1 - b : b, x = shore[4 * i + (side > 0 ? 2 : 0)], y = shore[4 * i + (side > 0 ? 3 : 1)]
+    if (x !== x) pen = false
+    else pen ? sc.lineTo(x, y) : ((pen = true), sc.moveTo(x, y))
+  }
+}
+// The rim of the shaft the river ends in, once it is in sight.
+function rimmed(w: number) {
+  let pen = false
+  sc.weight = w
+  for (let j = 0; j <= 48; j++) {
+    const a = (TAU * j) / 48
+    if (!cam.project(SX + RR * Math.cos(a), YL, SZ + RR * Math.sin(a), p3) || !visible(p3.x, p3.y) || !into(p3.x, p3.y)) pen = false
+    else pen ? sc.lineTo(p3.x, p3.y) : ((pen = true), sc.moveTo(p3.x, p3.y))
+  }
+}
+// The refresh rate, a bass line in A under the picture, which is its timbre: on A while the line opens,
+// walking as the land rises and the firs grow, and climbing the major chord as we run for the lip.
+const A1 = 55, CS = 69.3, E1 = 41.2, B1 = 61.74, D2 = 73.42, E2 = 82.41, FS = 46.25
+const RIFF = [A1, A1, E1, A1, B1, CS, B1, E1, D2, CS, A1, E1, FS, A1, B1, CS, A1, E1, A1]
+const CLIMB = [CS, E2, 2 * A1, 2 * CS]
+const NOTES: [number, number][] = [[0, A1], ...RIFF.map((n, i): [number, number] => [1.2 + ((RUN - 1.2) * i) / RIFF.length, n]), ...CLIMB.map((n, i): [number, number] => [RUN + 0.2 * i, n])]
+const CYCLES = tune(NOTES)
 
 // White water: at each cascade a foam lip curling across the river, and spray thrown downstream on
 // ballistic arcs, each droplet a parabola; around each stone, ripple rings running outward.
@@ -508,118 +575,15 @@ function shaft(t: number, k: number, hatch: number) {
   }
 }
 
-// The pool: the modem's I/Q plane lying on the water (modem.ts), I downstream, Q across. Every point of its
-// constellation is a stone with rings running out from it; every symbol decided is a splash where the
-// receiver saw it land, so the worse the weather the wider they scatter; and skimming between them is the
-// wire itself, the last few milliseconds of what the speakers are playing. Unlocked, that is a ring.
-const RW = 2.2, PY0 = riverY(SC) + 0.04, PZ0 = riverZ(SC)
-const st = { i: 0, q: 0, a: 0 }, dc = { i: 0, q: 0 }
-const si = new Float64Array(STONES), sq = new Float64Array(STONES), sa = new Float64Array(STONES), round = new Uint8Array(STONES)
-let slip = 0, standing = 0
-// Where every stone is now, turned as the carrier is; and the ones standing, in order round the pool,
-// which is the order the speakers visit them in.
-function place_(t: number) {
-  const ph = turn(t, slip), c = Math.cos(ph), s = Math.sin(ph)
-  standing = 0
-  for (let n = 0; n < STONES; n++) {
-    stone(n, t, st)
-    si[n] = st.i * c - st.q * s, sq[n] = st.i * s + st.q * c, sa[n] = st.a
-    if (st.a > 0.5) round[standing++] = n
-  }
-  round.subarray(0, standing).sort((a, b) => Math.atan2(sq[a], si[a]) - Math.atan2(sq[b], si[b]))
-}
-const wet = (i: number, q: number) => cam.project(SC + RW * i, PY0, PZ0 + RW * q, p3) && visible(p3.x, p3.y)
-function stones(t: number) {
-  const k0 = Math.floor(t * RS), on = landK * smooth(ON, ON + 0.3, t)
-  for (let n = 0; n < STONES; n++) {
-    if (sa[n] < 0.02) continue
-    const i = si[n], q = sq[n]
-    for (let ring = 0; ring < 3; ring++) {
-      const u = ring > 1 ? (0.9 * t + 0.37 * n) % 1 : 0, r = ring > 1 ? 0.11 + 0.3 * u : (ring ? 0.06 : 0.11) * sa[n]
-      ink.color(STONE[0], STONE[1], STONE[2], on * sa[n] * (ring > 1 ? 0.45 * (1 - u) : 1.8))
-      let pen = false
-      for (let j = 0; j <= 12; j++) {
-        const a = (j / 12) * TAU
-        if (!wet(i + r * Math.cos(a), q + r * Math.sin(a))) {
-          pen = false
-          continue
-        }
-        pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
-        pen = true
-      }
-    }
-  }
-  // talking, the wire is a scribble: keep only a moment of it, faint, under the stones
-  const m = smooth(ON + 0.7, ON + 1.2, t)
-  ink.color(WATER[0], WATER[1], WATER[2], mix(0.6, 0.14, m) * on)
-  let pen = false
-  for (let j = 0; j < 160; j++) {
-    signal(t - mix(0.003, 0.001, m) * (1 - j / 159), slip)
-    if (!wet(sig.i, sig.q)) {
-      pen = false
-      continue
-    }
-    pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
-    pen = true
-  }
-  for (let a = 0; a < 420 && (k0 - a) / RS > ON + 1.2; a++) {
-    const lit = decision(k0 - a, slip, dc) === Kind.Data ? 0.8 : 1.5 // headers and pilots are the receiver's references: hotter
-    if (wet(dc.i, dc.q)) ink.color(WHITE[0], WHITE[1], WHITE[2], 1.6 * on * lit * (1 - a / 420)).dot(p3.x, p3.y, 0.006)
-  }
-}
-
-// Rain: streaks falling through the valley, as many as the rain is heavy, each in its place in the depth
-// of the picture so the land in front of it hides it.
-const DROPS = 2600, RX = Float32Array.from({ length: DROPS }, (_, d) => -8 + 66 * rnd(d * 3 + 1)).sort()
-function drop(d: number, t: number, heavy: number) {
-  const x = RX[d]
-  if (rnd(d * 11 + 5) > heavy || x < eye.x + 1.5) return
-  const z = riverZ(x) + (2 * rnd(d * 5 + 2) - 1) * 12, y = riverY(x) + 13 - ((9 * t + 13 * rnd(d * 7 + 3)) % 13)
-  if (y > height(x, z)) seg(x, y, z, x + 0.2, y + 0.8, z, INK, 0.6)
-}
-
-// The firs, loudest first: the speakers follow one at a time, the newest every ninth of a second. A fir is a
-// triangle wave, so each is a pitch, the number of its teeth times the rate it is retraced at.
-const FIR = items.map((it, i) => (it.kind === TREE && it.n > 2 ? i : -1)).filter((i) => i >= 0).sort((a, b) => items[a].t0 - items[b].t0)
-function newest(t: number) {
-  const q = Math.floor(t * 9) / 9
-  let it = items[FIR[0]]
-  for (const i of FIR) if (items[i].t0 <= q) it = items[i]
-  for (let v = 0; v < it.n; v++) if (cam.project(VX[3 * (it.a + v)], VX[3 * (it.a + v) + 1], VX[3 * (it.a + v) + 2], p3)) (hx[heroN] = p3.x), (hy[heroN++] = p3.y)
-}
-
-// The speakers retrace their trace at a note, not a hum: harmonics of the river's 55 Hz, [from, harmonic],
-// 4 : 5 : 6 a major chord, climbing it as we run for the lip. (The firs bring their own pitch, so they are
-// retraced slowly.) The phase is carried across each change, so the trace never jumps.
-const NOTES = [[0, 4], [1.2, 4], [1.65, 6], [2.1, 8], [2.55, 6], [3, 0.5], [8.7, 4], [9.15, 5], [9.6, 6], [10.05, 8], [10.5, 10], [10.95, 12], [11.4, 1]] // and over the lip it is the river's own hum again, under the roar
-const CYC = [0]
-for (let i = 1; i < NOTES.length; i++) CYC.push(CYC[i - 1] + 55 * NOTES[i - 1][1] * (NOTES[i][0] - NOTES[i - 1][0]))
-function cycles(tt: number) {
-  let i = NOTES.length - 1
-  while (i > 0 && tt < NOTES[i][0]) i--
-  return CYC[i] + 55 * NOTES[i][1] * (tt - NOTES[i][0])
-}
-// At the pool the note is the modem's: the fewer the stones, the lower, down to the hook's own 110 Hz.
-const TONES = STEPS.map(([t, c]) => [t, { 4: 2, 8: 3, 16: 4, 32: 6 }[c.pts.length / 2] ?? 4])
-const PCYC = [0]
-for (let i = 1; i < TONES.length; i++) PCYC.push(PCYC[i - 1] + 55 * TONES[i - 1][1] * (TONES[i][0] - TONES[i - 1][0]))
-function rounds(tt: number) {
-  let i = TONES.length - 1
-  while (i > 0 && tt < TONES[i][0]) i--
-  return PCYC[i] + 55 * TONES[i][1] * (tt - TONES[i][0])
-}
-let pl = 0, pr = 0 // the pool's low-pass state
-
 export const valley: Scene = {
   dur: DUR,
+  fade: 0.25, // the meander's last picture is this one's first
   build(t, f) {
     crane(t)
-    ink.clear(), (heroN = 0), (grown = 0)
+    ink.clear(), sc.clear(), (grown = 0), (flip = false), (far = -1), (banks = firs.length = near.length = 0)
     horizon.fill(-9)
-    const next = { i: 0 }, edge = { i: 0 }, behind = occlude > 0.5 ? eye.x + 0.3 : -Infinity, heavy = rain(t) / 45
-    let heroRow = -1, nd = 0, pooled = t < ON
-    slip = chase(t)
-    if (t > ON) place_(t)
+    const next = { i: 0 }, edge = { i: 0 }, behind = occlude > 0.5 ? eye.x + 0.3 : -Infinity
+    let heroRow = -1
     const land = (landK = 1 - smooth(11.9, 12.5, t)) // under the rim the land is out of sight: only the shaft's rock is left
     const T = t - DUR, lit = smooth(11.2, 12.3, t), wall = smooth(FAR, FAR + 1, t) * (1 - smooth(12.3, 13.3, t)) // the rock's ink, until the falls are between us and it
     const brim = smooth(FAR, FAR + 1, t) * (1 - smooth(18.4, DUR, t))
@@ -631,13 +595,15 @@ export const valley: Scene = {
       if (x < behind) continue
       items_(t, x, next)
       rim(x, edge, brim)
-      if (!pooled && x > SC - 3.2) (pooled = true), stones(t)
-      for (; heavy > 0 && nd < DROPS && RX[nd] < x; nd++) drop(nd, t, heavy)
       for (const c of CASCADES) if (c >= x0 && c < x && t > opens(c)) whitewater(t, c)
       // the banks and the current, from the last row to this one
       if (i > 0 && i < NR && x0 >= behind && t > opens(x0)) {
         const y0 = riverY(x0), y1 = riverY(x), w0 = wide(x0) * open(x0, t), w1 = wide(x) * open(x, t)
         for (const side of [-1, 1]) seg(x0, y0, riverZ(x0) + side * w0, x, y1, riverZ(x) + side * w1, WATER, 0.9)
+        if (i % 2 === 0) for (const side of [-1, 1]) {
+          const ok = cam.project(x, y1, riverZ(x) + side * w1, p3) && visible(p3.x, p3.y) && into(p3.x, p3.y), o = 4 * banks + side + 1
+          ;(shore[o] = ok ? p3.x : NaN), (shore[o + 1] = p3.y), (banks += (side + 1) / 2)
+        }
       }
       if (rise <= 0) continue
       // the cross-section, risen from the river's level, drawn where it clears the horizon
@@ -660,18 +626,19 @@ export const valley: Scene = {
         pen = true
       }
       if (t >= SCAN && rise < 1.2) heroRow = i
+      if (i % AR === 0) section(o, index * fog(sz[NC >> 1]))
       for (let j = 1; j < NC; j++) if (ok[j] && ok[j - 1] && RK[o + j] < 2 && RK[o + j - 1] < 2) raise(sx[j - 1], sy[j - 1], sx[j], sy[j])
-      if (heroRow === i && t < 3) for (let j = 0; j < NC && heroN < HERO; j++) if (ok[j]) (hx[heroN] = sx[j]), (hy[heroN++] = sy[j])
     }
     if (land > 0.06) items_(t, Infinity, next)
     // the contours the meander's rivers combed out onto, carried on at their own heights, so they tilt with the land
-    // as we crane up, and give way as its cross-sections rise
+    // as we crane up, and give way as its cross-sections rise; the speakers keep the three a side they traced
     const cl = 0.2 * (1 - smooth(1, 2.6, t))
     if (cl > 0.01)
       for (const side of [-1, 1])
         for (let l = 0; l < LEVELS; l++) {
-          let pen = false
+          let pen = false, kept = 0
           ink.color(INK[0], INK[1], INK[2], cl)
+          if (l % 4 === 2) (sc.weight = 5 * cl), (kept = 1)
           for (let x = X0; x < XM + 8; x += 0.4) {
             const z = contour(side, l, x)
             if (z !== z || !cam.project(x, riverY(x) + (l + 0.5) * CI, z, p3)) {
@@ -679,17 +646,12 @@ export const valley: Scene = {
               continue
             }
             pen ? ink.lineTo(p3.x, p3.y) : ink.moveTo(p3.x, p3.y)
+            if (kept) pen ? sc.lineTo(p3.x, p3.y) : sc.moveTo(p3.x, p3.y)
             pen = true
           }
         }
     rim(Infinity, edge, brim)
     if (wall > 0) shaft(t, wall, 1 - 0.8 * smooth(12.6, 14, t))
-    if (t >= 3 && t < ON + 0.3) newest(t)
-    // nothing new growing: the speakers trace the river itself, from under us to the lip
-    if (heroN < 2 && t >= SCAN && land > 0.06)
-      for (let x = Math.max(X0, eye.x + 1); x < LIP && heroN < HERO; x += 0.3)
-        if (cam.project(x, riverY(x), riverZ(x), p3)) (hx[heroN] = p3.x), (hy[heroN++] = p3.y)
-    heroGain = t < SCAN ? 0.3 : t < 3 ? 0.7 : t < ON + 0.3 ? 1 : 0.4 // a ridge or one far fir carries less than the river does
     // the shaft's printer runs from early on, so the water has its history when it shows; its drops fall
     // from when we run for the lip, its water is lit as we come over, and both turn from water to the plot
     // as we ride down with them
@@ -700,12 +662,6 @@ export const valley: Scene = {
       sight(WE, WT, UP, cur[6])
       f.look = lit > 0 ? { tau: mix(LOOK.tau, TAU_RASTER, smooth(0, 0.2, lit)) } : undefined
     }
-    // over the edge the speakers trace the rim, the spectrum going over it, until the choir takes over
-    if (heroN < 2 && t > 6)
-      for (let j = 0; j < 96 && heroN < HERO; j++) {
-        const a = (TAU * j) / 96
-        if (cam.project(SX + RR * Math.cos(a), YL + 0.9 * loud(lane(a)), SZ + RR * Math.sin(a), p3)) (hx[heroN] = p3.x), (hy[heroN++] = p3.y) // heard even where it is out of frame
-      }
     // exposure: the ink is energy per length, so as the valley fills in it would burn brighter and
     // brighter; past a reference length, stop down, as an eye or a camera would
     const stop = Math.min(1, (EXPOSE / Math.max(1, ink.len)) ** 0.7)
@@ -726,21 +682,18 @@ export const valley: Scene = {
         line.color(WATER[0], WATER[1], WATER[2], glow((x - X0) / (XM - X0), t + MEANDER) * k)
         pen ? line.lineTo(p3.x, p3.y) : line.moveTo(p3.x, p3.y)
         pen = true
-        if (t < SCAN && heroN < HERO) (hx[heroN] = p3.x), (hy[heroN++] = p3.y)
       }
       f.ch.push({ w: fade, path: line })
     }
     // the equations: the meander's carries on a moment, then the board of everything takes over
     if (t < 0.6) say.say(f, t, RIVER_EQ, WATER, [['\\omega_1', W1, 2], ['\\omega_2', W2, 2], ['M_1', M1, 0], ['M_2', M2, 0]], 1 - smooth(0, 0.6, t))
-    const hero = t < SCAN ? 0 : t < 3 ? 1 : t < ON ? 2 : t < 8.7 ? 4 : 3 // what the speakers are tracing: river, land, firs, the river to the falls, the pool
+    const hero = t < SCAN ? 0 : t < 3 ? 1 : t < 4.8 ? 2 : 3 // what is new: the river, the land, the firs
     RIVER.vals[0] = W1, RIVER.vals[1] = W2, RIVER.hot = +(hero === 0)
     OPEN.vals[0] = clamp(X0 + (t - 0.25) / 0.03, X0, LIP), OPEN.hot = 1 - smooth(2, 3.5, t)
     LAND.vals[0] = rowX(Math.max(0, heroRow)), LAND.hot = +(hero === 1)
     FIRS.vals[0] = grown, FIRS.hot = +(hero === 2)
     WAVES.vals[0] = (7 * t) % TAU, WAVES.vals[1] = (5.3 * t) % TAU, WAVES.hot = FLOWS.hot = 0.4
     EYE.vals[0] = eye.x, EYE.vals[1] = eye.y, EYE.vals[2] = eye.z, EYE.hot = 0.3
-    MODEM.vals[0] = esn0(t), MODEM.vals[1] = order(t), MODEM.vals[2] = offset(t), MODEM.hot = +(hero === 4)
-    RAIN.vals[0] = rain(t), RAIN.hot = heavy
     // running for the lip the board gives way to one equation at a time: the water goes critical at the rim
     // (Fr = 1, where it runs as fast as its own waves), falls, is the plot, and turns
     const hand = smooth(10.6, 11.2, t)
@@ -756,24 +709,32 @@ export const valley: Scene = {
 
     f.rate = mix(2.4e6, 7.2e6, smooth(1, 8, t))
     if (t > SING) place(t - SING)
-    // autoset, as a scope does: whatever is traced fills the speakers' range, however small it is on screen
-    let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity
-    for (let i = 0; i < heroN; i++) (x0 = Math.min(x0, hx[i])), (x1 = Math.max(x1, hx[i])), (y0 = Math.min(y0, hy[i])), (y1 = Math.max(y1, hy[i]))
-    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, fit = 1.8 / Math.max(hero === 2 ? 0.05 : 0.3, x1 - x0, y1 - y0) // a far fir is small
-    return (tt, o) => {
-      // at the pool the speakers follow the wire while it is a bare carrier, its beat falling to nothing as
-      // it locks; then the stones, round and round at the modem's note, landing on each where the receiver
-      // saw it land. So a clear sky is a clean tone, rain is the grit in it, and four stones are a square wave.
-      const wire = smooth(ON, ON + 0.25, tt) * (1 - smooth(8.5, 8.9, tt)), talk = smooth(ON + 0.7, ON + 1.2, tt)
-      if (wire > 0) {
-        let x = 0, y = 0
-        if (talk < 1) signal(tt, slip), (x = (1 - talk) * sig.i), (y = (1 - talk) * sig.q)
-        if (talk > 0 && standing) {
-          const v = rounds(tt) * standing, n = round[Math.floor(v) % standing], sd = sigma(tt)
-          x += talk * (si[n] + sd * hash(Math.floor(v) * 1.618)), y += talk * (sq[n] + sd * hash(Math.floor(v) * 2.414 + 7))
+    // the speakers' picture: the land, then the line and contours while they last, the far peaks, the firs
+    // nearest us, the banks, and the shaft's rim ahead (wrap.ts draws what is over it)
+    if (fade > 0) {
+      let pen = false
+      for (let i = 0; i < 2; i++) {
+        sc.weight = 3 * fade
+        for (let j = 0, n = line.v.length / STRIDE; j < n; j += 4) {
+          const v = STRIDE * (i ? j : n - 1 - j)
+          if (!line.v[v + 7] || !into(line.v[v], line.v[v + 1])) pen = false
+          else pen ? sc.lineTo(line.v[v], line.v[v + 1]) : ((pen = true), sc.moveTo(line.v[v], line.v[v + 1]))
         }
-        pl += (0.3 * wire * x - pl) * 0.4, pr += (0.3 * wire * y - pr) * 0.4
-        o.l += pl, o.r += pr
+      }
+    }
+    if (far >= 0) traced(items[far], 0.6, 3, t)
+    for (const i of firs) traced(items[i], 4, 1, t)
+    if (banks) bank(-1, 1.5 * land), bank(1, 1.5 * land)
+    if (t > FAR) rimmed(2 * smooth(FAR, FAR + 1, t))
+    sc.commit(t)
+    const tip = { x: 0, y: 0 }
+    return (tt, o) => {
+      // the speakers trace it forth and back at the bass line's note; hushed at the lip, where the scope ends
+      const c = CYCLES(tt), u = 2 * (c - Math.floor(c)), k = 1 - smooth(RUN + 0.8, RUN + 1, tt)
+      if (k > 0) {
+        sc.at(u < 1 ? u : 2 - u, tt, tip)
+        ;(hl += (GX * tip.x - hl) * 0.5), (hr += (GY * tip.y - hr) * 0.5), (hl2 += (hl - hl2) * 0.5), (hr2 += (hr - hr2) * 0.5)
+        ;(o.l += k * hl2), (o.r += k * hr2)
       }
       // the falls are heard coming; at the lip everything holds its breath; over the edge the scope rule
       // ends, and they roar
@@ -784,13 +745,6 @@ export const valley: Scene = {
         o.l += roar, o.r += roar
         if (tt > SING) sing(tt - SING, o) // silent until we go over, then fading in; on past the end, as the speakers run ahead
       }
-      if (heroN < 2 || tt > 17.8) return
-      const ph = (cycles(tt) % 1) * 2, u = (ph < 1 ? ph : 2 - ph) * (heroN - 1), i = Math.min(heroN - 2, Math.floor(u)), a = u - i
-      const k = heroGain * (1 - wire) * hush * (1 - smooth(13.8, 17.8, tt))
-      // a gentle low-pass (about 4 kHz) takes the edge off the traced corners
-      hl += (k * fit * (hx[i] + (hx[i + 1] - hx[i]) * a - cx) - hl) * 0.4
-      hr += (k * fit * (hy[i] + (hy[i + 1] - hy[i]) * a - cy) - hr) * 0.4
-      o.l += hl, o.r += hr
     }
   },
 }
