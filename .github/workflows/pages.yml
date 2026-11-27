@@ -29,7 +29,7 @@ jobs:
       - run: npm run build
       # deep links (/<project>) are routed by the app: serve it for every path
       - run: cp dist/index.html dist/404.html
-      # /next/: the world branch while it is being made, built under its own base
+      # /next/: the world branch, where new work is made before it comes to main, built under its own base
       - id: next
         run: git ls-remote --exit-code --heads origin world && echo ok=1 >> "$GITHUB_OUTPUT" || true
       - if: steps.next.outputs.ok
@@ -40,6 +40,19 @@ jobs:
       - if: steps.next.outputs.ok
         working-directory: next
         run: npm ci && npx tsc --noEmit && npx vite build --base=/next/ --outDir ../dist/next --emptyOutDir
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+      # /v1/: the first site, the band of frequencies and its intro, kept as it was on its own branch
+      - id: v1
+        run: git ls-remote --exit-code --heads origin v1 && echo ok=1 >> "$GITHUB_OUTPUT" || true
+      - if: steps.v1.outputs.ok
+        uses: actions/checkout@v4
+        with:
+          ref: v1
+          path: v1
+      - if: steps.v1.outputs.ok
+        working-directory: v1
+        run: sed -i 's#href="/how/"#href="/v1/how/"#' index.html && npm ci && npx vite build --base=/v1/ --outDir ../dist/v1 --emptyOutDir
         env:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
       - uses: actions/upload-pages-artifact@v3
