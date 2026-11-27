@@ -1,7 +1,7 @@
 // What River has not drawn in CAD, made here out of boxes, cylinders and strokes, in millimetres: the strobe glasses'
-// LCD valves, their stand and the ball they watch; the desk PEEP plugs into (a monitor, a keyboard and its USB-A port,
-// a TV remote) and the words it types. Each is written as a GLB in memory, so mesh.ts and the tracer take it exactly as
-// they take River's own (a blob: URL through the same worker).
+// LCD valves, their stand and the ball they watch; the desk PEEP plugs into (a monitor, a keyboard, a tower and its
+// USB-A ports), the trigger that fires it and the words it types. Each is written as a GLB in memory, so mesh.ts and
+// the tracer take it exactly as they take River's own (a blob: URL through the same worker).
 import { faces } from '../beam/font'
 
 export type Mat = { col: number[]; metal: number; rough: number } // linear albedo (and alpha), as glTF's

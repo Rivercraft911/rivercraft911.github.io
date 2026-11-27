@@ -7,8 +7,8 @@
 // clear, a run of still pictures, and under it and past the rim, where the lens does not reach, it flies on smoothly.
 // Here time runs ten times slow, so a valve opens twice a second on the screen (never more: a lens large on the screen
 // must not flicker faster than 3 Hz) and a lob takes the half second or so it would. After a while River's board comes
-// off the right temple; clicked, it comes up to the camera and turns over.
-import { TAU, clamp, glide, mix, smooth } from '../../acts/scene'
+// off the right temple (clickable any time); clicked, it comes out, lit, and turns to show both faces.
+import { TAU, clamp, glide, smooth } from '../../acts/scene'
 import { Plucks } from '../../dsp/pluck'
 import { ball, box, make, tube, type Mat } from '../make'
 import { ctx, frame, part, site, solid, turn, type V } from '../ctx'
@@ -98,21 +98,18 @@ const at = (x: number, y: number, z: number, o: V) => {
   for (let i = 0; i < 3; i++) o[i] = n[i] * (1.0005 + y * GM) + (e[i] * x + N[i] * z) * GM
   return o
 }
-// the board's middle as it is now: on the temple, apart (out to the west and up), or clicked (up to the camera)
-const B: V = [0, 0, 0], B1: V = [0, 0, 0]
+// the board's middle as it is now: on the temple, or out to the west and up (apart, or clicked)
+const B: V = [0, 0, 0]
 function board(o: V) {
-  const a = smooth(0, 1, apart)
-  at(BOARD[0] - 40 * a, BOARD[1] + 16 * a, BOARD[2], B)
-  at(BOARD[0] - 70, BOARD[1] + 45, BOARD[2] - 40, B1)
-  for (let i = 0; i < 3; i++) o[i] = mix(B[i], B1[i], lift)
-  return o
+  const a = smooth(0, 1, Math.max(apart, lift))
+  return at(BOARD[0] - 40 * a, BOARD[1] + 16 * a, BOARD[2], o)
 }
 
 export function draw(k: number) {
   const P = PLACES[k], dt = ctx.dt
   site(P.lat, P.lon, n)
   frame(n, e, N)
-  // coming apart, after a while at rest here (and together again away); clicked, the board comes up to the camera
+  // coming apart, after a while at rest here (and together again away); clicked, the board comes out and turns
   const here = ctx.focus === k
   apart = clamp(apart + (here && ctx.since > APART ? dt : -dt) / 2.5)
   const want = here && ctx.picked === 'strobe-board' ? 1 : 0, w = 3.2
@@ -125,11 +122,11 @@ export function draw(k: number) {
   if (now > frames) events.n++
   frames = now
   if (n[0] * ctx.E[0] + n[1] * ctx.E[1] + n[2] * ctx.E[2] < 0.5) return
-  const clear = valve(tau), a = smooth(0, 1, apart)
+  const clear = valve(tau)
   // the frame, and the stand under its bridge
   for (let j = 0; j < 3; j++) (ax[j] = -e[j]), (az[j] = N[j])
   solid('strobe-frame', at(0, LIFT / GM + 23.09, 0, c), ax, n, az, GS)
-  if (here) part('strobe-frame', at(0, EYE + 12, -10, c), 40 * GM)
+  if (here) part('strobe-frame', at(0, MID, 0, c), 75 * GM)
   solid('glasses-stand', at(0, 40.5, -30, c), ax, n, az, 81 * GM)
   // the panes, in their slots
   for (const s of [-1, 1]) {
@@ -137,17 +134,17 @@ export function draw(k: number) {
     const cw = Math.cos(WRAP), sw = Math.sin(WRAP)
     for (let j = 0; j < 3; j++) (ax[j] = s * cw * e[j] + sw * N[j]), (az[j] = sw * e[j] - s * cw * N[j])
     solid(clear ? 'valve-clear' : 'valve-dark', at(s * PANE[0], EYE, PANE[2], c), ax, n, az, W * GM)
-    if (here) part(s < 0 ? 'strobe-valve-r' : 'strobe-valve-l', c, 16 * GM)
+    if (here) part(s < 0 ? 'strobe-valve-r' : 'strobe-valve-l', c, 18 * GM)
   }
   // the board: its long side along the temple, the USB-C end (its −x) to the back, its parts outward (west), on edge
   for (let j = 0; j < 3; j++) (ax[j] = -N[j]), (ay[j] = -e[j]), (az[j] = -n[j])
-  turn(ay, ax, spin, ay), turn(az, ax, spin, az)
+  turn(ax, n, spin, ax), turn(ay, n, spin, ay) // (clicked, it turns about the vertical, its faces to every side)
   if (ctx.models['strobe-board']) {
     const m = ctx.models['strobe-board'], ext = Math.max(m.hi[0] - m.lo[0], m.hi[1] - m.lo[1], m.hi[2] - m.lo[2]), s = 1000 * GM
     board(B)
     for (let i = 0; i < 3; i++) c[i] = B[i] + (s * (ax[i] * (m.lo[0] + m.hi[0]) + ay[i] * (m.lo[1] + m.hi[1]) + az[i] * (m.lo[2] + m.hi[2]))) / 2
-    solid('strobe-board', c, ax, ay, az, s * ext)
-    if (here && (a > 0.5 || lift > 0.05)) part('strobe-board', B, 24 * GM)
+    solid('strobe-board', c, ax, ay, az, s * ext, 1 + 0.8 * lift, 0.15 * lift) // (lit up a little, clicked)
+    if (here) part('strobe-board', B, 21 * GM)
   }
   // the lobs in flight, spinning (topspin, 6 turns a second) as they go
   for (let i = 0; i < 3; i++) (ax[i] = -e[i]), (ay[i] = n[i]), (az[i] = N[i])
@@ -160,8 +157,8 @@ export function draw(k: number) {
   }
 }
 
-// ---- the camera, while it rests here: from behind them to just behind the right lens, then back out as they come apart,
-// and to the board, clicked. [s, ln d, pitch, yaw, the point looked at (mm from the place's own: east, up, north)]
+// ---- the camera, while it rests here: from behind them to just behind the right lens, then back out as the board comes
+// off. [s, ln d, pitch, yaw, the point looked at (mm from the place's own: east, up, north)]
 export const RISE = 0.07
 const BACK = [Math.log(0.36), 0.1, 0.05, 0, 0, 0]
 const EYEV = [Math.log(620 * GM), 0.02, 0, -PANE[0], EYE - (0.01 + RISE) / GM, -436] // the eye 220 mm behind the right pane, looking 400 mm past it
@@ -169,12 +166,10 @@ const OUT = [Math.log(0.3), 0.32, -0.75, 0, 0, 0]
 const KEYS = [[0, ...BACK], [2.5, ...BACK], [5, ...EYEV], [APART, ...EYEV], [APART + 3, ...OUT]]
 const cam = [0, 0, 0, 0, 0, 0]
 export function steer(s: number, _picked: string, o: Steer) {
-  if (s > APART + 3.5 && lift < 1e-3) return false
+  if (s > APART + 3.5) return false
   glide(KEYS, s, cam)
-  board(c)
-  const a = lift
-  o.d = Math.exp(mix(cam[0], Math.log(0.16), a)), o.pitch = mix(cam[1], 0.15, a), o.yaw = mix(cam[2], -1.3, a)
-  for (let i = 0; i < 3; i++) o.at[i] = mix((e[i] * cam[3] + n[i] * cam[4] + N[i] * cam[5]) * GM, c[i] - n[i] * (1.01 + RISE), a)
+  o.d = Math.exp(cam[0]), o.pitch = cam[1], o.yaw = cam[2]
+  for (let i = 0; i < 3; i++) o.at[i] = (e[i] * cam[3] + n[i] * cam[4] + N[i] * cam[5]) * GM
   return true
 }
 

@@ -1,19 +1,21 @@
 // The bench: PEEP doing its job, at true scale. A desk on the ground (a monitor, a keyboard, the computer, a small tower
-// with two USB-A ports in its front, and a TV remote) and PEEP, 12.06 × 8 mm, just out of a port. Arriving, the camera
-// comes down to the tower's front and PEEP slides into the port, all of it but its back edge, as it sits in a real one;
-// the camera draws back, the remote fires PEEP's trigger (three 9 ms bursts of 38 kHz infrared, 30 ms apart, violet as a
-// camera's sensor sees infrared; shown ten times slow so the three can be counted) and the screen fills at the macro's
-// own pace, a key every 20 ms (a press report, 10 ms, a release, 10 ms), in real time. Then PEEP comes out of the port again, a part to click: it comes up to the camera and
-// turns over, and its chips are parts in turn. In the intro's fly-past the same in a second: it plugs in, it fires, it types.
-import { TAU, clamp, glide, mix, smooth } from '../../acts/scene'
+// with two USB-A ports in its front) and PEEP, 12.06 × 8 mm, just out of a port; in front of the tower, River's trigger,
+// an ESP32 and an IR emitter aimed at the port, and a phone showing the page the ESP32 serves. Arriving, the camera comes
+// down to the tower's front and PEEP slides into the port, all of it but its back edge, as it sits in a real one; the
+// camera draws back, fire is pressed on the phone, the emitter sends PEEP's trigger (three 9 ms bursts of 38 kHz
+// infrared, 30 ms apart, violet as a camera's sensor sees infrared; shown ten times slow so the three can be counted) and
+// the screen fills at the macro's own pace, a key every 20 ms (a press report, 10 ms, a release, 10 ms), in real time.
+// Then PEEP comes out of the port again. Clicked, it comes out and up and turns over, and its chips are parts in turn.
+// In the intro's fly-past the same in a second: it plugs in, it fires, it types.
+import { TAU, clamp, glide, smooth } from '../../acts/scene'
 import { Plucks } from '../../dsp/pluck'
-import { ball, box, dome, make, prism, rounded, text, tube, type Mat } from '../make'
+import { ball, box, dome, make, pipe, quad, rounded, slab, text, tube, type Mat } from '../make'
 import { ctx, frame, part, site, solid, turn, unit, type V } from '../ctx'
 import { PLACES, type About, type Steer } from '../places'
 import { faces } from '../../beam/font'
 
 // What PEEP types: its own one line, ASCII only, as its hid_ascii can send (River may change it).
-export const MACRO = 'PEEP: a 12.06 x 8 mm keystroke injector. An IR burst from any TV remote, and it types this.'
+export const MACRO = 'PEEP: a 12.06 x 8 mm keystroke injector. Three 38 kHz IR bursts, and it types this.'
 const KEY = 0.02 // s a character: press, 10 ms, release, 10 ms (macro.c's REPORT_MS, twice)
 const BURST = 0.009, GAP = 0.03, IRSLOW = 10 // the trigger (esp32-trigger), and how slow it is shown
 const MM = 1.8e-4, GROUND = 1.0003 // radii a millimetre (1 radius is 5.6 m), and where the ground is
@@ -46,7 +48,8 @@ make('peep-chrome', () => {
   text(() => dim, 'untitled', -SW / 2 + 16, SY + SH / 2 - 17, -0.85, 9, 1.3)
 })
 // the macro, wrapped at word ends; each line's first key, the pen's x after each of its keys, and its baseline
-const MAXW = SW / 2 - 24 - X0, width = (t: string) => [...t].reduce((w, ch) => w + (faces.hershey.g[ch]?.[0] ?? 0.6), 0) * CAP
+const wide = (t: string, size: number) => [...t].reduce((w, ch) => w + (faces.hershey.g[ch]?.[0] ?? 0.6), 0) * size
+const MAXW = SW / 2 - 24 - X0, width = (t: string) => wide(t, CAP)
 const lines: { from: number; ends: number[]; y: number }[] = []
 for (let from = 0; from < MACRO.length; ) {
   let to = MACRO.length
@@ -112,19 +115,51 @@ make('peep-tower', () => {
 })
 make('peep-led', () => ball({ col: [0.55, 0.75, 1, 1], metal: 0, rough: 1 }, [0, 0, 0], 0.8, 12))
 
-// The remote: a TV remote lying on the ground, its infrared LED behind a dark window in its front end. Its own axes:
-// x across, y along it (+y its front), z up.
-const RL = 185, RW = 46, RT = 16
-const LED: [number, number, number] = [0, RL / 2 + 0.6, RT / 2]
-make('peep-remote', () => {
-  const body: Mat = { col: [0.03, 0.03, 0.034, 1], metal: 0.2, rough: 0.42 }, rub: Mat = { col: [0.07, 0.07, 0.075, 1], metal: 0, rough: 0.85 }
-  prism(body, rounded(RW, RL, 12), 0, RT)
-  dome({ col: [0.05, 0.004, 0.012, 1], metal: 0, rough: 0.12 }, [LED[0], LED[1] - 1.5, LED[2]], [0, 1, 0], 2.8)
-  tube({ col: [0.5, 0.03, 0.025, 1], metal: 0, rough: 0.7 }, [0, 66, RT], [0, 0, 1], 5, 4.6, 2.5)
-  tube(rub, [0, 28, RT], [0, 0, 1], 15, 14.5, 1.6, 48), tube(rub, [0, 28, RT], [0, 0, 1], 7, 6.6, 3, 32)
-  for (let r = 0; r < 4; r++) for (let c = -1; c <= 1; c++) tube(rub, [c * 12, -8 - r * 14, RT], [0, 0, 1], 4.4, 4, 2, 20)
-  for (const x of [-15, 15]) box(rub, [x - 4.5, -76, RT], [x + 4.5, -58, RT + 2])
+// Where each stands, mm from the place (x west, z north): the trigger in front of the tower, looking at the port.
+const MONX = 100, MONZ = -190, KBZ = 60, TOWX = -290, TOWZ = -20 - ZF, RIGX = -330, RIGZ = 140, PHX = -190, PHZ = 200
+
+// The trigger, as River's (PEEP's esp32-trigger): a Seeed XIAO ESP32-C6, 21 × 17.8 mm, wired on 3V3, GND and D1 to an
+// Adafruit 5639 high-power IR emitter, which stands on a printed wedge aimed up at PEEP's port. The XIAO serves one
+// button, fire, on the local Wi-Fi network; pressed, it sends three 9 ms bursts of 38 kHz, 30 ms apart. The rig's own
+// axes: x across, y up, z toward the port. (The two boards' details are drawn from their sizes, not their CAD.)
+const AIM = Math.atan2(PY - 24, Math.hypot(RIGX - TOWX - PX, RIGZ - TOWZ - ZF) - 10), WL = 17, WH = WL * Math.tan(AIM) // how far up it looks; the wedge
+// a point of the emitter's own frame (x across, y off its face, z along it toward its LED, from the wedge slope's middle), in the rig's
+const slope = (x: number, y: number, z: number): [number, number, number] => [x, WH / 2 + y * Math.cos(AIM) + z * Math.sin(AIM), WL / 2 - y * Math.sin(AIM) + z * Math.cos(AIM)]
+const LED: [number, number, number] = [0, 4.1, 15.2]
+make('peep-rig', () => {
+  const pcb: Mat = { col: [0.02, 0.025, 0.03, 1], metal: 0, rough: 0.5 }, can: Mat = { col: [0.7, 0.7, 0.72, 1], metal: 1, rough: 0.3 }
+  const print: Mat = { col: [0.5, 0.5, 0.52, 1], metal: 0, rough: 0.7 }
+  // the XIAO, flat behind the wedge, its USB-C to the back: its board, its RF can, the receptacle, its castellated pads
+  box(pcb, [-8.9, 0, -45], [8.9, 1, -24]), box(can, [-5.6, 1, -38], [5.6, 2.8, -26]), box(can, [-4.45, 1, -46.5], [4.45, 4.2, -39.2])
+  for (const x of [-1, 1]) for (let i = 0; i < 7; i++) box(gold, [x * 8.9 - 0.7, 0, -43.3 + i * 2.54 - 0.6], [x * 8.9 + 0.7, 1.05, -43.3 + i * 2.54 + 0.6])
+  // the wedge
+  const a: [number, number, number] = [-10, 0, 0], b: [number, number, number] = [10, 0, 0], c: [number, number, number] = [10, 0, WL], d: [number, number, number] = [-10, 0, WL]
+  const f: [number, number, number] = [10, WH, WL], g: [number, number, number] = [-10, WH, WL]
+  quad(print, a, b, c, d, [0, -1, 0]), quad(print, d, c, f, g, [0, 0, 1]), quad(print, a, g, f, b, [0, Math.cos(AIM), -Math.sin(AIM)])
+  quad(print, a, d, g, g, [-1, 0, 0]), quad(print, b, f, c, c, [1, 0, 0])
+  // its wires: 3V3 (red) and GND (black) from one side of the XIAO, D1 (yellow) from the other, to the emitter's socket
+  ;[[8.2, 2, [0.6, 0.05, 0.04, 1]], [8.2, 1, [0.02, 0.02, 0.02, 1]], [-8.2, 1, [0.8, 0.62, 0.06, 1]]].forEach(([x, i, col], k) => {
+    const from: [number, number, number] = [x as number, 1.4, -43.3 + (i as number) * 2.54], to = slope(2 - 2 * k, 4.5, -10.5)
+    pipe({ col: col as number[], metal: 0, rough: 0.6 }, [from, [from[0], 3.5, from[2] + 5], [(to[0] + from[0]) / 2, 5, (from[2] + to[2]) / 2], [to[0], to[1] - 1, to[2] - 4], to], 0.55, 8)
+  })
 })
+make('peep-emitter', () => {
+  const led: Mat = { col: [0.12, 0.09, 0.16, 1], metal: 0, rough: 0.08 }
+  box(black, [-8.9, 0, -12.7], [8.9, 1.6, 12.7]) // the board, 17.8 × 25.4 mm
+  box({ col: [0.85, 0.85, 0.82, 1], metal: 0, rough: 0.5 }, [-4, 1.6, -12.7], [4, 7.6, -7.5]) // its JST PH socket
+  tube(led, [0, LED[1], 8], [0, 0, 1], 2.5, 2.5, 6.5, 24, true), dome(led, [0, LED[1], 14.5], [0, 0, 1], 2.5) // the 5 mm LED
+})
+// A phone by it, showing the XIAO's page (esp32-trigger's own): "peep.", the red fire button, and what came back. The
+// page's own axes: x across, y up the screen, z out of it.
+const PW = 71.5, PL = 147, PT = 7.8, SAID = ['ready', 'sending...', 'trigger sent.']
+const centred = (m: Mat, t: string, y: number, size: number, w: number) => text(() => m, t, -wide(t, size) / 2, y, 0.05, size, w)
+make('peep-phone', () => slab(graphite, rounded(PW, PL, 9), 0, PT))
+make('peep-page', () => {
+  box({ col: [0.004, 0.004, 0.005, 1], metal: 0, rough: 0.3 }, [-PW / 2 + 2.5, -PL / 2 + 3, -0.1], [PW / 2 - 2.5, PL / 2 - 3, 0])
+  centred({ col: [0.85, 0.85, 0.85, 1], metal: 0, rough: 0.6 }, 'peep.', 44, 10, 1.4)
+})
+make('peep-fire', () => centred({ col: [1, 0.09, 0.07, 1], metal: 0, rough: 0.6 }, 'fire', -14, 22, 3))
+SAID.forEach((t, i) => make(`peep-said-${i}`, () => centred({ col: [0.33, 0.33, 0.33, 1], metal: 0, rough: 0.6 }, t, -46, 3.4, 0.5)))
 make('peep-ir', () => ball({ col: [0.62, 0.44, 1, 1], metal: 0, rough: 1 }, [0, 0, 0], 3, 16))
 
 // ---- where things are: x to the west (your right as you face the screen from the north), y up, z north, mm ----------
@@ -153,17 +188,15 @@ function put(id: string, O: ArrayLike<number>, ax: V, ay: V, az: V, u = 1, k = 1
   for (let i = 0; i < 3; i++) c[i] = O[i] + s * (ax[i] * (m.lo[0] + m.hi[0]) + ay[i] * (m.lo[1] + m.hi[1]) + az[i] * (m.lo[2] + m.hi[2])) / 2
   solid(id, c, ax, ay, az, s * Math.max(m.hi[0] - m.lo[0], m.hi[1] - m.lo[1], m.hi[2] - m.lo[2]), k, glow)
 }
-const MON = blank(), KB = blank(), TOW = blank(), REM = blank()
+const MON = blank(), KB = blank(), TOW = blank(), RIG = blank(), PH = blank()
 const AT0: V = [0, 0, 0] // the place's own look point
-const MONX = 100, MONZ = -190, KBZ = 60, TOWX = -290, TOWZ = -20 - ZF, REMX = -170, REMZ = 250 // where each stands (the desk's middle on the place)
 let built = -1
 function build(k: number) {
   if (built === k) return
   built = k
   site(PLACES[k].lat, PLACES[k].lon, n), frame(n, e, No)
   ground(MONX, MONZ, 0, MON), ground(MONX, KBZ, 0, KB), ground(TOWX, TOWZ, 0, TOW)
-  // the remote points at the port
-  ground(REMX, REMZ, Math.atan2(TOWX + PX - REMX, TOWZ + ZF - REMZ), REM)
+  ground(RIGX, RIGZ, Math.atan2(TOWX + PX - RIGX, TOWZ + ZF - RIGZ), RIG), ground(PHX, PHZ, 0.35, PH)
   for (let i = 0; i < 3; i++) AT0[i] = n[i] * (1.01 + RISE)
   // the close look's point, 14 mm out of the port and 6 up: where it truly is (the tower stands on the curve, leaning
   // 3° out from the place's own up), in the place's own frame
@@ -178,7 +211,7 @@ type Beat = { in0: number; in1: number; fire: number; out0: number; out1: number
 const VISIT: Beat = { in0: 1.6, in1: 3.2, fire: 5.6, out0: 9.4, out1: 10.8, end: 11.2 }
 const PASS: Beat = { in0: 0, in1: 0.4, fire: 0.45, out0: 4, out1: 5, end: 5 }
 let beat = VISIT, s = Infinity, B = -Infinity // the beat, how far in, and the planet time it began
-let resting = false, passing = false
+let resting = false, passing = false, last = 0
 const OUT = 26 // mm PEEP stands out of the port, apart
 // how far PEEP is out of the port, mm
 const out = (q: number) => OUT * (1 - smooth(beat.in0, beat.in1, q) + smooth(beat.out0, beat.out1, q))
@@ -201,29 +234,31 @@ export const about: Record<string, About> = {
   'peep-pd': { name: 'VEMD10940F', does: 'A side-looking PIN photodiode, 3 × 2 mm, beside the receiver at the back edge.' },
   'peep-ldo': { name: 'TPS7A02', does: '3.3 V for the chip from the port’s 5 V, in a 1 × 1 mm X2SON.' },
   'peep-usb': { name: 'USB-A contacts', does: 'The board edge is the plug: four gold contacts on a 0.8 mm four-layer board, pressed to the port’s tongue by two 0 Ω 0805 resistors soldered on their sides as 1.25 mm spacers.' },
+  'peep-xiao': { name: 'XIAO ESP32-C6', does: 'PEEP’s trigger: Seeed’s 21 × 17.8 mm ESP32-C6 board serves one button, fire, on the local Wi-Fi network (peep-trigger.local). Pressed, it keys a 38 kHz carrier on D1 into three 9 ms bursts, 30 ms apart, then waits half a second before it will fire again.' },
+  'peep-emitter': { name: 'Adafruit 5639', does: 'A high-power infrared LED emitter with its own driver, its input active-high: the XIAO’s 38 kHz bursts on D1 light it. It is aimed at PEEP’s side-facing detector, since the port’s shell can block the light.' },
+  'peep-phone': { name: 'The trigger’s page', does: 'What the XIAO serves: “peep.”, one red button, fire, and a line saying what came back (“trigger sent.”). Anyone on the network can press it; there is no password, so it belongs on a trusted LAN.' },
 }
 const CHIPS: [id: string, x: number, y: number, z: number, r: number][] = [
-  ['peep-mcu', 1.5, -0.95, -1.28, 2.6],
-  ['peep-ir', 1.5, -0.8, 2.63, 1.3],
-  ['peep-pd', -2.59, -0.9, 2.33, 1.5],
+  ['peep-mcu', 1.5, -0.95, -1.28, 2.9],
+  ['peep-ir', 1.5, -0.8, 2.63, 1.5],
+  ['peep-pd', -2.59, -0.9, 2.33, 1.8],
   ['peep-ldo', -3.98, -0.6, -3.05, 0.8],
-  ['peep-usb', -0.21, 0.45, -2, 3],
+  ['peep-usb', -0.21, 0.45, -2, 5],
 ]
-const mine = (id: string) => id === 'peep' || id.startsWith('peep-')
+const mine = (id: string) => id === 'peep' || CHIPS.some((c) => c[0] === id)
 // What the world's music hears from here (sound.ts): n, how many events so far; f, the last one's pitch (Hz). Every key
-// PEEP types (the note of its usage code, below) and every burst of the remote's (760 Hz: the 38 kHz carrier slowed 50×).
+// PEEP types (the note of its usage code, below) and every burst of the emitter's (760 Hz: the 38 kHz carrier slowed 50×).
 export const events = { n: 0, f: 0 }
 let told = 0, flashed = 0
-let lift = 0, vlift = 0, spin = 0 // how far PEEP has come up to the camera (a critically damped spring), and its turn
-const P: V = [0, 0, 0], ax: V = [0, 0, 0], ay: V = [0, 0, 0], az: V = [0, 0, 0], q: V = [0, 0, 0], w: V = [0, 0, 0]
-// PEEP in the port: across it (its x along the tower's −x), parts up (its y down), its USB edge in (its z out)
+let lift = 0, vlift = 0, spin = 0 // how far PEEP has come out, clicked (a critically damped spring), and its turn
+const ax: V = [0, 0, 0], ay: V = [0, 0, 0], az: V = [0, 0, 0], q: V = [0, 0, 0], w: V = [0, 0, 0]
+// PEEP in the port: across it (its x along the tower's −x), parts up (its y down), its USB edge in (its z out). Its middle
+// is 3.5 mm inside the mouth when in, on the tongue's contacts; out, it comes down to the port's line; clicked, it comes
+// 16 mm out of wherever it was, then 14 mm up, and turns over.
 function peep(o: V) {
-  // (its middle 3.5 mm inside the mouth when in, on the tongue's contacts; out, it comes down to the port's line)
-  const f = out(s) / OUT, z = ZF - 7.5 + OUT * f, y = PY - 0.16 + 20 * f * f
-  pt(TOW, PX, y, z, w)
-  pt(TOW, PX, PY + 30, ZF + 45, P) // where it comes to, clicked: up and toward the camera
-  const a = lift, arc = Math.sin(Math.PI * a) * 14 * MM
-  for (let i = 0; i < 3; i++) (o[i] = mix(w[i], P[i], a) + TOW.y[i] * arc), (ax[i] = -TOW.x[i]), (ay[i] = -TOW.y[i]), (az[i] = TOW.z[i])
+  const f = out(s) / OUT, z = ZF - 7.5 + OUT * f + 16 * smooth(0, 0.5, lift), y = PY - 0.16 + 20 * f * f + 14 * smooth(0.3, 1, lift)
+  pt(TOW, PX, y, z, o)
+  for (let i = 0; i < 3; i++) (ax[i] = -TOW.x[i]), (ay[i] = -TOW.y[i]), (az[i] = TOW.z[i])
   turn(ay, ax, spin, ay), turn(az, ax, spin, az)
   return o
 }
@@ -233,16 +268,17 @@ export function draw(k: number) {
   // the beat's clock: a visit starts one when the camera comes to rest here, the fly-past (planet time < 0, the
   // arrival's) when it comes to look; either lets one that is running finish first
   const dt = ctx.dt, here = ctx.focus === k, rest = here && ctx.since >= 0, past = here && ctx.since < 0 && ctx.t < 0
-  if (rest && !resting && s >= beat.end) (beat = VISIT), (s = 0)
+  if (rest && !resting) (last = ctx.since), s >= beat.end && ((beat = VISIT), (s = 0))
   if (past && !passing && s >= beat.end) (beat = PASS), (s = 0)
-  ;(resting = rest), (passing = past), (s += dt), (B = ctx.t - s)
+  // (a visit's clock is the place's own, which waits while the visitor holds the camera or has a part picked)
+  ;(s += rest ? Math.max(ctx.since - last, 0) : dt), (resting = rest), (passing = past), (last = ctx.since), (B = ctx.t - s)
   // the keys gone down and the bursts fired, told as they happen (only while a beat runs)
   const keys = s < beat.end && s >= beat.fire ? typed(s) : 0, fired = s < beat.end ? clamp(Math.floor((s - beat.fire) / IRSLOW / (BURST + GAP)) + 1, 0, 3) : 0
   if (keys < told) told = 0
   if (fired < flashed) flashed = 0
   for (; flashed < fired; flashed++) events.n++, (events.f = 760)
   for (; told < keys; told++) events.n++, (events.f = NOTE[told])
-  // clicked: up to the camera, turning over slowly, the pads and then the parts to it; let go, back, flat
+  // clicked: out and up, turning over slowly, the pads and then the parts to the light; let go, back, flat
   const want = here && mine(ctx.picked) ? 1 : 0, W = 3.2
   vlift += (W * W * (want - lift) - 2 * W * vlift) * dt
   lift = clamp(lift + vlift * dt, 0, 1)
@@ -256,10 +292,19 @@ export function draw(k: number) {
   put('peep-keyboard', KB.o, KB.x, KB.y, KB.z)
   put('peep-tower', TOW.o, TOW.x, TOW.y, TOW.z)
   put('peep-led', pt(TOW, 55, PY - 13, ZF + 0.3, q), TOW.x, TOW.y, TOW.z, 1, 0, 14)
-  for (let i = 0; i < 3; i++) (ax[i] = -REM.x[i]), (ay[i] = REM.z[i])
-  put('peep-remote', REM.o, ax, ay, REM.y)
-  const l = ir(s)
-  if (l > 0.01) put('peep-ir', pt(REM, LED[0], LED[2], LED[1], q), REM.x, REM.y, REM.z, 1, 0, 4000 * l)
+  // the trigger, its emitter on the wedge's slope; and the phone, fire pressed a moment before the bursts, saying what came back
+  put('peep-rig', RIG.o, RIG.x, RIG.y, RIG.z)
+  const ca = Math.cos(AIM), sa = Math.sin(AIM), m0 = slope(0, 0, 0), l = ir(s)
+  for (let i = 0; i < 3; i++) (ay[i] = RIG.y[i] * ca - RIG.z[i] * sa), (az[i] = RIG.y[i] * sa + RIG.z[i] * ca)
+  put('peep-emitter', pt(RIG, m0[0], m0[1], m0[2], q), RIG.x, ay, az)
+  const led = slope(LED[0], LED[1], LED[2])
+  if (l > 0.01) put('peep-ir', pt(RIG, led[0], led[1], led[2], q), RIG.x, RIG.y, RIG.z, 1, 0, 4000 * l)
+  put('peep-phone', PH.o, PH.x, PH.y, PH.z)
+  const press = smooth(beat.fire - 0.75, beat.fire - 0.6, s) * (1 - smooth(beat.fire - 0.35, beat.fire - 0.15, s))
+  const said = s < beat.fire - 0.6 ? 0 : s < beat.fire + 3 * IRSLOW * (BURST + GAP) ? 1 : 2
+  for (let i = 0; i < 3; i++) ay[i] = -PH.z[i]
+  pt(PH, 0, PT, 0, q)
+  put('peep-page', q, PH.x, ay, PH.y, 1, AR, G), put('peep-fire', q, PH.x, ay, PH.y, 1, AR, G * (1 + 2 * press)), put(`peep-said-${said}`, q, PH.x, ay, PH.y, 1, AR, G)
   // the screen: the old text fading, or the new as far as it is typed (the line being typed is covered past its last key
   // by a piece of the editor's ground); the caret after it
   const A = old(s), N = typed(s), fresh = s >= beat.fire
@@ -282,37 +327,30 @@ export function draw(k: number) {
   peep(q)
   put('peep', q, ax, ay, az, 1000)
   if (!here) return
-  // clickable once it has typed; clicked, its chips too, those on the side turned to the camera
-  if (s >= beat.fire + MACRO.length * KEY + 0.3 || lift > 0.05) reach('peep', q, 7.5)
+  // what a click can find, each a ball about half its size across: PEEP; clicked, its chips too, those on the side turned
+  // to the camera; the trigger's two boards and the phone
+  part('peep', q, 6.5 * MM)
   if (lift > 0.6)
     for (const [id, x, y, z, r] of CHIPS) {
       for (let i = 0; i < 3; i++) w[i] = q[i] + (ax[i] * x + ay[i] * y + az[i] * z) * MM
-      if (Math.sign(y) * ((ctx.E[0] - q[0]) * ay[0] + (ctx.E[1] - q[1]) * ay[1] + (ctx.E[2] - q[2]) * ay[2]) > 0) reach(id, w, r)
+      if (Math.sign(y) * ((ctx.E[0] - q[0]) * ay[0] + (ctx.E[1] - q[1]) * ay[1] + (ctx.E[2] - q[2]) * ay[2]) > 0) part(id, w, r * MM)
     }
-}
-// A part a click can find (ctx.part): a ball, r mm, at c. A click finds only what is 0.02 radii or more from the eye
-// (reality.project), and PEEP comes nearer than that, so a ball nearer is slid out along the eye's ray, grown as it goes:
-// the same disc on the screen.
-const far: V = [0, 0, 0]
-function reach(id: string, c: V, r: number) {
-  const E = ctx.E, D = Math.hypot(c[0] - E[0], c[1] - E[1], c[2] - E[2]), k = Math.max(1, 0.025 / D)
-  for (let i = 0; i < 3; i++) far[i] = E[i] + (c[i] - E[i]) * k
-  part(id, far, r * MM * k)
+  part('peep-xiao', pt(RIG, 0, 1, -35, w), 11 * MM)
+  const em = slope(0, 2, 0)
+  part('peep-emitter', pt(RIG, em[0], em[1], em[2], w), 14 * MM)
+  part('peep-phone', pt(PH, 0, PT / 2, 0, w), 75 * MM)
 }
 
-// ---- the camera, while it rests here: down to the port as PEEP goes in, back for the remote and the screen; to PEEP,
-// clicked. Keys: [s, ln d, pitch, yaw, the point looked at (mm from the place's own: west, up, north)]
+// ---- the camera, while it rests here: down to the port as PEEP goes in, back for the trigger and the screen. Keys: [s, ln d, pitch, yaw, the point looked at (mm from the place's own: west, up, north)]
 const WIDE = [Math.log(0.25), 0.36, -0.15, 0, 0, 0]
 const CLOSE = [Math.log(0.012), 0.3, 0.65, 0, 0, 0] // (its point set where the port is: build())
 let KEYS: number[][] = []
 const cam = [0, 0, 0, 0, 0, 0]
 export function steer(_since: number, _picked: string, o: Steer) {
-  if (s >= VISIT.end && lift < 1e-3) return false
+  if (s >= VISIT.end) return false
   glide(KEYS, beat === VISIT ? s : VISIT.end, cam)
-  // and to PEEP, clicked: 50 mm off it, a little above, from the east-northeast
-  const a = lift
-  o.d = Math.exp(mix(cam[0], Math.log(0.009), a)), o.pitch = mix(cam[1], 0.22, a), o.yaw = mix(cam[2], 1.25, a)
-  for (let i = 0; i < 3; i++) o.at[i] = mix((-e[i] * cam[3] + n[i] * cam[4] + No[i] * cam[5]) * MM, P[i] - AT0[i], a)
+  o.d = Math.exp(cam[0]), o.pitch = cam[1], o.yaw = cam[2]
+  for (let i = 0; i < 3; i++) o.at[i] = (-e[i] * cam[3] + n[i] * cam[4] + No[i] * cam[5]) * MM
   return true
 }
 

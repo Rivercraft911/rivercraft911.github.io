@@ -50,7 +50,7 @@ export const BEST: Record<string, string> = {
   valley: 'DVB-S2 at 69.8 Mb/s out of a $5 Wi-Fi chip',
   launch: 'live rocket video from a hacked $5 ESP32; 0 of 5.7 M frames failed',
   lighthouse: 'RGB laser raster off a 27 000 RPM polygon',
-  bench: 'a TV remote makes it type; a USB keyboard 12.06 × 8 mm',
+  bench: 'three bursts of 38 kHz infrared make it type; a USB keyboard 12.06 × 8 mm',
   glasses: 'open strobe glasses, 2 – 20 frames/s, released as MK1',
   hearts: '144 LEDs; twin hearts beat as one over ESP-NOW',
   receiver: 'a $33 GPS front end; cold fixes on recorded sky',
@@ -133,6 +133,33 @@ export const ORDER: Entry[] = [
 
 // New since projects.ts was written, and rewrites of what has moved on (a slug here replaces its old entry).
 const NEW: Work[] = [
+  {
+    // PEEP, its trigger as River's own (PEEP's software/firmware/esp32-trigger)
+    slug: 'peep',
+    title: 'PEEP',
+    remarkable: 'Three bursts of 38 kHz infrared make it type: the world’s smallest IR-triggered keyboard, 12.06 × 8 mm',
+    years: '2026',
+    numbers: [
+      ['board', '12.06 × 8 mm, 4 layers, 0.8 mm'],
+      ['MCU', 'STM32F042G6, crystal-less USB'],
+      ['receiver', 'VSOP38338, 38 kHz'],
+      ['trigger', 'XIAO ESP32-C6 and an Adafruit 5639 IR emitter: three 9 ms bursts of 38 kHz, 30 ms apart'],
+      ['re-arm', '250 ms of IR silence'],
+    ],
+    body: [
+      'A USB keyboard the size of a fingertip that plugs straight into a USB-A port on its own board edge. A burst of 38 kHz infrared from across the room starts its stored macro; it types it as ordinary keyboard reports, ignores IR while it types, and re-arms after 250 ms of quiet.',
+      'Its trigger is a XIAO ESP32-C6 driving an Adafruit high-power IR emitter: it serves one button, fire, on the local Wi-Fi network, and sends three 9 ms bursts of 38 kHz, 30 ms apart. For systems you own or may test.',
+    ],
+    proof: [{ src: `${RAW}PEEP/main/docs/media/peep-on-fingertip.jpg`, alt: 'An assembled PEEP board on a fingertip' }],
+    boards: ['peep'],
+    media: [
+      { src: `${RAW}PEEP/main/docs/media/peep-in-usb-a.jpg`, alt: 'PEEP inside a USB-A port' },
+      { src: `${RAW}PEEP/main/docs/media/peep-usb-contacts.jpg`, alt: 'The USB contacts on PEEP’s board edge' },
+      { src: `${RAW}PEEP/main/docs/media/pcb-panel.jpg`, alt: 'A panel of PEEP boards' },
+    ],
+    links: [['source', `${GH}PEEP`]],
+    todo: ['a demo video'],
+  },
   {
     slug: 'bleps',
     title: 'BLEPS',
