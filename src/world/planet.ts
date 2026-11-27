@@ -231,7 +231,7 @@ addEventListener('pointerup', (e) => {
 })
 addEventListener('wheel', (e) => {
   if (!active) return
-  want.d = clamp(want.d * Math.exp(e.deltaY * 0.0012), focus < 0 ? 1.25 : 0.03, focus < 0 ? 9 : 1.2)
+  want.d = clamp(want.d * Math.exp(e.deltaY * 0.0012), focus < 0 ? 1.25 : 0.004, focus < 0 ? 9 : 1.2) // (a place's close-ups sit near 0.005)
   idle = 0, grabbed = performance.now()
 }, { passive: true })
 addEventListener('keydown', (e) => {
