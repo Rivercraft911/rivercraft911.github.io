@@ -46,6 +46,7 @@ const ZD = 0.025;                     // how the land stands: at ZD h (0.4 + 1.5
 const ZT = 0.022;                     // nothing stands taller
 const FAR = vec2f(0.7, 1.5);          // it stands in full nearer than this, and not at all past that
 const HA = 0.021;                     // how far over the cloud base the wall's towers meet the stratosphere, and spread
+const TALL = 7.0;                     // past this many eye radii from the pole the storm stands no taller than fair weather
 const POOL = vec3f(45.88, 5.74, 15.0); // the river's middle (places.ts), where the valley's pool lies, and the lake's radius, in s
 // the lows, where the westerlies shed them
 const LOWS = array<vec3f, 6>(vec3f(0.33, 0.7, 0.63), vec3f(-0.6, 0.62, 0.5), vec3f(-0.39, 0.78, -0.49), vec3f(0.53, -0.66, 0.53), vec3f(-0.66, -0.7, 0.27), vec3f(0.1, -0.64, -0.76));
@@ -558,10 +559,11 @@ fn veil(p: vec3f, L: vec3f, fp: f32) -> f32 {
   let b = dot(p, L);
   if (b < -0.05 * r) { return 1.0; }
   let storm = p.y > r * cos(14.0 * u.p[7].y);
+  let tall = p.y > r * cos(TALL * u.p[7].y); // (over 0.012 the deck stands only inside 4.3, met at most 2.2 sunward)
   let mu = max(b / r, 0.08);
   var v = 1.0;
   if (wx > 0.1 || storm) {
-    for (var j = 0; j < select(1, 2, storm); j++) {
+    for (var j = 0; j < select(1, 2, tall); j++) {
       let alt = max(select(0.012, CB, j == 0), r - 0.9995 + 0.008 * f32(j));
       if (alt > CB + select(HC, HW, storm)) { break; }
       let d = deck(normalize(p + L * (sqrt(b * b - r * r + (1.0 + alt) * (1.0 + alt)) - b)), fp);
@@ -964,12 +966,18 @@ fn planet(q: vec2f) -> vec3f {
     // the deck's shell, as tall as the storm's wall only where the ray passes the storm
     let t0 = max(sh.x, 0.0);
     let t1 = min(sh.y, sky.t);
-    let calm = max(max(normalize(ro + rd * t0).y, normalize(ro + rd * t1).y), normalize(ro + rd * 0.5 * (t0 + t1)).y) < cos(14.0 * u.p[7].y);
+    let e0 = normalize(ro + rd * t0);
+    let e1 = normalize(ro + rd * t1);
+    let em = normalize(ro + rd * 0.5 * (t0 + t1));
+    let calm = max(max(e0.y, e1.y), em.y) < cos(14.0 * u.p[7].y);
     if (calm) { sh = ball(ro, rd, 1.0 + CB + HC + 0.0005); }
     if (sh.y > 0.0) {
       wx = weather(normalize(ro + rd * max(sh.x, 0.0)));
       clear = cleared(look, pl);
-      if (clear > 0.0 && (wx * clear > 0.1 || !calm)) { sky = clouds(ro, rd, max(sh.x, 0.0), min(sh.y, sky.t), L); } // a clear sky needs no search
+      // and only as tall as fair weather's where the ray comes no nearer the pole than TALL: no nearer than the middle
+      // of its arc, less the arc's longer half
+      if (!calm && acos(clamp(em.y, -1.0, 1.0)) - acos(clamp(min(dot(em, e0), dot(em, e1)), -1.0, 1.0)) > TALL * u.p[7].y) { sh = ball(ro, rd, 1.0 + CB + HC + 0.0005); }
+      if (sh.y > 0.0 && clear > 0.0 && (wx * clear > 0.1 || !calm)) { sky = clouds(ro, rd, max(sh.x, 0.0), min(sh.y, sky.t), L); } // a clear sky needs no search
     }
     // the land, stood up, as far as it can be seen: to the sea, or to the cloud that hides it
     let zt = ball(ro, rd, 1.0 + ZT);
