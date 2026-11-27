@@ -19,7 +19,7 @@ import { clamp, hash } from '../../acts/scene'
 import { Frames, rc, rings } from '../../dsp/dvbs2'
 import { ball, box, dome, make, pipe, tube } from '../make'
 import { ctx, cross, dot, frame, part, site, solid, unit, type V } from '../ctx'
-import { PLACES, type About, type Steer } from '../places'
+import { PLACES, type About } from '../places'
 
 type V3 = [number, number, number]
 const MM = 5.5e-4 // radii a millimetre
@@ -53,6 +53,8 @@ make('xiao', () => {
 })
 make('xiao-can', () => box(TIN, [-9.6, 0, -3], [3.6, 2.2, 6.2]))
 // The 360 camera, as River's photo labels it: a white body on a white box, a 200° fisheye either side (sizes assumed).
+// With an eye either side of its head it is a bird already, so it has a pigeon's beak, a 13 mm one, a pigeon's own
+// length, dark, looking at the transmitter it feeds: Pigeon Vision's camera, before it flew.
 make('cam360', () => {
   box(WHITE, [-30, 0, -18], [30, 30, 18])
   tube(WHITE, [0, 30, 0], [0, 1, 0], 25, 25, 56, 48, true)
@@ -60,6 +62,7 @@ make('cam360', () => {
     tube(BLACK, [s * 23, 64, 0], [s, 0, 0], 9, 8.5, 7, 32)
     dome(GLASS, [s * 29.5, 64, 0], [s, 0, 0], 7.5, 24)
   }
+  tube(mat(0.06, 0.06, 0.07, 0, 0.4), [0, 57, 24], [0, 0, 1], 5, 0.6, 13, 24, true) // the beak
   box(BLACK, [-12, 6, 18], [12, 12, 18.6]) // where the SPI comes out
 })
 // The W5500 module: its RJ45 at +x, a 2 × 5 header at −x (sizes assumed).
@@ -199,7 +202,7 @@ let start = 0, was = false, framed = 0
 // been, and a pitch from its MODCOD, a semitone a step from 240 Hz at the bench's 14 (valley.ts's tonic).
 export const events = { n: 0, f: 0 }
 
-const n: V = [0, 0, 0], E: V = [0, 0, 0], N: V = [0, 0, 0], O: V = [0, 0, 0], w: V = [0, 0, 0], c: V = [0, 0, 0], h: V = [0, 0, 0], to: V = [0, 0, 0]
+const n: V = [0, 0, 0], E: V = [0, 0, 0], N: V = [0, 0, 0], O: V = [0, 0, 0], w: V = [0, 0, 0], c: V = [0, 0, 0]
 const ax: V = [0, 0, 0], ay: V = [0, 0, 0], az: V = [0, 0, 0]
 // bench point to the world: the bench is the pool's tangent plane (its heights are the rim's under each thing)
 function world(x: number, y: number, z: number, o: V) {
@@ -227,20 +230,17 @@ function turned(th: number) {
   for (let i = 0; i < 3; i++) (ax[i] = E[i] * cs + N[i] * sn), (ay[i] = O[i]), (az[i] = E[i] * sn - N[i] * cs)
 }
 
-// A XIAO (`id`, its place p): lifted `a` and its can over it when apart; picked, up to face the eye and turning.
+// A XIAO (`id`, its place p): lifted `a` and its can over it when apart; picked, a little higher, whole, and turning
+// slowly over about its own length, so both faces come round.
 function board(id: string, p: number[], dt: number, here: boolean) {
   const f = held[id], a = apart.x
   follow(f, here && ctx.picked === id ? 1 : 0, 2.6, dt)
   spin[id] = f.x > 0.01 ? spin[id] + 0.3 * dt : 0
-  const y = p[1] + 16 * a + 24 * f.x
+  const y = p[1] + 16 * a + 12 * f.x, over = spin[id] * f.x
   turned(p[3])
-  world(p[0] - 30 * f.x, y, p[2] - 25 * f.x, c) // (picked, out over the water, clear of the rest)
-  for (let i = 0; i < 3; i++) to[i] = ctx.E[i] - c[i]
-  unit(to)
-  cross(O, to, h), unit(h)
-  const tilt = f.x * (Math.PI / 2 - Math.asin(clamp(dot(to, O), -1, 1)))
-  rot(ax, h, tilt), rot(ay, h, tilt), rot(az, h, tilt), rot(ax, O, spin[id] * f.x), rot(ay, O, spin[id] * f.x), rot(az, O, spin[id] * f.x)
-  put('xiao', p[0] - 30 * f.x, y, p[2] - 25 * f.x, ax, ay, az)
+  world(p[0], y, p[2], c)
+  rot(ay, ax, over), rot(az, ax, over)
+  put('xiao', p[0], y, p[2], ax, ay, az)
   // the can, over the S3 (its middle 3 mm toward the U.FL end, 1.6 to the side), lifted off when apart
   const lift = 1.2 + 12 * a * (1 - f.x) // (picked, it is whole again)
   for (let i = 0; i < 3; i++) w[i] = c[i] + (ay[i] * lift + ax[i] * -3 + az[i] * 1.6) * MM
@@ -249,7 +249,7 @@ function board(id: string, p: number[], dt: number, here: boolean) {
     for (let i = 0; i < 3; i++) w[i] += ay[i] * 1.1 * MM
     solid('xiao-can', w, ax, ay, az, 13.2 * MM)
   }
-  if (here) part(id, c, 14 * MM)
+  if (here) (c[0] += ay[0] * MM), (c[1] += ay[1] * MM), (c[2] += ay[2] * MM), part(id, c, 11 * MM)
 }
 
 let ready = false
@@ -274,10 +274,10 @@ export function draw(k: number) {
   turned(SCR[3]), put('screen', SCR[0], SCR[1], SCR[2], ax, ay, az)
   put('coax', 0, 0, 0, E, O, N), put('jumpers', 0, 0, 0, E, O, N) // (made in the bench's own millimetres)
   if (here) {
-    world(CAM[0], CAM[1] + 45, CAM[2], c), part('camera', c, 40 * MM)
-    world(ATT[0], ATT[1], ATT[2] - 9, c), part('coax', c, 14 * MM)
-    world(ETH[0], ETH[1] + 5, ETH[2], c), part('w5500', c, 20 * MM)
-    world(SCR[0], SCR[1] + SY, SCR[2], c), part('screen', c, 55 * MM)
+    world(CAM[0], CAM[1] + 43, CAM[2], c), part('camera', c, 43 * MM)
+    world(ATT[0], ATT[1], ATT[2] - 10, c), part('coax', c, 14 * MM)
+    world(ETH[0], ETH[1] + 5, ETH[2], c), part('w5500', c, 19 * MM)
+    world(SCR[0], SCR[1] + SY, SCR[2], c), part('screen', c, 52 * MM)
   }
   const f = shown.x
   if (f < 0.01) return
@@ -331,15 +331,4 @@ export const about: Record<string, About> = {
   coax: { name: 'coax, 30 dB', does: 'The link, contained: coax through a 30 dB attenuator at 2420 MHz. Live, 2.4 hours on air: 5 725 408 frames decoded, none failed.' },
   w5500: { name: 'W5500', does: 'An Ethernet module on the receiver’s SPI: the decoded transport stream goes out as UDP at 10 Mb/s.' },
   screen: { name: 'the video, received', does: 'Both fisheye streams as received, as the laptop on the bench played them.' },
-}
-
-// The camera, while it rests here: with a board picked, up close to it.
-export function steer(_since: number, picked: string, o: Steer) {
-  const p = picked === 'tx' ? TX : picked === 'rx' ? RX : null
-  if (!p) return false
-  world(p[0] - 30, p[1] + 30, p[2] - 25, c)
-  const P = PLACES.find((P) => P.id === 'valley')!
-  ;(o.d = 0.06), (o.pitch = 0.3), (o.yaw = P.view[2])
-  for (let i = 0; i < 3; i++) o.at[i] = c[i] - n[i] * 1.01
-  return true
 }

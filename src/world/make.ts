@@ -179,18 +179,6 @@ export function slab(m: Mat, q: [number, number][], y0: number, y1: number) {
   prism(m, q, y0, y1)
   for (let i = o; i < p.P.length; i += 3) [p.P[i + 1], p.P[i + 2], p.N[i + 1], p.N[i + 2]] = [p.P[i + 2], p.P[i + 1], p.N[i + 2], p.N[i + 1]]
 }
-// a sheet through rows of points (every row as long), smooth: its normals from its neighbours' unless `nrm` gives them
-export function sheet(m: Mat, rows: V3[][], nrm?: V3[][]) {
-  const p = part(m), o = p.P.length / 3, R = rows.length, C = rows[0].length
-  const at = (i: number, j: number) => rows[Math.min(R - 1, Math.max(0, i))][Math.min(C - 1, Math.max(0, j))]
-  for (let i = 0; i < R; i++)
-    for (let j = 0; j < C; j++) {
-      const a = at(i, j + 1), b = at(i, j - 1), c = at(i + 1, j), d = at(i - 1, j), u = [a[0] - b[0], a[1] - b[1], a[2] - b[2]], v = [c[0] - d[0], c[1] - d[1], c[2] - d[2]]
-      const n = nrm?.[i][j] ?? [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]], l = Math.hypot(...n) || 1
-      p.P.push(...rows[i][j]), p.N.push(n[0] / l, n[1] / l, n[2] / l)
-      if (i && j) p.I.push(o + (i - 1) * C + j - 1, o + (i - 1) * C + j, o + i * C + j, o + (i - 1) * C + j - 1, o + i * C + j, o + i * C + j - 1)
-    }
-}
 
 // ---- for Pigeon Vision (sites/launch.ts): two more ways to make a thing ------------------------------------------
 // A smooth surface through rows × cols of points, at(i, j) for i ≤ rows, j ≤ cols, each vertex's normal from its

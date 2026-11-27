@@ -3,7 +3,7 @@
 // sizes in radii. Every place names the projects (projects.ts slugs) whose page it opens. The valley's river is the
 // intro's own θ(s), cut into the land as a canyon (planet.wgsl).
 import { ABOUT as PIGEON, draw as launch, steer as apart, where as rocket } from './sites/launch'
-import { about as rxAbout, draw as receiver, steer as rxSteer } from './sites/receiver'
+import { about as rxAbout, draw as receiver } from './sites/receiver'
 import { ABOUT as SAMWISE, NORMAL as SSO, VIEW as SAT, draw as station, steer as detumble, where as bus } from './sites/station'
 import { NORMAL as BLEPS, VIEW as CUBE, about as blAbout, draw as bleps, steer as blSteer, where as cube } from './sites/bleps'
 import { about as primes, core, steer as descend, where as well } from './sites/core'
@@ -11,7 +11,7 @@ import { RISE as BROW, about as strobe, draw as glasses, steer as look } from '.
 import { draw as hearts } from './sites/hearts'
 import { about as r01, draw as lighthouse, steer as projector } from './sites/lighthouse'
 import { RISE as DESK, about as peep, draw as bench, steer as plug } from './sites/bench'
-import { about as dvAbout, draw as dvbs2, steer as dvSteer } from './sites/dvbs2'
+import { about as dvAbout, draw as dvbs2 } from './sites/dvbs2'
 
 export type Monument = { id: string; size: number; at?: [number, number]; lift?: number; turn?: number; flip?: boolean; k?: number }
 export type Place = {
@@ -43,8 +43,8 @@ export type About = { name: string; does: string; board?: string }
 export const PLACES: Place[] = [
   { id: 'bleps', slugs: ['bleps', 'cubesat-imaging-sim', 'yapling-observatory'], lat: 90, lon: 0, monuments: [], view: CUBE, ink: [0.55, 0.85, 1], draw: bleps, where: cube, orbit: BLEPS, steer: blSteer, about: blAbout },
   { id: 'launch', slugs: ['pigeon-vision', 'yapogee'], lat: 34, lon: -38, monuments: [], view: [0.25, 0.12, 0.35], ink: [1, 0.7, 0.35], draw: launch, where: rocket, steer: apart, about: PIGEON },
-  { id: 'valley', slugs: ['esp-dvbs2'], lat: 18, lon: 8, monuments: [], view: [0.36, 0.4, -0.7], ink: [0.5, 0.78, 1], draw: dvbs2, steer: dvSteer, about: dvAbout },
-  { id: 'receiver', slugs: ['ephemeris', 'driftwood'], lat: 8, lon: 82, monuments: [], view: [0.38, 0.5, -0.3], ink: [0.6, 0.9, 1], draw: receiver, steer: rxSteer, about: rxAbout },
+  { id: 'valley', slugs: ['esp-dvbs2'], lat: 18, lon: 8, monuments: [], view: [0.36, 0.4, -0.7], ink: [0.5, 0.78, 1], draw: dvbs2, about: dvAbout },
+  { id: 'receiver', slugs: ['ephemeris', 'driftwood'], lat: 8, lon: 82, monuments: [], view: [0.38, 0.5, -0.3], ink: [0.6, 0.9, 1], draw: receiver, about: rxAbout },
   { id: 'lighthouse', slugs: ['r-01'], lat: -13.732, lon: 53.734, monuments: [], view: [0.6, 0.38, 3.84], ink: [1, 0.35, 0.3], draw: lighthouse, steer: projector, about: r01 },
   { id: 'bench', slugs: ['peep', 'infiniterecon'], lat: 2, lon: -16, monuments: [], view: [0.25, 0.36, -0.15], ink: [0.45, 1, 0.62], draw: bench, rise: DESK, steer: plug, about: peep },
   { id: 'glasses', slugs: ['strobeglasses'], lat: -20, lon: 18, monuments: [], view: [0.36, 0.1, 0.05], ink: [0.95, 0.95, 0.55], draw: glasses, rise: BROW, steer: look, about: strobe },
