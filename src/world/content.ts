@@ -138,16 +138,16 @@ const NEW: Work[] = [
     years: '2026 –',
     numbers: [
       ['spacecraft', '1U, 10 × 10 × 11.35 cm, about 2 kg; planned for a 550 km circular orbit'],
-      ['cameras', 'four, on one payload card round a Jetson Orin or a CM5'],
-      ['River’s part', 'the TT&C board, its whole radio; the FOC motor-control board for its wheels; the star tracker'],
+      ['cameras', 'four, on River’s payload board round a Jetson Orin'],
+      ['River’s part', 'the TT&C board, its whole radio; the Jetson Orin payload board; the FOC motor-control board for its wheels; the star tracker'],
       ['S-band', 'esp-dvbs2 again: DVB-S2 from an ESP32-S3 at 2.4 GHz, through a GRF5526 PA'],
       ['UHF', 'LoRa at 433 MHz, SX1262'],
       ['pointing', 'reaction wheels on Finertia, FOC from an RP2350A: 26 × 26 mm, 6 layers, a Faulhaber 2610'],
       ['status', 'in design for a 2027 flight; the radio being laid out, Finertia routed'],
     ],
     body: [
-      'Stanford SSI’s next satellite is a 1U CubeSat built round its cameras. It takes its name from Anableps, the four-eyed fish that sees above and below the waterline at once, and it has four cameras on one payload card. In the simulator its cameras are planned in, a pair of 190° fisheyes, back to back, stitch the whole sphere around it while a main camera looks down at Earth. Its pictures come down the way Pigeon Vision’s video does: esp-dvbs2, an ESP32-S3 making DVB-S2 out of its own Wi-Fi radio.',
-      'River co-leads the satellite team. The heart of River’s part is the TT&C board, Yapling: the satellite’s whole radio, its S-band downlink from the ESP32-S3 and its UHF link, a 433 MHz LoRa beacon, with an RP2350B that boots from MRAM. Beside it, Finertia, the FOC motor-control board for the reaction wheels, bolts to the motor’s 26 mm flange: an RP2350A on CAN commutates a Faulhaber 2610 BLDC through a DRV8311P bridge, its phase currents Kelvin-sensed. To slew the 0.00496 kg·m² axis at 1°/s the wheel takes up 86.6 µN·m·s, 1 047 rpm of the bare rotor. And River is building its star tracker.',
+      'Stanford SSI’s next satellite is a 1U CubeSat built round its cameras. It takes its name from Anableps, the four-eyed fish that sees above and below the waterline at once, and it has four cameras on one payload board. In the simulator its cameras are planned in, a pair of 190° fisheyes, back to back, stitch the whole sphere around it while a main camera looks down at Earth. Its pictures come down the way Pigeon Vision’s video does: esp-dvbs2, an ESP32-S3 making DVB-S2 out of its own Wi-Fi radio.',
+      'River co-leads the satellite team. The heart of River’s part is the TT&C board, Yapling: the satellite’s whole radio, its S-band downlink from the ESP32-S3 and its UHF link, a 433 MHz LoRa beacon, with an RP2350B that boots from MRAM. Then the payload board, a Jetson Orin carrying the four cameras’ links. Beside them, Finertia, the FOC motor-control board for the reaction wheels, bolts to the motor’s 26 mm flange: an RP2350A on CAN commutates a Faulhaber 2610 BLDC through a DRV8311P bridge, its phase currents Kelvin-sensed. To slew the 0.00496 kg·m² axis at 1°/s the wheel takes up 86.6 µN·m·s, 1 047 rpm of the bare rotor. And River is building its star tracker.',
       'Its cameras and its links are planned in two simulators River wrote: Field of View flies the cameras over Stanford at 550 km and sends their video down a DVB-S2 link, and Yapling Observatory couples the orbit, radio, pointing, power and heat.',
     ],
     media: [
