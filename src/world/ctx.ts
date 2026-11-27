@@ -51,6 +51,19 @@ export const ctx = {
   ppr: 1,
   models: {} as Record<string, Model>,
   items: [] as Placed[], // this frame's solids
+  since: -1, // seconds since the camera came to rest at the place, −1 while it flies or is above the planet
+  picked: '', // the part of the place last clicked (part()), '' for none
+}
+
+// The parts of the place looked at that a click can pick: each frame a place says where its parts are, and a click
+// there picks the nearest under the pointer before it flies anywhere (planet.ts). A picked part says so to the page
+// too, as a 'part' event on window.
+export type Part = { id: string; c: V; r: number }
+export const parts = { n: 0, list: [] as Part[] }
+// Part `id`, a ball of radius r radii at world point c, can be clicked this frame.
+export function part(id: string, c: ArrayLike<number>, r: number) {
+  const q = parts.list[parts.n] ?? (parts.list[parts.n] = { id: '', c: [0, 0, 0], r: 0 })
+  ;(q.id = id), (q.c[0] = c[0]), (q.c[1] = c[1]), (q.c[2] = c[2]), (q.r = r), parts.n++
 }
 
 // Can the eye see world point w past the planet?

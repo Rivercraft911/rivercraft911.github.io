@@ -10,7 +10,7 @@ import { model, type Solids } from '../gpu/mesh'
 import { aim } from '../acts/reality'
 import { clamp, view, type Scene, type Frame } from '../acts/scene'
 import { PLACES } from './places'
-import { ctx, cross, dot, frame, len, look, seen, site, stand, turn, unit, type V } from './ctx'
+import { ctx, cross, dot, frame, len, look, parts, seen, site, stand, turn, unit, type V } from './ctx'
 import { made } from './make'
 import { HALF, sight } from './sites/bleps'
 import { covered, hovered, mount, page, route, within } from './pages'
@@ -121,6 +121,7 @@ export function go(k: number, t: number, quiet = false) {
   if (k === focus && flight < 0) return
   for (const key of ['eye', 'at', 'up'] as const) for (let i = 0; i < 3; i++) from[key][i] = now[key][i]
   focus = k
+  ctx.picked = ''
   const [d, pitch, yaw] = k < 0 ? [HOME.d, HOME.pitch, rest.yaw] : PLACES[k].view
   want.d = rest.d = d, want.pitch = rest.pitch = pitch, want.yaw = rest.yaw = yaw
   restAt(k, to)
@@ -251,6 +252,18 @@ function pick(cx: number, cy: number) {
   })
   return best
 }
+// the part of the place looked at under the pointer (ctx.part), if any: the nearest whose ball the pointer is within
+function touch(cx: number, cy: number) {
+  const x = ((2 * cx) / innerWidth - 1) * view.a, y = 1 - (2 * cy) / innerHeight
+  let best = '', bd = Infinity
+  for (let i = 0; i < parts.n; i++) {
+    const q = parts.list[i]
+    if (!look(q.c)) continue
+    const d = Math.hypot(seen.x - x, seen.y - y), D = Math.hypot(q.c[0] - ctx.E[0], q.c[1] - ctx.E[1], q.c[2] - ctx.E[2])
+    if (d < Math.max(0.03, (q.r / D) * ctx.p[3]) && d < bd) (bd = d), (best = q.id)
+  }
+  return best
+}
 
 // ---- the frame -------------------------------------------------------------------------------------------------
 // The sun at the world's clock's zero: at the hearts it is just up, in the east-southeast, and from home the planet is
@@ -300,7 +313,7 @@ function tint(n: ArrayLike<number>, L: ArrayLike<number>, o: number[]) {
 // its sun) and the lens open by `lens` (0 a pinhole, 1 a macro lens's). The world draws with it, and so does the
 // arrival, which flies its own camera through the same air, as wide as `fov` (radians) if it says.
 const fw: V = [0, 0, 0], side = [0, 0], E = ctx.E
-export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number, lens: number, marked = false, wide = 0) {
+export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number, lens: number, marked = false, wide = 0, since = -1) {
   const { eye, at } = pose, up_ = pose.up
   E[0] = eye[0], E[1] = eye[1], E[2] = eye[2]
   const alt = Math.max(len(E) - 1, 1e-3), fov = wide || clamp(0.62 - 0.04 * Math.log10(0.3 / alt), 0.5, 0.75)
@@ -332,7 +345,7 @@ export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number
   // River's hardware, and the sun on it
   ctx.t = t, ctx.dt = dt, ctx.f = f, ctx.focus = focus
   ctx.L[0] = L[0], ctx.L[1] = L[1], ctx.L[2] = L[2]
-  ctx.items.length = 0
+  ctx.items.length = 0, parts.n = 0, ctx.since = since
   f.rate = 2.4e6, f.field = F, f.look = { tau: 0.025 } // a place may take the field over (the core, from inside)
   PLACES.forEach((P, k) => {
     for (const m of P.monuments) stand(m.id, sites[k], m.size, m.at, m.turn, m.lift, m.flip)
@@ -363,9 +376,11 @@ export const planet: Scene = {
     idle += dt
     if (dbg.has('go') && !(globalThis as { went?: boolean }).went && ((globalThis as { went?: boolean }).went = true)) go(PLACES.findIndex((P) => P.id === dbg.get('go')), t) // ?go=<id>: straight to a place
     if (clickAt) {
-      const k = pick(clickAt[0], clickAt[1])
+      const hit = focus >= 0 && flight < 0 ? touch(clickAt[0], clickAt[1]) : ''
+      const k = hit ? -1 : pick(clickAt[0], clickAt[1])
       clickAt = null
-      if (k >= 0) go(k, t)
+      if (hit) (ctx.picked = ctx.picked === hit ? '' : hit), dispatchEvent(new CustomEvent('part', { detail: ctx.picked }))
+      else if (k >= 0) go(k, t)
     }
     // the pointer's asks, followed the way an operator follows: quickly, never at once
     const fol = 1 - Math.exp(-dt * 6)
@@ -389,7 +404,7 @@ export const planet: Scene = {
 
     const c = covered(), fe = 1 - Math.exp(-4 * dt)
     side[0] += (c[0] - side[0]) * fe, side[1] += (c[1] - side[1]) * fe
-    paint(f, now, t, dt, focus, DEBUG ? +(dbg.get('ap') ?? 0) : focus >= 0 && flight < 0 ? 1 : 0, true)
+    paint(f, now, t, dt, focus, DEBUG ? +(dbg.get('ap') ?? 0) : focus >= 0 && flight < 0 ? 1 : 0, true, 0, focus >= 0 && flight < 0 ? t - fstart - flen : -1)
     return sound()
   },
 }
