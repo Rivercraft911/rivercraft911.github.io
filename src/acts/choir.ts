@@ -17,7 +17,7 @@ import { Plucks } from '../dsp/pluck'
 import { ASCII, END, LEAD, WRAP } from './clock'
 import { hash, mix, smooth } from './scene'
 
-const FALL = 12.5 // over the lip of the falls: silent before it
+const FALL = 9 // over the lip of the falls: silent before it
 const SPIN = LEAD // the whirlpool
 const TEXT = LEAD + WRAP // the text, and the drain under it
 export const LAND = TEXT + ASCII // the arrival: the dark of the cloud

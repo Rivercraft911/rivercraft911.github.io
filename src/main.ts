@@ -31,9 +31,9 @@ const audio = new Audio()
 const FILM = [hook, meander, valley, wrap, ascii, tour, reveal, named, planet]
 // ?short: the transmission in about half the time, each scene cut to its best stretch and played a little faster
 const SHORT = [
-  edit(hook, [[0.45, 3.7, 1.6]]),
+  edit(hook, [[0.45, 3.6, 1.6]]),
   edit(meander, [[0, 4.2, 2]]),
-  edit(valley, [[0, 8.5, 2.6], [8.5, VALLEY, 1.4]]), // the valley and its storm quickly, the falls nearly as they are
+  edit(valley, [[0, 7, 2], [7, VALLEY, 1.3]]), // the valley quickly, the falls nearly as they are
   edit(wrap, [[0, WRAP, 1.3]]),
   edit(ascii, [[0, ASCII, 1.6]]),
   edit(tour, [[0, TOUR, 1.2]]),
@@ -72,7 +72,7 @@ load('tech').then((face) => gpu.glyphs(face, CHARS)) // the raster's character g
 attach(gpu.device) // the planet's models start loading now, long before it is reached
 
 let on = q.has('auto') || q.has('world') || deep() >= 0
-let t = Number(q.get('t') ?? (q.has('fall') ? 11 : 0))
+let t = Number(q.get('t') ?? (q.has('fall') ? 7.5 : 0))
 let speed = q.has('pause') ? 0 : 1
 let last = performance.now()
 let heard = q.has('auto') || q.has('rec') // the speakers wait for a gesture

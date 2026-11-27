@@ -1,9 +1,10 @@
 // R0 · The whirlpool. The river ends in a shaft: it goes over the rim all the way round and falls, and at
-// the foot the water has nowhere to go but down a drain, so the pool there turns. Every angle of the rim is
-// a frequency and every drop carries the spectrum of the moment it went over (drops.wgsl), so the curtain
-// is a waterfall plot of the soundtrack, the pool an SDR waterfall wound round its drain, angle for
-// log-frequency and log-radius for age, and the choir's partials, octaves apart, its spiral arms. The water
-// spins up into a vortex and drinks the spectrum down in log spirals, and we ride a streamline in after it.
+// the foot the water has nowhere to go but down a drain, so the pool there turns. It is night, and the moon
+// stands high over the mouth. Every angle of the rim is a frequency and the water going over there is as heavy
+// as that band of the soundtrack is loud; every drop carries the spectrum of the moment it went over
+// (drops.wgsl), and the pool winds it in as foam, angle for log-frequency and log-radius for age, the choir's
+// partials, octaves apart, its spiral arms. The water spins up into a vortex and drinks it all down, and we
+// ride a streamline in after it and go down the drain.
 import { heard } from '../audio/audio'
 import { BINS, F0, PER as PER_BIN, Waterfall } from '../dsp/waterfall'
 import { ROWS, WRAP as SHADER } from '../gpu/fields'
@@ -12,7 +13,6 @@ import type { Field } from '../gpu/raster'
 import { descent, place, rate, sing } from './choir'
 import { ASCII, WRAP as DUR, LEAD } from './clock' // LEAD: how long the choir has been falling when the wrap begins
 import { aim } from './reality'
-import { Say } from './say'
 import { TAU, glide, mix, smooth, type Frame, type Scene } from './scene'
 
 const PER = 360 // rows printed per octave of the choir's descent
@@ -80,8 +80,8 @@ function print(T: number, now: number, f: Field) {
 // The pool as it is at T: how far it has spun up, its inflow β, its circulation Γ, the depth of its funnel,
 // how far its water turns an e-fold (K), r_c², and the drain's radius. A pure function of T, so the camera
 // can be flown through it ahead of time; `pool` is the pool now, for the beam to draw on it too.
-export type Pool = { wet: number; beta: number; gamma: number; H: number; K: number; k: number; R: number; hole: number }
-export function poolAt(T: number, o: Pool) {
+type Pool = { wet: number; beta: number; gamma: number; H: number; K: number; k: number; R: number; hole: number }
+function poolAt(T: number, o: Pool) {
   o.wet = 0.3 + 0.7 * smooth(-5, 1.5, T)
   o.beta = BETA * rate(T + LEAD)
   o.gamma = TAU * o.beta * RC * RC * K * o.wet
@@ -91,40 +91,43 @@ export function poolAt(T: number, o: Pool) {
   return o
 }
 const HOLE = 0.07
-export const pool: Pool = { wet: 0, beta: 0, gamma: 0, H: 0, K: 0, k: RC * RC, R, hole: 0 }
-// The free surface, how far the water at r has turned since it landed, and how fast it is turning, rad/s.
-export const surface = (r: number, p = pool) => (-p.H * p.k) / (r * r + p.k)
-export const turned = (r: number, p = pool) => 0.5 * p.K * Math.log((1 + p.k / (r * r)) / (1 + p.k / (R * R)))
-export const swirl = (r: number, p = pool) => p.gamma / (TAU * (r * r + p.k))
-// The vortex's axis, for whoever comes back up it: the drain at the origin, +z up, M metres to the unit;
-// `pool` is its state, and poolAt(T) its state at any wrap time (valley.ts SHAFT places it in the valley).
-export const AXIS = { up: [0, 0, 1], M, RIM, HF, R, RC }
+const pool: Pool = { wet: 0, beta: 0, gamma: 0, H: 0, K: 0, k: RC * RC, R, hole: 0 }
+// The free surface, and how fast the water at r is turning, rad/s.
+const surface = (r: number, p = pool) => (-p.H * p.k) / (r * r + p.k)
+const swirl = (r: number, p = pool) => p.gamma / (TAU * (r * r + p.k))
+// The moon, high over the mouth behind us as we come to the lip: the way toward it, and its light.
+const MOON = [0.25, -0.33, 0.91].map((v, _, a) => v / Math.hypot(...a))
+const MOONLIGHT = 1.1
 
-// The camera, in the pool's units. From high in the shaft, looking down on the disc the spectrum makes (the
-// valley flies it there, and on until T = 0), it swoops down to the water and is taken by it: it rides a
-// streamline in, r = r₀e^(−at), turning as the water turns, ω = Γ / 2π(r² + r_c²), so faster the further it
-// falls, banking into the funnel, and at the last it is over the drain and goes down it. Keys: time, eye,
-// what it looks at, the lens, and which way is up.
+// The camera, in the pool's units. From high in the shaft, looking down on the pool as it spins up (the valley
+// flies it there), it swoops down to the water and is taken by it: it rides a streamline in, r = r₀e^(−at),
+// turning as the water turns, ω = Γ / 2π(r² + r_c²), so faster the further it falls, banking into the funnel;
+// over the drain it turns to look straight down it, and falls down its throat, turning with the water, into
+// the dark. Keys: time, eye, what it looks at, the lens, and which way is up.
 const RIDE = -0.5, OUT = DUR + ASCII // when it joins the streamline, and when it is gone down the drain
+export const OVER = OUT - 1.9, DROP = OUT - 1.25 // when it is over the drain, and when it drops into it
 export const KEYS: number[][] = [
-  [-2.6, 0.25, 0.9, 2, 0, -0.1, 0, 1.0, 0, 0, 1],
+  [-2.5, 0.3, 0.6, 1.7, 0, -0.05, -0.15, 1.05, 0, 0, 1],
   [-1.4, 0.95, 0.5, 0.9, 0, -0.1, -0.1, 1.05, 0, 0, 1],
 ]
+// Down the throat at the end: how far under its mouth the eye is, falling as a stone does, and how fast it turns.
+const sink = (T: number) => 0.45 * Math.max(0, T - DROP) ** 2
 {
   const p = poolAt(0, { ...pool })
   let ph = 1.5
   for (let T = RIDE; T <= OUT + 0.001; T += 0.1) {
     poolAt(T, p)
-    const end = smooth(OUT - 0.9, OUT - 0.2, T), in_ = smooth(RIDE, DUR + 1, T) // over the drain at the last; how far into the ride
+    const end = smooth(OVER - 0.7, OVER, T), look = smooth(OVER - 0.4, DROP, T), in_ = smooth(RIDE, DUR + 1, T) // over the drain; looking down it; how far into the ride
     const r = Math.exp(-0.36 * (T - RIDE)) * (1 - end), ri = r * mix(0.5, 0.42, in_), ahead = ph + mix(0.8, 1.5, in_)
     const c = Math.cos(ph), s = Math.sin(ph), bank = 0.9 * in_ * (1 - end), lid = surface(Math.max(p.hole, 1e-3), p)
+    const z = mix(Math.max(surface(r, p), lid) + 0.07 + 0.3 * r, lid + 0.12, end) - sink(T)
     KEYS.push([
-      T, r * s, r * c, mix(Math.max(surface(r, p), lid) + 0.07 + 0.3 * r, lid - 0.1, smooth(OUT - 0.5, OUT, T)), // down it at the last
-      ri * Math.sin(ahead), ri * Math.cos(ahead), surface(ri, p) - 0.4 * end,
-      mix(1.15, 1.35, in_),
-      -bank * s + end * Math.cos(ph), -bank * c - end * Math.sin(ph), 1 - end,
+      T, r * s, r * c, z,
+      mix(ri * Math.sin(ahead), 0.02 * s, look), mix(ri * Math.cos(ahead), 0.02 * c, look), mix(surface(ri, p), z - 1, look),
+      mix(1.15, 1.45, in_),
+      -bank * s + look * Math.cos(ph), -bank * c - look * Math.sin(ph), 1 - look,
     ])
-    ph += 0.1 * 0.32 * swirl(Math.max(r, 0.12), p) // a third as fast as the water, so it streams past
+    ph += 0.1 * mix(0.32, 0.12, look) * swirl(Math.max(r, 0.12), p) // a third as fast as the water, so it streams past
   }
 }
 const key: number[] = [], to = [0, 0, 0], upward = [0, 0, 1]
@@ -133,43 +136,39 @@ const key: number[] = [], to = [0, 0, 0], upward = [0, 0, 1]
 // ghost of itself every frame behind, strobing echoes, not a blur. Its light fades within the frame.
 export const TAU_RASTER = 0.006
 
-// The shaft at fall time T into the frame: the raster's field, the droplets, and the spectrum's new rows
-// for both. `light` is the raster's gain (dark, it only prints), `plot` how far the water has turned from
-// water to the plot's colours, `rain` the droplets' brightness, `n` the share of them in play.
-const field: Field = { shader: SHADER, k: 1, p: new Float32Array(52), res: 1.5 } // finer than the usual raster: its partials are filaments
+// The shaft at fall time T into the frame: the raster's field, the droplets, and the spectrum's new rows for
+// both. `light` is the raster's gain (dark, it only prints), `rain` the droplets' brightness, `n` the share of
+// them in play, `plume` the mist breathed out of the mouth, `veil` the mist close round the lens.
+const field: Field = { shader: SHADER, k: 1, p: new Float32Array(52), res: 1.5 } // finer than the usual raster: the curtain's ligaments
 const drops: Drops = { k: 1, n: 1, p: new Float32Array(112) }
-export const live = [0, 0, 0] // the circulation, the inflow, the spiral's pitch in degrees: for the equation
-export function vortex(T: number, now: number, f: Frame, light = 1, plot = 1, rain = 1, n = 1) {
+export function vortex(T: number, now: number, f: Frame, light = 1, rain = 1, n = 1, plume = 0, veil = 0) {
   const p = field.p, q = drops.p, head = print(T, now, field), Tc = T + LEAD
-  const { wet, beta, gamma, H, K, hole } = poolAt(T, pool), fell = PER * (descent(Tc) - descent(Tc - FALL))
-  p[7] = wet, p[15] = hole
+  const { wet, H, K, hole } = poolAt(T, pool), fell = PER * (descent(Tc) - descent(Tc - FALL))
+  p[7] = wet, p[11] = veil, p[15] = hole
   p[16] = R, p[17] = A0, p[18] = ARC, p[19] = light
   p[20] = head % ROWS, p[21] = PER / BETA, p[22] = head - printer.from, p[23] = fell
   p[24] = 0.9, p[25] = Math.min(0.3, Math.max(-0.15, printer.ref - 0.8)) // the landing's white water; the reference level, as an offset in the rows' units
   p[26] = H, p[27] = RC
-  p[28] = K, p[29] = plot, p[30] = U0, p[31] = DU
-  p[32] = RIM, p[33] = HF, p[34] = 1, p[35] = 1
+  p[28] = K, p[29] = T, p[30] = U0, p[31] = DU
+  p[32] = RIM, p[33] = HF, p[34] = FALL, p[35] = plume
+  p[36] = MOON[0], p[37] = MOON[1], p[38] = MOON[2], p[39] = MOONLIGHT
   p[46] = p[47] = 0
   field.k = +(light > 0)
-  field.res = T < 0 ? 1 : 1.5 // finest once we are down on the water
   field.cell = undefined
   f.field = field
   f.look = { tau: TAU_RASTER }
 
   q[16] = R, q[17] = RIM, q[18] = HF, q[19] = FALL
-  q[20] = T, q[21] = 1.5, q[22] = plot
+  q[20] = T, q[21] = 1.5, q[23] = 1
   q[24] = p[20], q[25] = p[21], q[26] = fell, q[27] = p[25]
   q[28] = H, q[29] = RC * RC, q[30] = K, q[31] = hole
   q[34] = A0, q[35] = LIFE
   q[36] = 38, q[37] = 0.7, q[38] = 1.1, q[39] = 0.12
-  q[40] = 0.05, q[41] = 1.4, q[42] = p[22]
+  q[40] = 0.05, q[41] = 1, q[42] = p[22]
+  q[44] = MOON[0], q[45] = MOON[1], q[46] = MOON[2], q[47] = MOONLIGHT
   for (let j = 0; j < 64; j++) q[48 + j] = PER * (descent(Tc) - descent(Tc - (j * SMAX) / 63))
   drops.k = rain, drops.n = n, drops.rows = fed.n > 0 ? fed : undefined
   f.drops = drops
-
-  live[0] = gamma * M * M // m²/s
-  live[1] = beta
-  live[2] = (Math.atan(1 / K) * 360) / TAU // on the axis, where tan α = 2πβr_c² / Γ = 1 / K: the arms' pitch
   return field
 }
 // Through this eye: the raster and the droplets see the shaft through one camera.
@@ -184,19 +183,11 @@ export function fly(T: number) {
   sight(k, to, upward, k[6])
 }
 
-// The live equation, top left, one for the whole way down: the lip's, the fall's, the plot's and the
-// vortex's, each growing out of the last term by term. Its clock is T, so it carries across the scenes.
-export const say = new Say()
-export const VORTEX_INK = [0.62, 0.88, 1]
-export const VORTEX = 'z = -\\frac{\\Gamma^2}{8 \\pi^2 g\\,(r^2 + r_c^2)},\\; \\tan \\alpha = \\frac{u_r}{u_\\theta} = \\frac{2 \\pi \\beta\\,(r^2 + r_c^2)}{\\Gamma}'
-export const turning = (f: Frame, T: number, i = 1) => say.say(f, T, VORTEX, VORTEX_INK, [['\\Gamma', live[0], 0], ['\\beta', live[1], 2], ['\\alpha', live[2], 1]], i)
-
 export const wrap: Scene = {
   dur: DUR,
   build(t, f) {
     vortex(t, (f.at ?? 0) + t, f)
     fly(t)
-    turning(f, t)
     place(t + LEAD)
     return (tt, o) => sing(tt + LEAD, o)
   },

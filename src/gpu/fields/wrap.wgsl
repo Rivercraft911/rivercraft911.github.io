@@ -1,50 +1,54 @@
-// The shaft and its whirlpool. The river goes over the rim of a round shaft (radius RIM, HF deep) all the
-// way round, and lands in the pool at its foot on a ring of radius R round the drain: 80 Hz to 8 kHz of
-// log-frequency round one half of it, mirrored on the other, so the spectrum meets itself at both ends. The
-// pool turns as a Scully vortex: u_θ = Γr / 2π(r² + r_c²), which ties its free surface to
-// z = −Γ² / 8π²g(r² + r_c²) (the Rankine −Γ²/8π²gr² outside the core, a bowl within), and with the Burgers
-// inflow u_r = −βr each parcel has turned Φ(r) = (K/2) ln((1 + r_c²/r²) / (1 + r_c²/R²)) since it landed at
-// R, K = Γ / 2πβr_c², and has aged ln(R/r)/β: log-radius is age. Inside the core that is K radians every
-// e-fold: a log spiral, the same at every scale. The water is dyed with the spectrum it fell with, frequency
-// its hue; it mirrors the curtain falling round it (drops.wgsl draws the drops themselves), mist stands
-// where that lands, and the rock behind is lit by it. At the bottom the drain opens, dark. Read out as text
-// the water gives way to glyphs.
+// The shaft and its whirlpool, by moonlight. The river goes over the rim of a round shaft (radius RIM, HF deep)
+// all the way round and falls: a glassy sheet at the lip that aerates as it falls, tears into ligaments and the
+// ligaments into beads (Rayleigh–Plateau: drops.wgsl draws the beads), landing on a ring of radius R round the
+// drain. The pool turns as a Scully vortex, u_θ = Γr / 2π(r² + r_c²), which ties its free surface to
+// z = −Γ² / 8π²g(r² + r_c²); with the Burgers inflow u_r = −βr each parcel has turned
+// Φ(r) = (K/2) ln((1 + r_c²/r²) / (1 + r_c²/R²)) since it landed at R, and has aged ln(R/r)/β: log-radius is age.
+// The moon stands high over the mouth. Its light comes in as a slanted shaft the rim cuts (lit: exact, for any
+// point), and the mist in it shows it as god rays. Under it all is the soundtrack: each angle round the rim is a
+// frequency (80 Hz to 8 kHz of log-frequency round half of it, mirrored on the other), and the water going over
+// there is as heavy as that band is loud; the foam the pool winds in is the spectrum it fell with; and the
+// moonbow in the spray, each colour at its own angle from the antisolar point, is as bright as its band. At the
+// bottom the drain opens, a throat of water turning down into the dark. Read out as text, the water's light is
+// glyphs: its foam the dense ones, winding in.
 //
-// p[0..3] camera; p[1].w how far the water has spun up, p[3].w the drain's radius
+// p[0..3] camera; p[1].w how far the water has spun up, p[2].w the mist curling over the lip, p[3].w the drain's radius
 // p[4] R, 80 Hz's angle, the lanes' arc, gain     p[5] head row (ring), rows an e-fold in, rows printed, rows the falls take
-// p[6] the landing's foam, reference offset, depth H, core r_c      p[7] winding K, water to plot, 80 Hz and 8 kHz's span on the rows
-// p[8] the rim's radius and height, the rock's light, the mist      p[11] -, -, how far the text has spread (0..1.3), how dark the drain has drawn all (0..1)
+// p[6] the landing's foam, reference offset, depth H, core r_c      p[7] winding K, T (s), 80 Hz and 8 kHz's span on the rows
+// p[8] the rim's radius and height, the fall's seconds, the plume   p[9] toward the moon, its light
+// p[11] -, -, how far the text has spread (0..1.3), how dark it has all gone (0..1)
 
 const TAU = 6.2831853;
 const DB = 56.0 * 0.33219281; // the rows' range, 56 dB, in doublings of power
 const ROWS = 4096.0;
+const LIG = 420.0; // ligaments round the rim (drops.wgsl)
+const AIR = vec3f(0.0008, 0.0016, 0.0032); // what light there is in the shaft besides the moon's: the sky through its mouth
 
 // A row's level is dB over the floor, in 16 bits as two bytes (filtering is linear, so it filters them
 // apart and they add back exactly); power and back again, with the floor as zero.
 fn at(t: vec2f) -> f32 { return dot(textureSampleLevel(data, smp, t, 0.0).rg, vec2f(65280.0, 255.0) / 65535.0); }
 fn power(s: f32) -> f32 { return exp2(DB * clamp(s - u.p[6].y, 0.0, 1.0)) - 1.0; }
 fn level(p: f32) -> f32 { return log2(1.0 + p) / DB; }
+fn hot(lv: f32) -> f32 { return pow(min(lv / 0.8, 1.25), 4.0); } // a display's contrast: 10 dB under the loudest is a third of it
 
-// Frequency as colour, the way a prism would lay the band out (drops.wgsl has the same): 80 Hz ember red,
-// through gold and green, to 8 kHz violet.
+// Frequency as colour, the way a prism lays the band out: 80 Hz red, through gold and green, to 8 kHz violet.
 fn hue(b: f32) -> vec3f {
-  var c = array(vec3f(1.0, 0.05, 0.02), vec3f(1.0, 0.28, 0.02), vec3f(1.0, 0.7, 0.08), vec3f(0.2, 1.0, 0.3),
-                vec3f(0.03, 0.75, 1.0), vec3f(0.12, 0.25, 1.0), vec3f(0.55, 0.12, 1.0));
+  var c = array(vec3f(1.0, 0.08, 0.04), vec3f(1.0, 0.35, 0.05), vec3f(1.0, 0.75, 0.15), vec3f(0.3, 1.0, 0.35),
+                vec3f(0.1, 0.75, 1.0), vec3f(0.2, 0.3, 1.0), vec3f(0.55, 0.2, 1.0));
   let x = clamp(b, 0.0, 1.0) * 6.0;
   let i = min(u32(x), 5u);
   return mix(c[i], c[i + 1u], x - f32(i));
 }
-// What water carrying level lv in lane b sends out: blue-white and foaming while it is water, its own hue once it is the plot.
-fn hot(lv: f32) -> f32 { return pow(min(lv / 0.8, 1.25), 4.0); } // a display's contrast: 10 dB under the loudest is a third of it
-fn glow(b: f32, lv: f32) -> vec3f {
-  let l3 = hot(lv);
-  let water = vec3f(0.5, 0.74, 1.0) * 0.06 + vec3f(0.9, 0.97, 1.0) * 0.12 * l3;
-  let dye = hue(b) * (0.012 + 2.6 * l3) + vec3f(1.0, 0.95, 0.9) * 1.5 * pow(max(lv - 0.8, 0.0) / 0.2, 2.0);
-  return mix(water, dye, u.p[7].y);
-}
 
 fn wrap(i: vec2f, n: vec2f) -> vec2f { return i - n * floor(i / n); }
-fn hash(p: vec2f) -> f32 { return fract(sin(dot(p, vec2f(127.1, 311.7))) * 43758.547); }
+// A lattice point's random value: an integer hash (PCG), which unlike a sine's holds up however far out it is.
+fn pcg(v: u32) -> u32 {
+  let s = v * 747796405u + 2891336453u;
+  let w = ((s >> ((s >> 28u) + 4u)) ^ s) * 277803737u;
+  return (w >> 22u) ^ w;
+}
+fn hash(p: vec2f) -> f32 { return f32(pcg(u32(i32(p.x)) + pcg(u32(i32(p.y)))) >> 8u) / 16777216.0; }
+fn hash3(p: vec3f) -> f32 { return f32(pcg(u32(i32(p.x)) + pcg(u32(i32(p.y)) + pcg(u32(i32(p.z))))) >> 8u) / 16777216.0; }
 // Value noise on a lattice that tiles every n cells, so it is seamless round the pool and round the ring.
 fn noise(x: vec2f, n: vec2f) -> f32 {
   let i = floor(x);
@@ -56,35 +60,81 @@ fn noise(x: vec2f, n: vec2f) -> f32 {
   let d = hash(wrap(i + 1.0, n));
   return mix(mix(a, b, w.x), mix(c, d, w.x), w.y);
 }
+fn noise3(x: vec3f) -> f32 {
+  let i = floor(x);
+  let f = x - i;
+  let w = f * f * (3.0 - 2.0 * f);
+  let e = vec2f(1.0, 0.0);
+  let a = mix(mix(hash3(i), hash3(i + e.xyy), w.x), mix(hash3(i + e.yxy), hash3(i + e.xxy), w.x), w.y);
+  let b = mix(mix(hash3(i + e.yyx), hash3(i + e.xyx), w.x), mix(hash3(i + e.yxx), hash3(i + e.xxx), w.x), w.y);
+  return mix(a, b, w.z);
+}
+
+// Foam's own cells, bubbles packed together (a cellular noise tiling every n cells): how far from the wall
+// between two of them, 0 on it.
+fn bubbles(x: vec2f, n: vec2f) -> f32 {
+  let i = floor(x);
+  let f = x - i;
+  var d1 = 9.0;
+  var d2 = 9.0;
+  for (var k = 0; k < 9; k++) {
+    let o = vec2f(f32(k % 3) - 1.0, f32(k / 3) - 1.0);
+    let c = wrap(i + o, n);
+    let p = o + vec2f(hash(c), hash(c + vec2f(1031.0, 67.0))) - f;
+    let d = dot(p, p);
+    d2 = min(d2, max(d1, d));
+    d1 = min(d1, d);
+  }
+  return sqrt(d2) - sqrt(d1);
+}
 
 // The lane at angle th round the shaft (from downstream toward +x), 0..1, mirrored on the far half.
 fn lane(th: f32) -> f32 {
   let b0 = fract((th - u.p[4].y) / TAU) * TAU / u.p[4].z;
   return select(b0, 2.0 - b0, b0 > 1.0);
 }
-// The curtain's light at angle th, height z: the water that went over √(1 − z/HF) of the fall ago.
-fn curtain(th: f32, z: f32) -> vec3f {
-  let b = lane(th);
-  let f = sqrt(clamp(1.0 - z / u.p[8].y, 0.0, 1.0));
-  let v = (u.p[5].x - u.p[5].w * f + 0.5) / ROWS;
+// How loud lane b was `back` rows behind the head, over the reference: 0..1.
+fn band(b: f32, back: f32) -> f32 {
+  let v = (u.p[5].x - back + 0.5) / ROWS;
   let x = u.p[7].z + b * u.p[7].w;
   let s = 0.5 * at(vec2f(x, v)) + 0.25 * (at(vec2f(x - 0.004, v)) + at(vec2f(x + 0.004, v)));
-  return glow(b, clamp(s - u.p[6].y, 0.0, 1.0));
+  return clamp(s - u.p[6].y, 0.0, 1.0);
 }
 
-// The night over the shaft: a low moon, and a sky only just lighter than black.
-const MOON = vec3f(-0.42, 0.55, 0.72);
-fn sky(r: vec3f) -> vec3f {
-  let m = max(dot(r, normalize(MOON)), 0.0);
-  return mix(vec3f(0.006, 0.012, 0.02), vec3f(0.001, 0.002, 0.007), sqrt(max(r.z, 0.0))) + vec3f(1.0, 0.9, 0.75) * (6.0 * pow(m, 4000.0) + 0.0015 * pow(m, 40.0));
+fn moon() -> vec3f { return u.p[9].xyz; }
+fn moonlight() -> vec3f { return vec3f(0.62, 0.8, 1.0) * u.p[9].w; } // cool: the valley's own water, in light
+// Whether the moon reaches P: under the rim, only if the way up toward it comes out through the mouth.
+fn lit(P: vec3f) -> f32 {
+  let L = moon();
+  let Q = P.xy + L.xy * (u.p[8].y - P.z) / L.z;
+  return select(smoothstep(u.p[8].x + 0.03, u.p[8].x - 0.03, length(Q)), 1.0, P.z >= u.p[8].y);
 }
-// How far along (o, d) the shaft's wall of radius r is, from inside it.
+
+// The night over the shaft: the moon, its aureole in the air, a sky only just lighter than black, and stars.
+fn sky(r: vec3f) -> vec3f {
+  let L = moon();
+  let m = dot(r, L);
+  let s = length(cross(r, L)); // the sine of the angle from the moon
+  var c = mix(vec3f(0.006, 0.010, 0.018), vec3f(0.0015, 0.0028, 0.0065), sqrt(max(r.z, 0.0)));
+  c += moonlight() * (0.012 * pow(max(m, 0.0), 24.0) + 0.06 * exp(-s / 0.02) * step(0.0, m));
+  let disk = smoothstep(0.0072, 0.0062, s) * step(0.0, m);
+  c += vec3f(1.0, 0.96, 0.88) * 26.0 * disk * (0.75 + 0.25 * sqrt(max(1.0 - s * s / 0.0000518, 0.0))); // limb-darkened
+  let g = vec2f(atan2(r.x, r.y), asin(clamp(r.z, -1.0, 1.0))) * 70.0;
+  let cell = floor(g);
+  let h = hash(cell);
+  let o = vec2f(hash(cell + 7.7), hash(cell + 3.1));
+  c += vec3f(0.85, 0.9, 1.0) * 1.5 * pow(h, 40.0) * smoothstep(0.18, 0.02, length(g - cell - o)) * step(0.0, r.z);
+  return c;
+}
+
+// How far along (o, d) the wall of a vertical cylinder of radius r is, from inside it.
 fn shaft(o: vec3f, d: vec3f, r: f32) -> f32 {
   let a = max(dot(d.xy, d.xy), 1e-9);
   let b = dot(o.xy, d.xy);
   return (-b + sqrt(max(b * b - a * (dot(o.xy, o.xy) - r * r), 0.0))) / a;
 }
-// The rock behind the falls: strata, wet, lit by the water falling in front of it.
+
+// The rock behind the falls: strata, wet, lit where the moon gets down to it.
 fn rock(P: vec3f) -> vec3f {
   let th = atan2(P.x, P.y);
   let w = fract(th / TAU);
@@ -92,9 +142,65 @@ fn rock(P: vec3f) -> vec3f {
   let joint = smoothstep(0.75, 1.0, noise(vec2f(w * 320.0, P.z * 2.0), vec2f(320.0, 64.0)));
   let ledge = smoothstep(0.5, 0.56, fract(P.z * 5.0 + 2.0 * bed));
   let stone = (0.25 + 0.75 * bed) * (1.0 - 0.6 * joint) * (0.7 + 0.3 * ledge);
-  return stone * (vec3f(0.004, 0.006, 0.009) + 0.11 * curtain(th, P.z)) * u.p[8].z;
+  let n = vec3f(-P.xy / max(length(P.xy), 1e-4), 0.0);
+  let sun = lit(P) * max(dot(n, moon()), 0.0);
+  return stone * (moonlight() * 0.01 * sun + AIR * 0.5);
 }
-// What the water mirrors along r from P: the curtain round it, the rock above that, the sky over the rim.
+
+// The curtain's radius at height z: it leaves the rim at RIM and lands at R, a parabola in time.
+fn rc(z: f32) -> f32 { return u.p[8].x - (u.p[8].x - u.p[4].x) * sqrt(clamp(1.0 - z / u.p[8].y, 0.0, 1.0)); }
+
+// One layer of the curtain's jets, s ligaments to a jet: at ligament coordinate l, f through the fall, gone over
+// at tb. Each jet keeps its place round the rim as it falls, its flow swelling and thinning; whole at the lip,
+// where they are one sheet, they part as it falls, and lower down each pinches into beads (Rayleigh–Plateau).
+// How much of the point it covers, how full its flow is, and where across the jet the point is (−1..1).
+fn jets(l: f32, s: f32, f: f32, tb: f32, heavy: f32, fp: f32, seed: f32) -> vec3f {
+  let x = l / s;
+  let cell = floor(x);
+  let n = LIG / s;
+  let id = cell - n * floor(cell / n);
+  let h0 = hash(vec2f(id, seed));
+  let slow = noise(vec2f(id * 0.71 + seed, tb * 0.9), vec2f(65536.0));
+  let bead = 0.5 + 0.5 * sin(TAU * ((3.0 + 4.0 * hash(vec2f(id, seed + 1.0))) * tb + h0));
+  let pinch = 0.7 * smoothstep(0.55, 1.0, f) * (1.0 - smoothstep(0.4, 1.0, fp / s));
+  let w = mix(0.62, (0.06 + 0.3 * slow * slow + 0.15 * heavy) * mix(1.0, 0.25 + 0.75 * bead, pinch), smoothstep(0.03, 0.45, f)); // half-width, in cells
+  let c = 0.5 + (h0 - 0.5) * max(1.0 - 2.0 * w, 0.0);
+  let d = x - cell - c;
+  let aa = 0.6 * fp / s + 0.02;
+  return vec3f(smoothstep(w + aa, w - aa, abs(d)), slow * (0.25 + 1.5 * h0 * h0), clamp(d / max(w, 1e-3), -1.0, 1.0));
+}
+
+// The curtain where a ray crosses it at C: its light, and how much of what is behind it it hides. fp is a pixel's
+// width in ligaments: detail finer than that is let go, so it never shimmers. Each jet is a rope of water: glass
+// where it is still whole, white where air is in it, catching the moon along one side.
+fn curtain(C: vec3f, rd: vec3f, fp: f32) -> vec4f {
+  let HF = u.p[8].y;
+  let f = sqrt(clamp(1.0 - C.z / HF, 0.0, 1.0)); // how far through its fall it is, in time
+  let tb = u.p[7].y - f * u.p[8].z; // when it went over
+  let th = atan2(C.x, C.y);
+  let l = fract(th / TAU) * LIG;
+  let heavy = hot(band(lane(th), u.p[5].w * f)); // as heavy as its band was loud when it went over
+  let a = jets(l, 2.0, f, tb, heavy, fp, 0.0);
+  let b = jets(l + 0.9, 7.0, f, tb, heavy, fp, 5.0);
+  let j = select(a, b, b.x > a.x);
+  let cov = max(a.x, b.x);
+  let streak = mix(noise(vec2f(l * 4.0, tb * 5.0), vec2f(LIG * 4.0, 65536.0)), 0.5, smoothstep(0.15, 0.4, fp));
+  let core = sqrt(max(1.0 - j.z * j.z, 0.0));
+  let white = smoothstep(0.02, 0.5, f) * core * core * pow(0.15 + 0.6 * j.y + 0.5 * streak, 2.0) * (0.6 + 0.6 * heavy); // aerating as it falls
+  let L = moon();
+  let n = vec3f(-C.xy / max(length(C.xy), 1e-4), 0.0); // its face toward the axis
+  let side = vec3f(n.y, -n.x, 0.0);
+  let nj = normalize(mix(vec3f(0.0, 0.0, 1.0), n * core + side * j.z, smoothstep(0.0, 0.1, f))); // the rope's own normal; at the lip it curls over
+  let sun = lit(C);
+  let glint = pow(max(dot(reflect(rd, nj), L), 0.0), 80.0) * (1.5 + 3.0 * (1.0 - smoothstep(0.0, 0.25, f)));
+  // over the lip the sheet is glass, and its flow lines catch the moon: the ink's streamlines, in the water's own light
+  let lines = pow(1.0 - abs(2.0 * noise(vec2f(l * 3.0, tb * 0.7), vec2f(LIG * 3.0, 65536.0)) - 1.0), 5.0);
+  let lip = mix(lines, 0.03, smoothstep(0.1, 0.4, fp * 3.0)) * (1.0 - smoothstep(0.05, 0.45, f)) * 1.2;
+  let col = moonlight() * sun * (white * 0.3 * (0.4 + 0.6 * abs(dot(n, L))) + glint * (0.3 + 0.7 * streak) + lip) + white * AIR * 2.0;
+  return vec4f(col * cov, cov * (0.08 + 0.9 * min(white, 1.0)));
+}
+
+// What the water mirrors along r from P: the sky through the mouth, else the curtain round it and the rock behind.
 fn mirrored(P: vec3f, r: vec3f) -> vec3f {
   let HF = u.p[8].y;
   let t1 = shaft(P, r, u.p[8].x);
@@ -102,26 +208,50 @@ fn mirrored(P: vec3f, r: vec3f) -> vec3f {
   if (z1 > HF) { return sky(r); }
   let f = sqrt(clamp(1.0 - z1 / HF, 0.0, 1.0));
   let Q = P + r * shaft(P, r, mix(u.p[8].x, u.p[4].x, f)); // where the curtain hangs at that height
-  return 0.7 * curtain(atan2(Q.x, Q.y), Q.z) + rock(P + r * t1);
+  let c = moonlight() * lit(Q) * 0.05 * smoothstep(0.0, 0.5, f) + AIR; // the curtain's mean light: the ripples blur the rest
+  return c + rock(P + r * t1) * 0.3;
 }
 
-// Read out as text, the glyphs spread like an infection: from a few seeds, fingering along the water's own
-// grain (flow: where on the water, in its coordinates) so the tendrils wind in with the spiral. A cell
-// turns when its time comes, and the front burns.
+// The mist: spray standing round where the falls land, a haze filling the shaft, and the plume it breathes out of
+// its mouth into the night. Density per unit of length.
+fn mist(P: vec3f) -> f32 {
+  let R = u.p[4].x;
+  let RIM = u.p[8].x;
+  let HF = u.p[8].y;
+  let r = length(P.xy);
+  let z = max(P.z, 0.0);
+  let n = noise3(vec3f(P.xy * 2.5, z * 1.8 - u.p[7].y * 0.5));
+  let foot = 1.0 * exp(-z / 0.5) * exp(-pow((r - R) / 0.35, 2.0));
+  let haze = 0.05 * exp(-z / 1.5);
+  let curl = u.p[2].w * 1.2 * exp(-pow((r - RIM + 0.15) / 0.3, 2.0) - pow((P.z - HF) / 0.3, 2.0)); // over the lip, where we go over
+  let rise = max(P.z - HF + 0.3, 0.0);
+  let plume = u.p[8].w * 0.06 * smoothstep(HF - 0.5, HF, P.z) * exp(-rise / 0.8) * smoothstep(RIM * (1.0 + 0.5 * rise), RIM * (0.3 + 0.5 * rise), r + 0.35 * (n - 0.5));
+  return (foot + select(haze, 0.0, P.z > HF) + plume + curl) * (0.2 + 1.6 * n * n) * step(-u.p[6].z * u.p[6].w * u.p[6].w / (r * r + u.p[6].w * u.p[6].w), P.z);
+}
+// The moonbow: each colour's own angle from the antisolar point (42.3° red, 40.6° violet), as bright as its band
+// in what is landing now; within it the sky's light is brighter, all the colours overlapping there.
+fn bow(rd: vec3f) -> vec3f {
+  let psi = degrees(acos(clamp(-dot(rd, moon()), -1.0, 1.0)));
+  let b = (42.4 - psi) / 1.8;
+  let lv = hot(band(clamp(b, 0.0, 1.0), u.p[5].w));
+  let ring = smoothstep(-0.3, 0.1, b) * smoothstep(1.3, 0.9, b);
+  return (mix(vec3f(1.0), hue(b), 0.8) * (0.35 + 1.6 * lv) * ring + vec3f(0.25) * smoothstep(41.0, 25.0, psi)) * 0.8;
+}
+// The phase of the mist's scattering: forward, mostly (Henyey–Greenstein, g = 0.6), and isotropic.
+fn phase(c: f32) -> f32 { return 0.5 * 0.0509 / pow(1.36 - 1.2 * c, 1.5) + 0.5 * 0.0796; }
+
+// Read out as text, the glyphs spread like an infection: from a few seeds, fingering along the water's own grain
+// (flow: where on the water, in its coordinates) so the tendrils wind in with the spiral. A cell turns when its
+// time comes.
 fn fbm(x: vec2f) -> f32 {
   var s = 0.0;
   var y = x;
   for (var i = 0; i < 4; i++) { s += exp2(-f32(i + 1)) * noise(y, vec2f(65536.0)); y = 2.03 * y + 17.0; }
   return s;
 }
-fn vein(x: vec2f) -> f32 { return abs(2.0 * fbm(x) - 1.0); } // 0 along branching curves
-fn infect(q: vec2f, flow: vec2f, c: vec3f) -> vec3f {
+fn infected(q: vec2f, flow: vec2f) -> f32 {
   let near = min(min(length(q - vec2f(-1.1, 0.6)), length(q - vec2f(1.3, -0.5))), length(q - vec2f(0.2, 0.9)));
-  let come = 0.4 * near / 1.6 + 0.6 * vein(flow);
-  let pi = u.p[11].z - come; // how long ago it was taken
-  text = step(0.0, pi);
-  let edge = select(0.0, exp(-pi / 0.05), pi >= 0.0 && u.p[11].z < 1.3); // the front burns: the newest glyphs
-  return c * (1.0 + 3.0 * edge);
+  return step(0.0, u.p[11].z - 0.4 * near / 1.6 - 0.6 * abs(2.0 * fbm(flow) - 1.0));
 }
 
 fn field(q: vec2f) -> vec3f {
@@ -130,28 +260,33 @@ fn field(q: vec2f) -> vec3f {
   let H = u.p[6].z;
   let k = u.p[6].w * u.p[6].w;
   let hole = u.p[3].w;
+  let R = u.p[4].x;
   let RIM = u.p[8].x;
   let HF = u.p[8].y;
+  let T = u.p[7].y;
+  let L = moon();
+  let e = fract(52.9829189 * fract(dot(q / u.px, vec2f(0.06711056, 0.00583715)))); // a per-pixel dither
   let lid = -H * k / (hole * hole + k); // the drain's mouth
-  if (ro.z < lid && length(ro.xy) < hole) { return vec3f(0.0); } // through it
+  let throat = ro.z < lid && length(ro.xy) < hole; // down it
 
-  // In through the shaft's mouth, if we are over the rim; outside it is the land, which the beam draws.
-  // (Decided here, drawn last: the derivatives below need every pixel.)
+  // Over the rim: in through the mouth, onto the land, or the sky. (Decided here, drawn last: the derivatives
+  // below need every pixel.)
   let over = ro.z > HF;
-  let t0 = select(0.0, max((HF - ro.z) / min(rd.z, -1e-5), 0.0), over);
-  let open = over && rd.z >= 0.0; // the sky
-  let land = over && !open && length(ro.xy + rd.xy * t0) > RIM;
-  let S = ro + rd * t0;
-  let tw = t0 + shaft(S, rd, RIM);
+  let tm = select(0.0, max((HF - ro.z) / min(rd.z, -1e-5), 0.0), over);
+  let mouth = !over || (rd.z < 0.0 && length(ro.xy + rd.xy * tm) < RIM);
+  let land = over && rd.z < 0.0 && !mouth;
+  let S = ro + rd * tm;
+  let tw = tm + shaft(S, rd, RIM);
+  let ttop = select(1e9, (HF - ro.z) / max(rd.z, 1e-6), !over && rd.z > 0.0);
 
   // Down to the surface: Newton on the height above it, each step shortened by the steepest the wall gets
   // along it (the slope 2Hk r / (r² + k)² falls off outside its peak at r_c/√3, so that is where the step
   // comes nearest the axis), so it slides down the funnel and across its throat without passing through,
   // and never creeps along a lip it grazes. Never breaking off keeps the derivatives below.
-  var t = max(t0, select(0.0, ro.z / -rd.z, ro.z > 0.0 && rd.z < 0.0));
+  var t = max(tm, select(0.0, ro.z / -rd.z, ro.z > 0.0 && rd.z < 0.0));
   let lat = max(length(rd.xy), 1e-6);
   let peak = u.p[6].w * 0.57735;
-  for (var i = 0; i < 48; i++) {
+  for (var i = 0; i < 40; i++) {
     let p = ro + rd * t;
     let r2 = dot(p.xy, p.xy);
     let g = p.z + H * k / (r2 + k);
@@ -163,18 +298,17 @@ fn field(q: vec2f) -> vec3f {
     }
     t = clamp(t + dt, 0.0, 60.0);
   }
-  let P = ro + rd * t;
+  var P = ro + rd * t;
   let d = P.xy;
   let r2 = max(dot(d, d), 1e-12);
   let rho = sqrt(r2);
   let depth = H * k / (r2 + k);
-  let miss = P.z + depth > 1e-3 * (1.0 + t) || t > tw;
-  let down = !miss && rho < hole && rd.z < 0.0; // into the drain's mouth (decided here, drawn last: the derivatives below need every pixel)
+  let pool = !(P.z + depth > 1e-3 * (1.0 + t) || t > tw || t > ttop) && mouth && !throat;
+  let down = pool && rho < hole && rd.z < 0.0; // into the drain's mouth
 
   // Where on the spectrum: angle round the drain, less the turn the water has made since it landed, is
   // frequency, mirrored on the far half; log-radius is age, in rows behind the head.
   let K = u.p[7].x;
-  let R = u.p[4].x;
   let a = atan2(d.x, d.y) - 0.5 * K * log((1.0 + k / r2) / (1.0 + k / (R * R))) - u.p[4].y;
   let w = (a - TAU * floor(a / TAU)) / TAU; // round the pool, 0..1, for the water's own texture
   let b0 = w * TAU / u.p[4].z;
@@ -195,8 +329,7 @@ fn field(q: vec2f) -> vec3f {
   let fy = min(max(abs(fr.x), abs(fr.y)), 256.0);
 
   // The rows' power over that footprint, taps dithered per pixel so a few of them read as grain.
-  let e = fract(52.9829189 * fract(dot(q / u.px, vec2f(0.06711056, 0.00583715))));
-  let ny = i32(clamp(ceil(fy * 0.5), 1.0, 4.0));
+  let ny = i32(clamp(ceil(fy * 0.5), 1.0, 3.0));
   let nx = i32(clamp(ceil(fx * 0.5), 1.0, 3.0));
   var pw = 0.0;
   for (var j = 0; j < ny; j++) {
@@ -206,26 +339,37 @@ fn field(q: vec2f) -> vec3f {
     }
   }
   pw /= f32(nx * ny);
-  let lv = select(level(pw), 0.0, miss) * smoothstep(-oldest, 60.0 - oldest, rows); // older than the rows hold: clear water
+  let lv = select(0.0, level(pw), pool) * smoothstep(-oldest, 60.0 - oldest, rows); // older than the rows hold: clear water
 
-  // Foam and ripples in the water's own coordinates (the angle it landed at, the row it landed with), so
-  // they ride the spiral in and wind up with it. Lace where the spectrum is loud, ripples everywhere, each
-  // let go where it would be finer than a pixel; and white water where the falls land, churned.
+  // Foam in the water's own coordinates (the angle it landed at, the row it landed with), so it rides the spiral
+  // in and winds up with it: lace where the spectrum it fell with is loud, white water churned where the falls
+  // land and all the way out under them; each let go where it would be finer than a pixel.
   let wet = u.p[1].w;
   let fine = vec2f(fx, fy);
-  let lace = 1.0 - abs(2.0 * noise(vec2f(w * 768.0, ring / 192.0), vec2f(768.0, ROWS / 192.0)) - 1.0);
-  let clump = noise(vec2f(w * 96.0, ring / 192.0), vec2f(96.0, ROWS / 192.0));
-  let churn = 0.6 * noise(vec2f(w * 384.0, ring / 4.0), vec2f(384.0, ROWS / 4.0)) + 0.4 * noise(vec2f(w * 1024.0, ring / 2.0), vec2f(1024.0, ROWS / 2.0)); // froth, as fine one way as the other
   let fell = rows + u.p[5].w; // rows since it landed: < 0 inside the ring
-  let white = u.p[6].x * (exp(-pow(fell / 40.0, 2.0)) + 0.6 * exp(min(fell, 0.0) / 110.0) * step(fell, 0.0)) * (0.03 + 0.97 * min(hot(lv), 1.0));
-  let far = 1.0 - smoothstep(4.0, 24.0, fine.x + fine.y / 4.0);
-  let foam = (smoothstep(0.93, 0.998, lace) * smoothstep(0.4, 0.9, clump + 0.5 * lv) * smoothstep(0.35, 0.95, hot(lv)) * (0.4 + 0.6 * wet)) * far + white * smoothstep(0.5, 0.8, churn + 0.15 * lace);
-  let ripple = noise(vec2f(w * 1536.0, ring / 6.0), vec2f(1536.0, ROWS / 6.0)) * (1.0 - smoothstep(1.0, 6.0, fine.x + fine.y));
+  let age = max(-fell, 0.0) / u.p[5].y; // e-folds since
+  let warp = noise(vec2f(w * 64.0, ring / 80.0), vec2f(64.0, ROWS / 80.0)) - 0.5; // marbling: the filaments wander
+  let fil = 1.0 - abs(2.0 * noise(vec2f(w * 512.0 + 30.0 * warp, ring / 90.0), vec2f(512.0, ROWS / 90.0)) - 1.0);
+  let fil2 = 1.0 - abs(2.0 * noise(vec2f(w * 1400.0 + 70.0 * warp, ring / 36.0), vec2f(1400.0, ROWS / 36.0)) - 1.0);
+  let clump = noise(vec2f(w * 40.0 + 3.0 * warp, ring / 150.0), vec2f(40.0, ROWS / 150.0));
+  let f1 = 1.0 - smoothstep(1.5, 5.0, fine.x + fine.y / 30.0); // each let go where finer than a pixel
+  let f2 = 1.0 - smoothstep(0.6, 2.0, fine.x + fine.y / 12.0);
+  let dens = clamp(1.6 * hot(lv) + 0.9 * clump - 0.35, 0.0, 1.0) * exp(-0.2 * age) * (0.4 + 0.6 * wet);
+  let threads = dens * mix(0.3, 0.06 + 1.1 * pow(fil, 6.0), f1) * mix(0.8, 0.4 + 0.9 * fil2 * fil2, f2);
+  let boil = noise(vec2f(w * 160.0 + 8.0 * warp, ring / 12.0 - T * 3.0), vec2f(160.0, ROWS / 12.0));
+  var froths = 0.6; // bubbles, where the falls land and they are big enough to see
+  let big = 1.0 - smoothstep(0.7, 2.5, fine.x * 0.26 + fine.y / 3.0);
+  if (pool && rho > R - 0.35 && big > 0.0) {
+    froths = mix(0.6, smoothstep(0.35, 0.0, bubbles(vec2f(w * 900.0 + 40.0 * warp, ring / 3.0 - T * 4.0), vec2f(900.0, ROWS / 3.0))), big);
+  }
+  let plunge = smoothstep(R - 0.3, R + 0.02, rho + 0.1 * fil) * smoothstep(0.35, 0.75, boil + 0.3 * fil - 0.6 * smoothstep(R, R - 0.25, rho)) * froths * u.p[6].x * 0.6;
+  let foam = clamp(max(threads, plunge), 0.0, 1.0);
+  let ripple = noise(vec2f(w * 1536.0, ring / 6.0 - T * 3.0), vec2f(1536.0, ROWS / 6.0)) * (1.0 - smoothstep(1.0, 6.0, fine.x + fine.y));
 
   // The surface's normal from the vortex, roughened by the ripples and the foam.
   let gh = 2.0 * H * k / ((r2 + k) * (r2 + k)) * d;
   let n0 = normalize(vec3f(-gh, 1.0));
-  let bump = 0.0012 * (0.4 + 0.6 * wet) * (ripple + foam);
+  let bump = 0.0014 * (ripple + 1.5 * foam);
   let bx = dpdx(bump);
   let by = dpdy(bump);
   let s1 = cross(dPy, n0);
@@ -233,35 +377,97 @@ fn field(q: vec2f) -> vec3f {
   let det = dot(dPx, s1);
   let n = normalize(abs(det) * n0 - sign(det) * (bx * s1 + by * s2) + 1e-9);
 
-  // Water: what it mirrors at grazing angles (Schlick, n = 1.33); seen into elsewhere, where the dye it
-  // carries glows in its own hue, brighter as the funnel draws the surface together, over the teal the
-  // depth scatters back (Beer–Lambert: 1 − e^(−κd) of it, d the water's depth under the surface).
+  // Water: what it mirrors (Schlick, n = 1.33), the moon's glitter on its ripples, and seen into, dark, but for
+  // the bubbles the falls drive down glowing under where they land; and its foam. The moon gets down to it past
+  // the rim and, deep in the funnel, past the funnel's own wall: a few steps toward the moon.
+  var sun = lit(P);
+  for (var i = 1; i < 4; i++) {
+    let Q = P + L * (0.06 * f32(i * i));
+    sun *= smoothstep(-0.01, 0.02, Q.z + H * k / (dot(Q.xy, Q.xy) + k));
+  }
   let cosi = clamp(dot(-rd, n), 0.0, 1.0);
   let fres = 0.02 + 0.98 * pow(1.0 - cosi, 5.0);
-  let deep = 1.0 - exp(-2.2 * (0.35 + depth));
-  let body = vec3f(0.0, 0.045, 0.05) * deep * (0.35 + 0.65 * max(n.z, 0.0));
-  let l3 = hot(lv);
-  let dye = (mix(vec3f(0.35, 0.6, 0.9) * (0.03 + l3), hue(b) * (0.012 + 2.4 * l3), u.p[7].y) + vec3f(1.0, 0.95, 0.9) * 1.5 * pow(max(lv - 0.8, 0.0) / 0.2, 2.0)) * (1.0 + 2.5 * depth / max(H, 1e-3));
-  let lit = vec3f(0.55, 0.68, 0.8) * foam * (0.5 + 0.5 * max(dot(n, normalize(MOON)), 0.0));
-  let mirror = mirrored(P, reflect(rd, n)) * fres;
-  var c = (dye + body) * (1.0 - fres) + lit + mirror;
-  if (miss) {
-    let W = ro + rd * tw;
-    c = select(rock(W), sky(rd), W.z > HF);
-    t = tw;
+  let h = normalize(L - rd);
+  // the glitter: the moon on each facet of the ripples that happens to face it, so a lobe as wide as the ripples
+  // are steep, broken into glints that ride the water and flicker as it moves; their mean where they are finer
+  // than a pixel
+  let a2 = pow(0.13 + 0.05 * wet, 2.0);
+  let nh = max(dot(n, h), 0.0);
+  let D = a2 / (3.14159 * pow(nh * nh * (a2 - 1.0) + 1.0, 2.0));
+  let glints = mix(0.8, 40.0 * pow(smoothstep(0.7, 0.97, noise(vec2f(w * 2400.0, ring / 1.5 - T * 9.0), vec2f(2400.0, ROWS / 1.5))), 3.0), 1.0 - smoothstep(0.5, 2.0, fine.x * 0.7 + fine.y));
+  let spec = moonlight() * 3.0 * sun * D * glints * (0.02 + 0.98 * pow(1.0 - max(dot(h, -rd), 0.0), 5.0)) * max(dot(n, L), 0.0) / (4.0 * max(cosi, 0.08));
+  let fizz = exp(-pow((rho - R) / 0.22, 2.0)) * (0.5 + boil) + 0.3 * plunge; // the bubbles under the water
+  let body = vec3f(0.0, 0.0012, 0.0018) * (0.3 + sun) + vec3f(0.18, 0.5, 0.46) * 0.03 * fizz * (0.2 + 0.8 * sun);
+  let froth = (moonlight() * sun * (0.14 + 0.26 * max(dot(n, L), 0.0)) + AIR * 3.0) * (1.0 + 0.3 * plunge);
+  var c = mix((body * (1.0 - fres) + mirrored(P, reflect(rd, n)) * fres + spec * (1.0 - foam)), froth, foam);
+  var text_ = 1.0; // what is read out as text: the water's light, not the curtain's
+
+  // Behind: the rock, or the sky through the mouth.
+  let W = ro + rd * tw;
+  c = select(select(select(rock(W), sky(rd), ttop <= tw || !mouth), vec3f(0.0), land), c, pool); // the land is the beam's
+  var tEnd = select(min(tw, ttop), t, pool);
+  // The curtain in front of it, if the ray goes out through it: where, found by halving.
+  let hit = ro + rd * tEnd;
+  if (mouth && !throat && length(hit.xy) > rc(hit.z) + 1e-4) {
+    var lo = tm;
+    var hi = tEnd;
+    for (var i = 0; i < 12; i++) {
+      let m = 0.5 * (lo + hi);
+      let p = ro + rd * m;
+      let o = length(p.xy) > rc(p.z);
+      lo = select(m, lo, o);
+      hi = select(hi, m, o);
+    }
+    let C = ro + rd * hi;
+    let rC = max(length(C.xy), 1e-3);
+    let fp = hi * cone() * LIG / (TAU * rC) / max(abs(dot(rd.xy, C.xy)) / rC, 0.2);
+    let cc = curtain(C, rd, fp);
+    c = c * (1.0 - cc.a) + cc.rgb;
+    text_ *= 1.0 - cc.a;
+    tEnd = hi;
   }
-  // Mist where the falls land, lit by them: a few steps along the ray through it.
-  var fog = vec3f(0.0);
-  for (var i = 0; i < 4; i++) {
-    let M = ro + rd * mix(t0, t, (f32(i) + e) / 4.0);
-    fog += exp(-max(M.z, 0.0) / 0.3) * exp(-pow((length(M.xy) - R) / 0.3, 2.0)) * curtain(atan2(M.x, M.y), 0.0);
+
+  // Down the drain: a throat of water turning down into the dark, its wall streaked with the spiral, lit less and
+  // less the further down from the light above.
+  let O = select(P, ro, throat);
+  let tt = shaft(O, rd, hole);
+  let Wt = O + rd * tt;
+  let below = lid - Wt.z;
+  // its foam the pool's threads wound on down, turning faster the further down
+  let wt = fract((atan2(Wt.x, Wt.y) - 14.0 * below - T * 4.0) / TAU);
+  let ft = 1.0 - abs(2.0 * noise(vec2f(wt * 160.0, below * 40.0 + T * 10.0), vec2f(160.0, 65536.0)) - 1.0);
+  let rush = smoothstep(0.75, 0.97, ft) * noise(vec2f(wt * 24.0, below * 6.0 + T * 3.0), vec2f(24.0, 65536.0));
+  let tube = (moonlight() * 0.05 * rush + AIR * 0.3) * exp(-below / 0.3) * select(1.0, 0.0, rd.z > 0.0 && throat);
+  c = select(c, tube, down || throat);
+  tEnd = select(tEnd, tt + select(t, 0.0, throat), down || throat);
+
+  // The mist along the way, lit where the moon gets down to it, the moonbow in it where it is lit; and the plume
+  // over the mouth. Its samples sit in a cylinder round the shaft, stratified and dithered.
+  let Rb = RIM * 2.2;
+  let ab = max(dot(rd.xy, rd.xy), 1e-9);
+  let bb = dot(ro.xy, rd.xy);
+  let disc = bb * bb - ab * (dot(ro.xy, ro.xy) - Rb * Rb);
+  let t1 = select(0.0, (-bb + sqrt(max(disc, 0.0))) / ab, disc > 0.0);
+  let t0m = select(0.0, max((-bb - sqrt(max(disc, 0.0))) / ab, 0.0), disc > 0.0);
+  let tMax = min(min(t1, select(tEnd, tm, land)), select(60.0, (HF + 3.0 - ro.z) / rd.z, rd.z > 1e-4));
+  var tau = 0.0;
+  var inLit = 0.0;
+  var inAll = 0.0;
+  let N = 6;
+  let span = max(tMax - t0m, 0.0);
+  for (var i = 0; i < N; i++) {
+    let s = t0m + span * (f32(i) + e) / f32(N);
+    let M = ro + rd * s;
+    let dd = mist(M) * span / f32(N);
+    let tr = exp(-0.7 * tau);
+    inLit += dd * lit(M) * tr;
+    inAll += dd * tr;
+    tau += dd;
   }
-  c += fog * (t - t0) * 0.15 * u.p[8].w;
-  if (down) { c = vec3f(0.0); } // the drain: dark
-  if (open) { c = sky(rd); }
-  if (land) { c = vec3f(0.0); }
+  c = c * exp(-0.7 * tau) + moonlight() * inLit * (phase(dot(rd, L)) + bow(rd) * 0.05) + AIR * inAll;
   c *= 1.0 - u.p[11].w;
-  let seen = infect(q, select(vec2f(w * 48.0, ring / 96.0), 4.0 * q, down || miss || open || land), c) * u.p[4].w;
-  if (land) { text = 0.0; }
-  return seen;
+
+  // Read out as text where the text has spread to.
+  text = text_ * infected(q, select(vec2f(w * 48.0, ring / 96.0), 4.0 * q, !pool || down || throat));
+  return c * u.p[4].w;
 }

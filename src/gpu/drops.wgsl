@@ -7,15 +7,18 @@
 // function of its number and the time, like every scene: nothing is remembered, so the clock may jump.
 // Each is deposited as the beam deposits a stroke, its light swept from where it was on the screen a frame
 // ago to where it is now, as the lens moved but not as it turned: riding down with the water the drops hang
-// still, and a pan does not smear them.
+// still, and a pan does not smear them. Each is lit by the moon where its light gets down past the rim
+// (wrap.wgsl lit), glinting as it wobbles; the band it went over in is the water's weight, and at the moonbow's
+// angle a drop sends back the colour of its own band.
 //
 // p[0..3] the camera (reality.ts aim)        p[4] R, the rim's radius, its height, the fall's seconds
-// p[5] T, the shutter in frames, how far water has turned to plot, brightness
+// p[5] T, the shutter in frames, -, brightness
 // p[6] head row (ring), rows an e-fold in, rows the falls take, reference offset
 // p[7] the funnel's depth H, r_c², winding K, the drain's radius
 // p[8] -, -, 80 Hz's angle, a droplet's mean seconds in the pool
 // p[9] the sheet's area a droplet stands for, least spot radius (px) and most (thousandths of the screen's height), how near the lens it fades
-// p[10] spray, the pool's glow, rows printed, -        p[12..27] rows the water has run in over the last s seconds
+// p[10] spray, the pool's flecks, rows printed, -     p[11] toward the moon, its light
+// p[12..27] rows the water has run in over the last s seconds
 
 struct U {
   res: vec2f,  // the phosphor's size, px
@@ -67,14 +70,21 @@ fn at(b: f32, row: f32) -> f32 { return textureSampleLevel(data, smp, vec2f((b *
 // A display's contrast: the loudest just under full, 10 dB under it a third of that, 20 dB a tenth.
 fn hot(lv: f32) -> f32 { return pow(min(lv / 0.8, 1.25), 4.0); }
 
-// Frequency as colour, the way a prism would lay the band out: 80 Hz ember red, through gold and green, to
-// 8 kHz violet. Linear light.
+// Frequency as colour, the way a prism lays the band out (wrap.wgsl has the same): 80 Hz red, through gold and
+// green, to 8 kHz violet. Linear light.
 fn hue(b: f32) -> vec3f {
-  var c = array(vec3f(1.0, 0.05, 0.02), vec3f(1.0, 0.28, 0.02), vec3f(1.0, 0.7, 0.08), vec3f(0.2, 1.0, 0.3),
-                vec3f(0.03, 0.75, 1.0), vec3f(0.12, 0.25, 1.0), vec3f(0.55, 0.12, 1.0));
+  var c = array(vec3f(1.0, 0.08, 0.04), vec3f(1.0, 0.35, 0.05), vec3f(1.0, 0.75, 0.15), vec3f(0.3, 1.0, 0.35),
+                vec3f(0.1, 0.75, 1.0), vec3f(0.2, 0.3, 1.0), vec3f(0.55, 0.2, 1.0));
   let x = clamp(b, 0.0, 1.0) * 6.0;
   let i = min(u32(x), 5u);
   return mix(c[i], c[i + 1u], x - f32(i));
+}
+
+// Whether the moon reaches P: under the rim, only if the way up toward it comes out through the mouth.
+fn lit(P: vec3f) -> f32 {
+  let L = u.p[11].xyz;
+  let Q = P.xy + L.xy * (u.p[4].z - P.z) / L.z;
+  return select(smoothstep(u.p[4].y + 0.03, u.p[4].y - 0.03, length(Q)), 1.0, P.z >= u.p[4].z);
 }
 
 struct Drop { p: vec3f, rows: f32, b: f32, x: f32, k: f32, born: f32, w: f32 } // where; rows behind the head; lane; e-folds in (< 0 falling); weight; cycle; the water's streaks
@@ -137,7 +147,7 @@ fn drop(id: u32, T: f32) -> Drop {
     o.k = 1.0;
     // streaks that fall with it; and over the rim it is glass, whitening as it breaks up
     let st = vnoise(vec2f(0.3 * l, 2.5 * tb)) * vnoise(vec2f(0.045 * l + 9.0, 0.8 * tb));
-    o.w = (0.25 + 5.0 * st * st) * mix(0.12, 1.0, smoothstep(0.0, 0.4, f0));
+    o.w = (0.25 + 5.0 * st * st) * smoothstep(0.3, 0.8, f0); // drops only where the sheet has broken into them
     return o;
   }
   let X = flowed(age - FALL) / u.p[6].y;
@@ -179,32 +189,39 @@ fn project(P: vec3f, e: vec4f, r: vec3f, up: vec3f, f: vec3f) -> vec3f { // px, 
       under = under || Q.z < -u.p[7].x * u.p[7].y / (dot(Q.xy, Q.xy) + u.p[7].y) - 0.004;
     }
   }
-  if (over || under || d.k <= 0.0 || a.z < near * 0.5 || any(a.xy < vec2f(-m)) || any(a.xy > u.res + m)) { splats[id] = o; return; }
+  // a drop that would land no light still costs its fill: the sheet's drops before it breaks up, and the pool's
+  // tracers but where the water carries foam
+  let dark = (d.x < 0.0 && d.x >= -1.5 && d.w <= 0.0) || (d.x >= 0.0 && unit(pcg(id * 5u + 1u)) > 0.25);
+  if (dark || over || under || d.k <= 0.0 || a.z < near * 0.5 || any(a.xy < vec2f(-m)) || any(a.xy > u.res + m)) { splats[id] = o; return; }
   let was = drop(id, T - u.dT);
   var b = project(was.p, vec4f(u.was[0].xyz, u.p[0].w), u.p[1].xyz, u.p[2].xyz, u.p[3].xyz); // from where the lens was, the way it looks now
   if (was.born != d.born || (was.x < 0.0) != (d.x < 0.0) || b.z < near * 0.5) { b = a; }
-  let plot = u.p[5].z;
-  let v = (b.xy - a.xy) * mix(2.0, 1.0, plot) * u.p[5].y; // water is seen through a longer shutter, silk; the plot through a short one
+  let v = (b.xy - a.xy) * 1.6 * u.p[5].y; // water is seen through a long shutter: silk
   let len = length(v);
   b = vec3f(a.xy + v * min(1.0, 0.02 * u.res.y / max(len, 1e-3)), b.z);
 
-  // the spectrum it carries
+  // the spectrum it carries: the band it went over in is its water's weight
   let lv = clamp(at(d.b, (u.p[6].x - d.rows + 0.5) / ROWS) - u.p[6].w, 0.0, 1.0) * smoothstep(0.0, 60.0, u.p[10].z - d.rows); // older than the rows hold: clear water
   let loud = hot(lv);
 
-  // water first: blue-white, streaked, foaming where it is loud; then the plot: frequency its hue, power
-  // its light, the loudest burning through to white
-  let grain = 0.8 + 0.4 * unit(pcg(id * 7u + 3u));
-  let water = (vec3f(0.36, 0.64, 1.0) * 0.07 + vec3f(0.9, 0.97, 1.0) * 0.12 * loud) * d.w;
-  let dye = hue(d.b) * (0.03 + 2.6 * loud) + vec3f(1.0, 0.95, 0.9) * 1.5 * pow(max(lv - 0.8, 0.0) / 0.2, 2.0);
-  var c = mix(water, dye * grain, plot);
+  // moonlight, where it gets down to it: each drop a lens sending the moon back from a point of it, brighter some
+  // moments than others as it wobbles; and at the bow's angle from the antisolar point, the colour of its band
+  let L = u.p[11].xyz;
+  let moon = vec3f(0.62, 0.8, 1.0) * u.p[11].w * lit(d.p);
+  let air = vec3f(0.0008, 0.0016, 0.0032);
+  let spark = 0.3 + 2.2 * pow(unit(pcg(id * 13u + u32(T * 20.0 + 9.0 * unit(pcg(id + 5u))))), 8.0);
+  let psi = degrees(acos(clamp(dot(normalize(d.p - e), -L), -1.0, 1.0)));
+  let bb = (42.4 - psi) / 1.8;
+  let bow = hue(bb) * smoothstep(-0.3, 0.1, bb) * smoothstep(1.3, 0.9, bb) * (0.3 + 1.6 * hot(clamp(at(clamp(bb, 0.0, 1.0), (u.p[6].x - u.p[6].z + 0.5) / ROWS) - u.p[6].w, 0.0, 1.0)));
+  var c = (moon * (0.1 * spark + 0.4 * bow) + air * 3.0) * (0.45 + 0.9 * loud) * d.w;
   var area = u.p[9].x / u.n;
   if (d.x >= 0.0) {
-    // in the pool the surface it rides is drawn together as r², and it glows as the dye under it does
-    c = mix(c, dye * grain, 0.6) * u.p[10].y;
+    // in the pool, flecks of foam riding the surface in, drawn together as r²
+    c = (moon * (0.008 + 0.2 * loud) + air) * u.p[10].y; // a quarter of them, so four times the light
     area *= exp(-1.1 * d.x);
   } else if (d.x < -1.5) {
-    c = (vec3f(0.8, 0.92, 1.0) * (1.0 - 0.7 * plot) + 0.7 * plot * hue(d.b)) * (0.1 + 1.5 * loud) * d.k;
+    // spray, thrown up where it lands
+    c = (moon * (0.5 * spark + 1.2 * bow) + air * 2.0) * (0.3 + 0.9 * loud) * d.k;
     area *= 0.6;
   }
   let fpx = u.p[0].w * 0.5 * u.res.y / a.z;
