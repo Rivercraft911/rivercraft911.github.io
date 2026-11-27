@@ -1,9 +1,9 @@
-// The bench: PEEP doing its job, at true scale. A desk on the ground (a monitor, a keyboard with a USB-A port in its left
-// end, a TV remote) and PEEP, 12.06 × 8 mm, beside the port. Arriving, the camera comes down to the port and PEEP slides
-// in, all of it but its back edge, as it sits in a real one; the camera draws back, the remote fires PEEP's trigger
-// (three 9 ms bursts of 38 kHz infrared, 30 ms apart, violet as a camera's sensor sees infrared; shown ten times slow so
-// the three can be counted) and the screen fills at the macro's own pace, a key every 20 ms (a press report, 10 ms, a
-// release, 10 ms), in real time. Then PEEP comes out of the port again, a part to click: it comes up to the camera and
+// The bench: PEEP doing its job, at true scale. A desk on the ground (a monitor, a keyboard, the computer, a small tower
+// with two USB-A ports in its front, and a TV remote) and PEEP, 12.06 × 8 mm, just out of a port. Arriving, the camera
+// comes down to the tower's front and PEEP slides into the port, all of it but its back edge, as it sits in a real one;
+// the camera draws back, the remote fires PEEP's trigger (three 9 ms bursts of 38 kHz infrared, 30 ms apart, violet as a
+// camera's sensor sees infrared; shown ten times slow so the three can be counted) and the screen fills at the macro's
+// own pace, a key every 20 ms (a press report, 10 ms, a release, 10 ms), in real time. Then PEEP comes out of the port again, a part to click: it comes up to the camera and
 // turns over, and its chips are parts in turn. In the intro's fly-past the same in a second: it plugs in, it fires, it types.
 import { TAU, clamp, glide, mix, smooth } from '../../acts/scene'
 import { Plucks } from '../../dsp/pluck'
@@ -60,23 +60,12 @@ for (let from = 0; from < MACRO.length; ) {
 }
 make('peep-caret', () => box(green, [-1.3, -6, -0.3], [1.3, CAP + 5, -0.2]))
 
-// The keyboard: an aluminium deck, 104 keys on 19.05 mm, and in its left end a USB-A port (its shell, a white tongue
-// and four gold contacts on it), 9 mm up and 35 mm from the back.
-const KW = 440, KD = 135, KH = 16, PY = 9, PZ = -35 // the deck; the port's middle
-const U = 19.05
+// The keyboard: an aluminium deck and 104 keys on 19.05 mm, untouched while the text comes.
+const KW = 440, KD = 135, KH = 16, U = 19.05
+const shell: Mat = { col: [0.62, 0.62, 0.64, 1], metal: 1, rough: 0.25 }, gold: Mat = { col: [0.85, 0.65, 0.25, 1], metal: 1, rough: 0.25 }
 make('peep-keyboard', () => {
   const deck: Mat = { col: [0.55, 0.56, 0.58, 1], metal: 1, rough: 0.42 }, cap: Mat = { col: [0.72, 0.72, 0.7, 1], metal: 0, rough: 0.5 }
-  const shell: Mat = { col: [0.62, 0.62, 0.64, 1], metal: 1, rough: 0.25 }
-  // the deck, solid but for the port's mouth in its left end (13.1 × 5.6 mm, 14 mm deep)
-  const x0 = -KW / 2, x1 = x0 + 14, z0 = PZ - 6.55, z1 = PZ + 6.55, y0 = PY - 2.8, y1 = PY + 2.8
-  box(deck, [x1, 0, -KD / 2], [KW / 2, KH, KD / 2])
-  box(deck, [x0, 0, -KD / 2], [x1, y0, KD / 2]), box(deck, [x0, y1, -KD / 2], [x1, KH, KD / 2])
-  box(deck, [x0, y0, -KD / 2], [x1, y1, z0]), box(deck, [x0, y0, z1], [x1, y1, KD / 2])
-  // the port: a steel shell 0.3 mm thick round a 12.5 × 5 opening, a tongue 1.84 mm thick on its floor, four contacts
-  box(shell, [x0 - 0.3, y0, z0], [x1, y0 + 0.3, z1]), box(shell, [x0 - 0.3, y1 - 0.3, z0], [x1, y1, z1])
-  box(shell, [x0 - 0.3, y0, z0], [x1, y1, z0 + 0.3]), box(shell, [x0 - 0.3, y0, z1 - 0.3], [x1, y1, z1])
-  box({ col: [0.8, 0.8, 0.78, 1], metal: 0, rough: 0.5 }, [x0 + 4, y0 + 0.3, PZ - 5.25], [x1, y0 + 2.14, PZ + 5.25])
-  for (const z of [-3.5, -1, 1, 3.5]) box({ col: [0.85, 0.65, 0.25, 1], metal: 1, rough: 0.25 }, [x0 + 5, y0 + 2.14, PZ + z - 0.5], [x1 - 1, y0 + 2.24, PZ + z + 0.5])
+  box(deck, [-KW / 2, 0, -KD / 2], [KW / 2, KH, KD / 2])
   // the keys, row by row from the back: widths in units, 0 a gap of half a key, negative a gap of that many
   const ROWS = [
     [1, -1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1],
@@ -97,6 +86,31 @@ make('peep-keyboard', () => {
     PAD[r].split('').forEach((c, i) => c === '1' ? key(left + (19 + i) * U, z, 1) : c === 'T' ? key(left + (19 + i) * U, z, 1, 2) : c === '2' && key(left + (19 + i) * U, z, 2))
   })
 })
+
+// The computer: a small white tower, 185 × 400 × 380 mm, on four feet, its front a bezel with vents and, near the top,
+// two USB-A ports (each a steel shell round a 12.5 × 5 mm opening 14 mm deep, a white tongue on its floor and four gold
+// contacts on the tongue) and the power button, its light on. PEEP goes into the left port.
+const TW = 185, TH = 400, TD = 380, ZF = TD / 2, PY = 362, PXS = [-16, 16], PX = PXS[0] // the box; the ports' row and middles
+make('peep-tower', () => {
+  const body: Mat = { col: [0.62, 0.62, 0.6, 1], metal: 0, rough: 0.45 }, bezel: Mat = { col: [0.55, 0.55, 0.54, 1], metal: 0, rough: 0.5 }
+  const slat: Mat = { col: [0.08, 0.08, 0.085, 1], metal: 0, rough: 0.6 }, white: Mat = { col: [0.8, 0.8, 0.78, 1], metal: 0, rough: 0.5 }
+  box(body, [-TW / 2, 10, -TD / 2], [TW / 2, TH, ZF - 16])
+  for (const x of [-1, 1]) for (const z of [-1, 1]) box(black, [x * (TW / 2 - 25) - 12, 0, z * (TD / 2 - 30) - 15], [x * (TW / 2 - 25) + 12, 10, z * (TD / 2 - 30) + 15])
+  // the bezel, solid but for the two ports' mouths
+  const y0 = PY - 2.8, y1 = PY + 2.8, [a, b] = PXS, z0 = ZF - 16
+  box(bezel, [-TW / 2, 10, z0], [TW / 2, y0, ZF]), box(bezel, [-TW / 2, y1, z0], [TW / 2, TH, ZF])
+  box(bezel, [-TW / 2, y0, z0], [a - 6.55, y1, ZF]), box(bezel, [a + 6.55, y0, z0], [b - 6.55, y1, ZF]), box(bezel, [b + 6.55, y0, z0], [TW / 2, y1, ZF])
+  for (const x of PXS) {
+    const x0 = x - 6.55, x1 = x + 6.55, zb = ZF - 14
+    box(shell, [x0, y0, zb], [x1, y0 + 0.3, ZF + 0.3]), box(shell, [x0, y1 - 0.3, zb], [x1, y1, ZF + 0.3])
+    box(shell, [x0, y0, zb], [x0 + 0.3, y1, ZF + 0.3]), box(shell, [x1 - 0.3, y0, zb], [x1, y1, ZF + 0.3])
+    box(white, [x - 5.25, y0 + 0.3, zb], [x + 5.25, y0 + 2.14, ZF - 4])
+    for (const d of [-3.5, -1, 1, 3.5]) box(gold, [x + d - 0.5, y0 + 2.14, zb + 1], [x + d + 0.5, y0 + 2.24, ZF - 5])
+  }
+  tube(body, [55, PY, ZF], [0, 0, 1], 7, 6.6, 1.5, 32) // the power button
+  for (let i = 0; i < 18; i++) box(slat, [-62, 40 + i * 15, ZF - 0.5], [62, 46 + i * 15, ZF + 1]) // the vents' slats
+})
+make('peep-led', () => ball({ col: [0.55, 0.75, 1, 1], metal: 0, rough: 1 }, [0, 0, 0], 0.8, 12))
 
 // The remote: a TV remote lying on the ground, its infrared LED behind a dark window in its front end. Its own axes:
 // x across, y along it (+y its front), z up.
@@ -139,19 +153,24 @@ function put(id: string, O: ArrayLike<number>, ax: V, ay: V, az: V, u = 1, k = 1
   for (let i = 0; i < 3; i++) c[i] = O[i] + s * (ax[i] * (m.lo[0] + m.hi[0]) + ay[i] * (m.lo[1] + m.hi[1]) + az[i] * (m.lo[2] + m.hi[2])) / 2
   solid(id, c, ax, ay, az, s * Math.max(m.hi[0] - m.lo[0], m.hi[1] - m.lo[1], m.hi[2] - m.lo[2]), k, glow)
 }
-const MON = blank(), KB = blank(), REM = blank()
+const MON = blank(), KB = blank(), TOW = blank(), REM = blank()
 const AT0: V = [0, 0, 0] // the place's own look point
-const DX = 110, DZ = -40, MONZ = -150 + DZ, KBZ = 100 + DZ, REMX = -400 + DX, REMZ = 165 + DZ // where each stands (the desk's middle on the place)
+const MONX = 100, MONZ = -190, KBZ = 60, TOWX = -290, TOWZ = -20 - ZF, REMX = -170, REMZ = 250 // where each stands (the desk's middle on the place)
 let built = -1
 function build(k: number) {
   if (built === k) return
   built = k
   site(PLACES[k].lat, PLACES[k].lon, n), frame(n, e, No)
-  ground(DX, MONZ, 0, MON), ground(DX, KBZ, 0, KB)
-  // the remote points at the port's mouth
-  const px = DX - KW / 2, pz = KBZ + PZ
-  ground(REMX, REMZ, Math.atan2(px - REMX, pz - REMZ), REM)
+  ground(MONX, MONZ, 0, MON), ground(MONX, KBZ, 0, KB), ground(TOWX, TOWZ, 0, TOW)
+  // the remote points at the port
+  ground(REMX, REMZ, Math.atan2(TOWX + PX - REMX, TOWZ + ZF - REMZ), REM)
   for (let i = 0; i < 3; i++) AT0[i] = n[i] * (1.01 + RISE)
+  // the close look's point, 14 mm out of the port and 6 up: where it truly is (the tower stands on the curve, leaning
+  // 3° out from the place's own up), in the place's own frame
+  pt(TOW, PX, PY + 6, ZF + 14, c)
+  for (let i = 0; i < 3; i++) c[i] = (c[i] - AT0[i]) / MM
+  CLOSE[3] = -(c[0] * e[0] + c[1] * e[1] + c[2] * e[2]), CLOSE[4] = c[0] * n[0] + c[1] * n[1] + c[2] * n[2], CLOSE[5] = c[0] * No[0] + c[1] * No[1] + c[2] * No[2]
+  KEYS = [[0, ...WIDE], [0.2, ...WIDE], [1.5, ...CLOSE], [3.6, ...CLOSE], [5.2, ...WIDE], [12, ...WIDE]]
 }
 
 // ---- the beat: what happens, s seconds in; a visit's (the camera's), or the fly-past's, a second long -----------------
@@ -197,14 +216,14 @@ export const events = { n: 0, f: 0 }
 let told = 0, flashed = 0
 let lift = 0, vlift = 0, spin = 0 // how far PEEP has come up to the camera (a critically damped spring), and its turn
 const P: V = [0, 0, 0], ax: V = [0, 0, 0], ay: V = [0, 0, 0], az: V = [0, 0, 0], q: V = [0, 0, 0], w: V = [0, 0, 0]
-// PEEP in the port: across the port (its x along the keyboard's −z), parts up (its y down), its USB edge in (its z out)
+// PEEP in the port: across it (its x along the tower's −x), parts up (its y down), its USB edge in (its z out)
 function peep(o: V) {
   // (its middle 3.5 mm inside the mouth when in, on the tongue's contacts; out, it comes down to the port's line)
-  const f = out(s) / OUT, x = -KW / 2 + 7.5 - OUT * f, y = PY - 0.16 + 20 * f * f
-  pt(KB, x, y, PZ, w)
-  pt(KB, -KW / 2 - 30, PY + 38, PZ + 18, P) // where it comes to, clicked: up and toward the camera
+  const f = out(s) / OUT, z = ZF - 7.5 + OUT * f, y = PY - 0.16 + 20 * f * f
+  pt(TOW, PX, y, z, w)
+  pt(TOW, PX, PY + 30, ZF + 45, P) // where it comes to, clicked: up and toward the camera
   const a = lift, arc = Math.sin(Math.PI * a) * 14 * MM
-  for (let i = 0; i < 3; i++) (o[i] = mix(w[i], P[i], a) + KB.y[i] * arc), (ax[i] = -KB.z[i]), (ay[i] = -KB.y[i]), (az[i] = -KB.x[i])
+  for (let i = 0; i < 3; i++) (o[i] = mix(w[i], P[i], a) + TOW.y[i] * arc), (ax[i] = -TOW.x[i]), (ay[i] = -TOW.y[i]), (az[i] = TOW.z[i])
   turn(ay, ax, spin, ay), turn(az, ax, spin, az)
   return o
 }
@@ -235,6 +254,8 @@ export function draw(k: number) {
   put('peep-screen', MON.o, MON.x, MON.y, MON.z, 1, AR, G)
   put('peep-chrome', MON.o, MON.x, MON.y, MON.z, 1, AR, G)
   put('peep-keyboard', KB.o, KB.x, KB.y, KB.z)
+  put('peep-tower', TOW.o, TOW.x, TOW.y, TOW.z)
+  put('peep-led', pt(TOW, 55, PY - 13, ZF + 0.3, q), TOW.x, TOW.y, TOW.z, 1, 0, 14)
   for (let i = 0; i < 3; i++) (ax[i] = -REM.x[i]), (ay[i] = REM.z[i])
   put('peep-remote', REM.o, ax, ay, REM.y)
   const l = ir(s)
@@ -282,15 +303,8 @@ function reach(id: string, c: V, r: number) {
 // ---- the camera, while it rests here: down to the port as PEEP goes in, back for the remote and the screen; to PEEP,
 // clicked. Keys: [s, ln d, pitch, yaw, the point looked at (mm from the place's own: west, up, north)]
 const WIDE = [Math.log(0.25), 0.36, -0.15, 0, 0, 0]
-const CLOSE = [Math.log(0.011), 0.4, 0.8, DX - KW / 2 - 12, PY + 4 - 150, KBZ + PZ]
-const KEYS = [
-  [0, ...WIDE],
-  [0.2, ...WIDE],
-  [1.5, ...CLOSE],
-  [3.6, ...CLOSE],
-  [5.2, ...WIDE],
-  [12, ...WIDE],
-]
+const CLOSE = [Math.log(0.012), 0.3, 0.65, 0, 0, 0] // (its point set where the port is: build())
+let KEYS: number[][] = []
 const cam = [0, 0, 0, 0, 0, 0]
 export function steer(_since: number, _picked: string, o: Steer) {
   if (s >= VISIT.end && lift < 1e-3) return false

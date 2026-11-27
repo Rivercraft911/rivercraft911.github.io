@@ -18,14 +18,20 @@ const SLOW = 10
 const FS = 20, CLEAR = 0.2 // the strobe: frames a second, and the share of each a valve is clear
 const GS = 0.13, GM = GS / 150.3 // the glasses, radii across, and radii to a millimetre of them
 export const LIFT = 76 * GM // how high the stand holds them
-const EYE = LIFT / GM + 23.1 - 4 // the lenses' middle, mm up
+// Where River's CAD puts the panes and the board (mechanical/strobe-glasses-mk1.step, valve_left, valve_right and the
+// MK1 PCB, in the frame's own millimetres about its middle; x east, y up, z north once it stands here): each 36.2 mm pane
+// in its slot, turned 20° about the vertical with the frame's wrap, its middle 30.2 mm out, 2.1 mm under the frame's
+// middle and 24.3 mm forward of it; the board on edge on the right temple's outer face, its parts outward, its USB-C
+// to the back.
+const MID = LIFT / GM + 23.09, PANE = [30.2, -2.1, -24.3], WRAP = (20 * Math.PI) / 180, BOARD = [-75.6, MID - 3.1, 10.05]
+const EYE = MID + PANE[1] // the lenses' middle, mm up
 const valve = (t: number) => t * FS - Math.floor(t * FS) < CLEAR // is a valve clear at real time τ?
 
 // ---- what is not in the CAD, in millimetres: each LCD valve, clear and dark, a little larger than the frame's window
 // it sits behind; the glasses' stand; the ball, a tennis ball (67 mm) with its seam -------------------------------------
-const W = 30, H = 34
-make('valve-clear', () => box({ col: [0.04, 0.045, 0.04, 0.55], metal: 0, rough: 0.05 }, [-W / 2, -H / 2, -0.6], [W / 2, H / 2, 0.6]))
-make('valve-dark', () => box({ col: [0.004, 0.005, 0.006, 0.985], metal: 0, rough: 0.05 }, [-W / 2, -H / 2, -0.6], [W / 2, H / 2, 0.6]))
+const W = 36.2, T = 1.83 // the pane: Adafruit 3627, square, its glass 1.83 mm
+make('valve-clear', () => box({ col: [0.04, 0.045, 0.04, 0.55], metal: 0, rough: 0.05 }, [-W / 2, -W / 2, -T / 2], [W / 2, W / 2, T / 2]))
+make('valve-dark', () => box({ col: [0.004, 0.005, 0.006, 0.985], metal: 0, rough: 0.05 }, [-W / 2, -W / 2, -T / 2], [W / 2, W / 2, T / 2]))
 make('glasses-stand', () => {
   const dark: Mat = { col: [0.03, 0.03, 0.035, 1], metal: 0.8, rough: 0.4 }
   tube(dark, [0, 0, 0], [0, 1, 0], 4, 3, 81, 24, true)
@@ -78,7 +84,7 @@ export const about: Record<string, About> = {
 }
 about['strobe-valve-l'] = about['strobe-valve-r'] = { name: 'LCD light valve', does: 'Adafruit 3627: a liquid-crystal shutter, 1.83 mm glass, dark while driven and clear when its leads are shorted. Here it runs 20 frames a second, 80 % dark: clear 10 ms in every 50.' }
 // the board on the right temple's outer face (mm, the glasses' own frame: x east, y up, z north), and where it goes apart
-const BOARD = [-75.8, EYE + 1.5, 15], APART = 16 // s at rest before they come apart
+const APART = 16 // s at rest before the board comes off
 let apart = 0, lift = 0, vlift = 0, spin = 0
 // What the world's music hears from here (sound.ts): n, how many times the lenses have opened so far; f, 100 Hz, the
 // valves' drive (±3.3 V pairs, 5 ms a half)
@@ -125,13 +131,16 @@ export function draw(k: number) {
   solid('strobe-frame', at(0, LIFT / GM + 23.09, 0, c), ax, n, az, GS)
   if (here) part('strobe-frame', at(0, EYE + 12, -10, c), 40 * GM)
   solid('glasses-stand', at(0, 40.5, -30, c), ax, n, az, 81 * GM)
-  // the valves, in the frame's windows (x ±31 mm, 4 mm under its middle, 36 mm in front of it)
-  for (const x of [-31, 31]) {
-    solid(clear ? 'valve-clear' : 'valve-dark', at(x, EYE, -36, c), ax, n, az, H * GM)
-    if (here) part(x < 0 ? 'strobe-valve-r' : 'strobe-valve-l', c, 16 * GM)
+  // the panes, in their slots
+  for (const s of [-1, 1]) {
+    // across the pane, out from the middle, turned back by the wrap; its face; up
+    const cw = Math.cos(WRAP), sw = Math.sin(WRAP)
+    for (let j = 0; j < 3; j++) (ax[j] = s * cw * e[j] + sw * N[j]), (az[j] = sw * e[j] - s * cw * N[j])
+    solid(clear ? 'valve-clear' : 'valve-dark', at(s * PANE[0], EYE, PANE[2], c), ax, n, az, W * GM)
+    if (here) part(s < 0 ? 'strobe-valve-r' : 'strobe-valve-l', c, 16 * GM)
   }
-  // the board: its long side along the temple (north), its parts outward (west), on edge
-  for (let j = 0; j < 3; j++) (ax[j] = N[j]), (ay[j] = -e[j]), (az[j] = n[j])
+  // the board: its long side along the temple, the USB-C end (its −x) to the back, its parts outward (west), on edge
+  for (let j = 0; j < 3; j++) (ax[j] = -N[j]), (ay[j] = -e[j]), (az[j] = -n[j])
   turn(ay, ax, spin, ay), turn(az, ax, spin, az)
   if (ctx.models['strobe-board']) {
     const m = ctx.models['strobe-board'], ext = Math.max(m.hi[0] - m.lo[0], m.hi[1] - m.lo[1], m.hi[2] - m.lo[2]), s = 1000 * GM
@@ -155,7 +164,7 @@ export function draw(k: number) {
 // and to the board, clicked. [s, ln d, pitch, yaw, the point looked at (mm from the place's own: east, up, north)]
 export const RISE = 0.07
 const BACK = [Math.log(0.36), 0.1, 0.05, 0, 0, 0]
-const EYEV = [Math.log(620 * GM), 0.02, 0, -31, EYE - (0.01 + RISE) / GM, -436] // the eye 220 mm behind the right lens, looking 400 mm past it
+const EYEV = [Math.log(620 * GM), 0.02, 0, -PANE[0], EYE - (0.01 + RISE) / GM, -436] // the eye 220 mm behind the right pane, looking 400 mm past it
 const OUT = [Math.log(0.3), 0.32, -0.75, 0, 0, 0]
 const KEYS = [[0, ...BACK], [2.5, ...BACK], [5, ...EYEV], [APART, ...EYEV], [APART + 3, ...OUT]]
 const cam = [0, 0, 0, 0, 0, 0]
