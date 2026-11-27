@@ -142,3 +142,40 @@ export function made(): [string, string][] {
     return [id, URL.createObjectURL(new Blob([head, js, mid, f], { type: 'model/gltf-binary' }))]
   })
 }
+
+// ---- cables and balls (the receiver's and the valley's bench) --------------------------------------------------
+// A cable of radius r along the points `pts` (mm), n sides round, its ends capped; each ring square to the way the
+// cable goes there, turned along it as little as it can be (parallel transport), so the cable never twists.
+export function pipe(m: Mat, pts: V3[], r: number, n = 12) {
+  const p = part(m), o = p.P.length / 3, T: V3[] = pts.map((_, i) => {
+    const a = pts[Math.max(i - 1, 0)], b = pts[Math.min(i + 1, pts.length - 1)], l = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2])
+    return [(b[0] - a[0]) / l, (b[1] - a[1]) / l, (b[2] - a[2]) / l]
+  })
+  const X = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+  let u = X(T[0], Math.abs(T[0][1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])
+  pts.forEach((q, i) => {
+    const t = T[i], d = u[0] * t[0] + u[1] * t[1] + u[2] * t[2], l0 = Math.hypot(u[0] - d * t[0], u[1] - d * t[1], u[2] - d * t[2])
+    u = [(u[0] - d * t[0]) / l0, (u[1] - d * t[1]) / l0, (u[2] - d * t[2]) / l0]
+    const v = X(t, u)
+    for (let j = 0; j < n; j++) {
+      const th = (j / n) * 2 * Math.PI, c = Math.cos(th), s = Math.sin(th), nn = [0, 1, 2].map((k) => c * u[k] + s * v[k])
+      p.P.push(...nn.map((x, k) => q[k] + r * x)), p.N.push(...nn)
+      if (i) p.I.push(o + (i - 1) * n + j, o + (i - 1) * n + ((j + 1) % n), o + i * n + ((j + 1) % n), o + (i - 1) * n + j, o + i * n + ((j + 1) % n), o + i * n + j)
+    }
+  })
+  for (const [i, s] of [[0, -1], [pts.length - 1, 1]]) {
+    const c = p.P.length / 3, t = T[i].map((x) => x * s)
+    p.P.push(...pts[i]), p.N.push(...t)
+    for (let j = 0; j < n; j++) {
+      const a = o + i * n + j, b = o + i * n + ((j + 1) % n), w = p.P.length / 3
+      p.P.push(...p.P.slice(a * 3, a * 3 + 3), ...p.P.slice(b * 3, b * 3 + 3)), p.N.push(...t, ...t)
+      p.I.push(...(s > 0 ? [c, w, w + 1] : [c, w + 1, w]))
+    }
+  }
+}
+// a prism lying flat: polygon q in (x, z), from y0 up to y1
+export function slab(m: Mat, q: [number, number][], y0: number, y1: number) {
+  const p = part(m), o = p.P.length
+  prism(m, q, y0, y1)
+  for (let i = o; i < p.P.length; i += 3) [p.P[i + 1], p.P[i + 2], p.N[i + 1], p.N[i + 2]] = [p.P[i + 2], p.P[i + 1], p.N[i + 2], p.N[i + 1]]
+}
