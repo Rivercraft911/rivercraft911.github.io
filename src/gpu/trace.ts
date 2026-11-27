@@ -199,7 +199,7 @@ export class Trace {
         }
         calm[i] = move < MOVE ? Math.min(calm[i] + 1, 255) : 0
         fades[i] = Math.min(1, Math.max(0, fades[i] + (calm[i] > 3 ? 0.05 : -0.125)))
-        if (calm[i] <= 3 && fades[i] <= 0) continue
+        if ((calm[i] <= 3 && fades[i] <= 0) || !M.traced) continue // (a slot still fading may hold another model now, one never traced)
         this.fade = Math.max(this.fade, fades[i])
         // kept in order of size, the smallest dropped when there are too many
         let k = Math.min(n, MAX - 1)

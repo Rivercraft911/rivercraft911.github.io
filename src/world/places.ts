@@ -44,7 +44,7 @@ export const PLACES: Place[] = [
   { id: 'bleps', slugs: ['bleps', 'cubesat-imaging-sim', 'yapling-observatory'], lat: 90, lon: 0, monuments: [], view: [0.2, 0.42, 0.75], ink: [0.55, 0.85, 1], draw: bleps, where: cube, orbit: BLEPS },
   { id: 'launch', slugs: ['pigeon-vision', 'yapogee'], lat: 34, lon: -38, monuments: [], view: [0.13, 0.75, -0.5], ink: [1, 0.7, 0.35], draw: launch, where: rocket },
   { id: 'valley', slugs: ['esp-dvbs2'], lat: 18, lon: 8, monuments: [], view: [0.36, 0.4, -0.7], ink: [0.5, 0.78, 1], draw: dvbs2, steer: dvSteer, about: dvAbout },
-  { id: 'receiver', slugs: ['ephemeris', 'driftwood'], lat: 8, lon: 82, monuments: [], view: [0.26, 0.42, -0.3], ink: [0.6, 0.9, 1], draw: receiver, steer: rxSteer, about: rxAbout },
+  { id: 'receiver', slugs: ['ephemeris', 'driftwood'], lat: 8, lon: 82, monuments: [], view: [0.38, 0.5, -0.3], ink: [0.6, 0.9, 1], draw: receiver, steer: rxSteer, about: rxAbout },
   { id: 'lighthouse', slugs: ['r-01'], lat: -13.732, lon: 53.734, monuments: [], view: [0.75, 0.38, 3.84], ink: [1, 0.35, 0.3], draw: lighthouse, steer: projector, about: r01 },
   { id: 'bench', slugs: ['peep', 'infiniterecon'], lat: 2, lon: -16, monuments: [], view: [0.25, 0.36, -0.15], ink: [0.45, 1, 0.62], draw: bench, rise: DESK, steer: plug, about: peep },
   { id: 'glasses', slugs: ['strobeglasses'], lat: -20, lon: 18, monuments: [], view: [0.36, 0.1, 0.05], ink: [0.95, 0.95, 0.55], draw: glasses, rise: BROW, steer: look, about: strobe },
