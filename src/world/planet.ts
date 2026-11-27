@@ -201,7 +201,7 @@ addEventListener('pointermove', (e) => {
   px = e.clientX, py = e.clientY
   moved += Math.abs(dx) + Math.abs(dy)
   want.yaw -= dx * k
-  want.pitch = clamp(want.pitch + dy * k, focus < 0 ? -1.4 : 0.06, 1.45)
+  want.pitch = clamp(want.pitch + dy * k, focus < 0 || PLACES[focus].orbit ? -1.4 : 0.06, 1.45) // (round what flies, from under it too)
   idle = 0
 })
 addEventListener('pointerup', (e) => {

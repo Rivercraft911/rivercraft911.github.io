@@ -1,5 +1,5 @@
-// What River has not drawn in CAD yet, made here out of boxes and cylinders, in millimetres: BLEPS's 1U and its wheel,
-// the strobe glasses' two LCD valves (clear and dark) and the wheel they strobe. Each is written as a GLB in memory, so
+// What River has not drawn in CAD, made here out of boxes and cylinders, in millimetres: the strobe glasses' two LCD
+// valves (clear and dark), the wheel they strobe, its post and the glasses' stand. Each is written as a GLB in memory, so
 // mesh.ts and the tracer take it exactly as they take River's own (a blob: URL through the same worker).
 type Mat = { col: number[]; metal: number; rough: number } // linear albedo (and alpha), as glTF's
 type Part = { mat: Mat; P: number[]; N: number[]; I: number[] }

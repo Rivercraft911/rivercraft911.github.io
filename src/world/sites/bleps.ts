@@ -1,17 +1,16 @@
 // BLEPS, River's next: Stanford SSI's 1U CubeSat with four cameras, in orbit at 550 km (1.086 radii) on a plane of
-// its own beside SAMWISE's, its ground track over the valley and the strobe glasses. It is not built yet, so it is made
-// here out of boxes and cylinders (make.ts): a 1U's rails, its cells, the main camera and a second looking down, the two
-// 190° fisheyes back to back on its sides, its 433 MHz tape antennas out, and one side left open to show the wheel
-// inside, River's Finertia (as baked from KiCad) on its motor in front of it.
+// its own beside SAMWISE's, its ground track over the valley and the strobe glasses. The spacecraft is River's own, as
+// the optical simulator builds it (cubesat-imaging-sim's makeSpacecraft, baked to bleps.glb): the rails, the white face
+// boards and their cells, the four wings opened flat round the deck, the main camera and a 190° fisheye on the deck,
+// the other fisheye back to back with it on the far face, and the 433 MHz tape dipole. Beside it, drawn out of it as an
+// exploded view, two of the boards it is built from: Yapogee S3, the hacked ESP32-S3 that makes its DVB-S2 downlink
+// (esp-dvbs2 again), and Finertia, its reaction wheel's controller, both as baked from KiCad.
 //
 // The pointing. It looks straight down, and as one of River's places comes within reach (60° off nadir) it turns to
-// hold it in the main camera, and lets it go behind. Every turn of the body about the wheel's axis is paid for by the
-// wheel turning the other way: with the 0.00496 kg·m² axis and the wheel's rotor (Finertia's own numbers: 1 047 rpm
-// for 1°/s), I/Iᵣ = 6 282, so the wheel turns 6 282 times for every time the body turns, whatever the time-lapse.
-// The orbit runs 547× life from afar, as SAMWISE's does, and slows to 15× as we come to it.
-// The main camera's footprint goes to the planet (planet.ts): 550 km × 7.07 mm / 25 mm, a 155.7 km square.
+// hold it in the main camera, and lets it go behind. The orbit runs 547× life from afar, as SAMWISE's does, and slows
+// to 15× as we come to it. The main camera's footprint goes to the planet (planet.ts): 550 km × 7.07 mm / 25 mm, a
+// 155.7 km square.
 import { clamp } from '../../acts/scene'
-import { box, dome, make, tube } from '../make'
 import { PLACES } from '../places'
 import { ctx, cross, dot, frame, site, solid, unit, type V } from '../ctx'
 import { DEG, RE, orbit } from './sky'
@@ -19,59 +18,18 @@ import { DEG, RE, orbit } from './sky'
 const A = 1.086, INC = 97.6 * DEG, RAAN = 258 * DEG, RATE = 0.6 // as SAMWISE's orbit, on another plane
 const N0 = Math.sqrt(3.986004418e14 / (A * RE) ** 3), HERE = 15 * N0 // rad a real second; and here, 15× life
 const MM = 0.028 / 100 // radii a millimetre: a 1U is the size of a landmark here, as SAMWISE's 2U is
-const WHEEL = 0.00496 / 7.9e-7 // the body's axis over the wheel's rotor
 const REACH = Math.cos(0.13) // 60° off nadir from 550 km is 7.4° of the planet away
 export const HALF = (550e3 * 7.07) / 25 / 2 / RE // the footprint's half-width, radii
 // The orbit's normal: the camera rides in the orbit's own frame (planet.ts).
 export const NORMAL = cross(orbit(1, RAAN, INC, 0, [0, 0, 0]), orbit(1, RAAN, INC, Math.PI / 2, [0, 0, 0]))
-
-// ---- the spacecraft, in millimetres: +y along its 113.5 mm, the cameras' end −y, its open face +z ----------------
-const AL = { col: [0.6, 0.61, 0.64, 1], metal: 1, rough: 0.3 }
-const DARK = { col: [0.035, 0.035, 0.04, 1], metal: 0, rough: 0.45 } // black anodising
-const PLATE = { col: [0.5, 0.5, 0.52, 1], metal: 1, rough: 0.5 } // bead-blasted aluminium
-const CELL = { col: [0.02, 0.035, 0.11, 1], metal: 0, rough: 0.08 } // triple-junction cells under cover glass
-const GLASS = { col: [0.01, 0.012, 0.02, 1], metal: 0, rough: 0.03 }
-const TAPE = { col: [0.75, 0.72, 0.66, 1], metal: 1, rough: 0.25 } // steel measuring tape
-const BRASS = { col: [0.8, 0.6, 0.3, 1], metal: 1, rough: 0.22 }
-const MARK = { col: [0.9, 0.9, 0.88, 1], metal: 0, rough: 0.5 }
-make('bleps', () => {
-  const H = 56.75
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(AL, [sx < 0 ? -50 : 41.5, -H, sz < 0 ? -50 : 41.5], [sx < 0 ? -41.5 : 50, H, sz < 0 ? -41.5 : 50])
-  box(PLATE, [-48, -H, -48], [48, -H + 3, 48]) // the cameras' end
-  box(PLATE, [-48, H - 3, -48], [48, H, 48]) // the antennas' end
-  box(PLATE, [-48, -50, -48], [48, 50, -46]) // the back, and on it two cells
-  for (const y of [-46, 4]) box(CELL, [-40, y, -49], [40, y + 42, -48])
-  for (const sx of [-1, 1]) {
-    box(PLATE, [sx < 0 ? -48 : 46, -50, -41.5], [sx < 0 ? -46 : 48, 50, 41.5])
-    box(CELL, [sx < 0 ? -49 : 48, -46, -36], [sx < 0 ? -48 : 49, -6, 36])
-    // a fisheye, its twin on the other side
-    tube(DARK, [sx * 48, 22, 0], [sx, 0, 0], 17, 15, 7)
-    dome(GLASS, [sx * 55, 22, 0], [sx, 0, 0], 12.5)
-  }
-  // the main camera, and a wider one beside it, looking down
-  tube(DARK, [0, -H, 0], [0, -1, 0], 16, 14, 20)
-  tube(GLASS, [0, -H - 20, 0], [0, -1, 0], 11, 10.5, 0.8)
-  tube(DARK, [27, -H, -27], [0, -1, 0], 8, 7, 9)
-  dome(GLASS, [27, -H - 9, -27], [0, -1, 0], 5.5)
-  // the 433 MHz tapes, a quarter wave each, out from the far end
-  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-    const a: [number, number, number] = [dx ? dx * 48 : -3, H - 6, dz ? dz * 48 : -3], b: [number, number, number] = [dx ? dx * 218 : 3, H - 5.6, dz ? dz * 218 : 3]
-    box(TAPE, [Math.min(a[0], b[0]), a[1], Math.min(a[2], b[2])], [Math.max(a[0], b[0]), b[1], Math.max(a[2], b[2])])
-  }
-  // inside, across the middle, the wheel's bay: its back plate, and the Faulhaber 2610 out of it toward the open face
-  box(AL, [-41.5, -41.5, -3], [41.5, 41.5, 0])
-  tube(DARK, [0, 0, 12], [0, 0, 1], 13, 13, 18, 32, true)
-})
-make('bleps-wheel', () => {
-  tube(BRASS, [0, -3, 0], [0, 1, 0], 24, 24, 6, 48, true)
-  tube(AL, [0, 3, 0], [0, 1, 0], 6, 5, 2, 24)
-  box(MARK, [18.5, 3, -2.5], [23.5, 3.3, 2.5]) // so its turning is seen, round Finertia
-})
+// bleps.glb, in its own millimetres: the deck (and the main camera's axis) toward −y, the bus's middle at the origin,
+// its box (wings, tapes and all) 302 × 264 × 315.5 mm with its middle 70.4 mm up y
+const BOX = 315.5, MID = 70.4
 
 // ---- the orbit and the pointing ------------------------------------------------------------------------------------
-let u = 1.3, rate = RATE, turn = 0 // its argument of latitude, how fast that goes, and the wheel's angle
-const B: V = orbit(A, RAAN, INC, u, [0, 0, 0]), r: V = [0, 0, 0], look: V = [0, -1, 0], want: V = [0, 0, 0], s: V = [0, 0, 0]
-const X: V = [1, 0, 0], Y: V = [0, 1, 0], Z: V = [0, 0, 1], was: V = [0, 1, 0], c: V = [0, 0, 0], e: V = [0, 0, 0], N: V = [0, 0, 0]
+let u = 1.3, rate = RATE // its argument of latitude, and how fast that goes
+const B: V = orbit(A, RAAN, INC, u, [0, 0, 0]), r: V = [0, 0, 0], look: V = [0, -1, 0], want: V = [0, 0, 0]
+const X: V = [1, 0, 0], Y: V = [0, 1, 0], Z: V = [0, 0, 1], c: V = [0, 0, 0], e: V = [0, 0, 0], N: V = [0, 0, 0]
 let LAND: V[] = [] // River's places on the ground (when first drawn: places.ts imports this)
 export const sight = [0, 0, 0, 0, 0] // where the main camera looks, on the ground (a unit vector), how surely, and its picture's up (rad east of north)
 
@@ -94,29 +52,29 @@ export function draw(k: number) {
   const f = 1 - Math.exp(-0.05 * (rate / N0) * dt)
   for (let i = 0; i < 3; i++) look[i] += (want[i] - look[i]) * f
   unit(look)
-  // its axes: −y along the look, its open face (+z) toward the orbit's normal side, where the camera rides
-  for (let i = 0; i < 3; i++) (was[i] = Y[i]), (Y[i] = -look[i])
+  // its axes: −y along the look, +z toward the orbit's normal side, where the camera rides
+  for (let i = 0; i < 3; i++) Y[i] = -look[i]
   const hy = dot(NORMAL, Y)
   for (let i = 0; i < 3; i++) Z[i] = NORMAL[i] - Y[i] * hy
   unit(Z), cross(Y, Z, X)
-  // the wheel pays for every turn about its axis
-  turn -= WHEEL * Math.asin(clamp(dot(cross(was, Y, s), Z), -1, 1))
-  turn %= 2 * Math.PI
   // where the main camera's axis meets the ground
   const b = dot(B, look), h = b * b - dot(B, B) + 1
   if (h > 0) for (let i = 0; i < 3; i++) sight[i] = B[i] + look[i] * (-b - Math.sqrt(h))
   sight[3] = h > 0 ? clamp(1 - (rate - HERE) / (4 * HERE)) : 0
   if (h > 0) unit(sight), frame(sight, e, N), (sight[4] = Math.atan2(dot(Z, e), dot(Z, N)))
 
-  // the body (its box's middle is 10 mm toward the cameras from its own); the wheel turning about +z, behind its
-  // motor; and on the motor's flange, facing out of the open side, Finertia
-  for (let i = 0; i < 3; i++) c[i] = B[i] - 10 * MM * Y[i]
-  solid('bleps', c, X, Y, Z, 436 * MM)
-  const cw = Math.cos(turn), sw = Math.sin(turn)
-  for (let i = 0; i < 3; i++) (s[i] = cw * X[i] + sw * Y[i]), (c[i] = B[i] + 6.5 * MM * Z[i])
-  solid('bleps-wheel', c, s, Z, cross(s, Z, want), 48 * MM)
-  for (let i = 0; i < 3; i++) (c[i] = B[i] + 34.5 * MM * Z[i]), (want[i] = -Y[i])
-  solid('finertia', c, X, Z, want, 26 * MM)
+  // the spacecraft (its box's middle is MID up from the bus's), and drawn out beside it, over its −x wing, facing the
+  // camera's side, the radio and the wheel's controller
+  for (let i = 0; i < 3; i++) c[i] = B[i] + MID * MM * Y[i]
+  solid('bleps', c, X, Y, Z, BOX * MM)
+  board('yapogee-s3', -112, 24, 61)
+  board('finertia', -112, -22, 26)
+}
+// Board `id` (`w` mm across) beside the bus: x across it, y up it (mm), standing in the plane of its +z face, facing out.
+const at: V = [0, 0, 0], nY: V = [0, 0, 0]
+function board(id: string, x: number, y: number, w: number) {
+  for (let i = 0; i < 3; i++) (at[i] = B[i] + MM * (X[i] * x + Y[i] * y + Z[i] * 50)), (nY[i] = -Y[i])
+  solid(id, at, X, Z, nY, w * MM)
 }
 
 // What it sounds like: its LoRa beacon at 433 MHz, heard a million times down, at 433 Hz. LoRa is chirps: each symbol

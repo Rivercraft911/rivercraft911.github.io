@@ -286,5 +286,23 @@
   "materials": 12,
   "project": "BLEPS",
   "note": "Finertia, BLEPS’s reaction wheel controller, 26 × 26 mm (its Faulhaber 2610 motor left out)"
+ },
+ {
+  "id": "bleps",
+  "file": "bleps.glb",
+  "bytes": 733736,
+  "tris": 27348,
+  "bounds": [
+   -0.151,
+   -0.06158,
+   -0.15775,
+   0.151,
+   0.20245,
+   0.15775
+  ],
+  "up": "y",
+  "materials": 12,
+  "project": "BLEPS",
+  "note": "BLEPS's 1U as the optical simulator builds it (cubesat-imaging-sim src/render/spacecraft.ts, makeSpacecraft of its default scenario), turned so its deck and main camera face −y; textures as their mean colour"
  }
 ]

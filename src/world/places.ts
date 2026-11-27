@@ -28,7 +28,7 @@ export type Place = {
 // In the order the index lists them, the work of now first. (Those on land keep their order among themselves in
 // planet.wgsl's FLAT; the arrival finds the hearts among them.)
 export const PLACES: Place[] = [
-  { id: 'bleps', slugs: ['bleps', 'cubesat-imaging-sim', 'yapling-observatory'], lat: 90, lon: 0, monuments: [], view: [0.11, 0.55, 0.75], ink: [0.55, 0.85, 1], draw: bleps, where: cube, orbit: BLEPS },
+  { id: 'bleps', slugs: ['bleps', 'cubesat-imaging-sim', 'yapling-observatory'], lat: 90, lon: 0, monuments: [], view: [0.2, 0.42, 0.75], ink: [0.55, 0.85, 1], draw: bleps, where: cube, orbit: BLEPS },
   { id: 'launch', slugs: ['pigeon-vision', 'yapogee'], lat: 34, lon: -38, monuments: [], view: [0.13, 0.75, -0.5], ink: [1, 0.7, 0.35], draw: launch, where: rocket },
   { id: 'valley', slugs: ['esp-dvbs2'], lat: 18, lon: 8, monuments: [], view: [0.32, 0.55, 0.3], ink: [0.5, 0.78, 1] },
   { id: 'receiver', slugs: ['ephemeris', 'driftwood'], lat: 8, lon: 82, monuments: [{ id: 'ephemeris', size: 0.07 }], view: [0.2, 0.42, -0.3], ink: [0.6, 0.9, 1], draw: receiver },
