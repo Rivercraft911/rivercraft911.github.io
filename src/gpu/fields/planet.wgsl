@@ -714,6 +714,237 @@ fn relief(ro: vec3f, rd: vec3f, t0: f32, t1: f32) -> f32 {
   return t1;
 }
 
+// ---- the well ------------------------------------------------------------------------------------------------------
+// At the pole, in the storm's eye, a well through the crust, and under it the planet is hollow: Primorial's world
+// (sites/core.ts), the primes at work, seen from anywhere down the well and, from inside, everywhere at once.
+//   Across the well, Sacks' spiral: every integer on one winding line, n at radius √n; a bead of light at each prime.
+//   Under it, the wheels: Pritchard's sieve as clockwork, a ring to each primorial, rolling along the integers.
+//   The floor: Ulam's spiral, 1 at its middle, and Eratosthenes' sieve run over it as waves, a colour to a prime.
+//   The dome: the search itself, 2^p − 1 for exponents past the record, trial factored.
+// The floor and the dome are their mean light here (lower, vault): the scene inside has them in full (core.wgsl, which
+// takes those two names over). Rock is seen through from outside the hollow, never from in it, so an eye that leaves
+// through the crust sees what it is leaving all the way out.
+const WA = 0.045;               // the well's radius
+const WF = 0.485;               // the floor's height over the planet's middle
+const WC = 0.5;                 // the dome's radius, about the floor's middle
+const WN = 0.981;               // the well's foot, in the dome's apex
+const WS = 0.996;               // Sacks' spiral, just under the water
+const WW = 0.62;                // the wheels
+const AU = vec3f(1.0, 0.72, 0.22);   // a prime that is 1 mod 4, a sum of two squares
+const AZ = vec3f(0.2, 0.62, 1.0);    // one that is 3 mod 4, and never is
+const WHITE = vec3f(1.0, 0.9, 0.7);
+const ALIVE = vec3f(0.2, 0.21, 0.3); // an integer nothing has struck yet
+const PRIMES = array<u32, 18>(2u, 3u, 5u, 7u, 11u, 13u, 17u, 19u, 23u, 29u, 31u, 37u, 41u, 43u, 47u, 53u, 59u, 61u);
+var<private> deep = 0.0;        // how far along its ray within() found its light
+
+// The i-th prime's colour, wherever it strikes: 2 blue, 3 vermilion, 5 green, 7 magenta, 11 yellow, on round the wheel
+// by the golden angle, so no two near each other are alike: ½ + ½ cos 2π(0.618 i + (0.33, 0.66, 0)), for the fifteen
+// primes to 47.
+const STRUCK = array<vec3f, 15>(
+  vec3f(0.26, 0.23, 1.00), vec3f(0.97, 0.41, 0.13), vec3f(0.04, 0.90, 0.54), vec3f(0.70, 0.00, 0.80), vec3f(0.66, 0.84, 0.01),
+  vec3f(0.06, 0.50, 0.92), vec3f(0.99, 0.16, 0.37), vec3f(0.22, 1.00, 0.27), vec3f(0.42, 0.10, 0.97), vec3f(0.89, 0.59, 0.04),
+  vec3f(0.00, 0.77, 0.71), vec3f(0.85, 0.02, 0.65), vec3f(0.49, 0.94, 0.07), vec3f(0.17, 0.33, 0.99), vec3f(1.00, 0.31, 0.21));
+fn strike(i: i32) -> vec3f { return STRUCK[i]; }
+// Is n prime? By trial division, good below 67².
+fn trial(n: u32) -> bool {
+  if (n < 2u) { return false; }
+  for (var i = 0; i < 18 && PRIMES[i] * PRIMES[i] <= n; i++) {
+    if (n % PRIMES[i] == 0u) { return false; }
+  }
+  return true;
+}
+// A level of the hollow as the eye has it at rest: x to the right, y away.
+fn plan(P: vec3f) -> vec2f { return vec2f(-P.x, P.z); }
+// A cell's face: a soft-cornered tile, its edge a pixel's footprint wide (f across the cell, w a pixel in cells).
+fn face(f: vec2f, w: vec2f, inset: f32) -> f32 {
+  let d = 0.5 - inset - abs(f - 0.5);
+  let e = clamp(d / max(w, vec2f(1e-4)) + 0.5, vec2f(0.0), vec2f(1.0));
+  return e.x * e.y;
+}
+// An integer written on its cell: 3 × 5 digits, a nibble and a half each, top row first. c: from the cell's middle, its
+// short side 1 and its long side (along x) L; cap: the largest a digit's dot may be.
+const DIGIT = array<u32, 10>(0x7b6fu, 0x2c97u, 0x73e7u, 0x73cfu, 0x5bc9u, 0x79cfu, 0x79efu, 0x7249u, 0x7befu, 0x7bcfu);
+fn numeral(n: u32, c: vec2f, L: f32, cap: f32) -> f32 {
+  var D = 1;
+  for (var m = n / 10u; m > 0u; m /= 10u) { D++; }
+  let cols = f32(4 * D - 1);
+  let unit = min(0.8 * L / cols, cap);
+  let x = c.x / unit + 0.5 * cols;
+  let y = 2.5 - c.y / unit;
+  if (x < 0.0 || y < 0.0 || y >= 5.0 || x >= cols) { return 0.0; }
+  let cx = i32(x) % 4;
+  if (cx == 3) { return 0.0; }
+  var m = n;
+  for (var i = D - 1 - i32(x) / 4; i > 0; i--) { m /= 10u; }
+  return f32((DIGIT[m % 10u] >> u32(14 - (i32(y) * 3 + cx))) & 1u);
+}
+
+// Sacks' spiral: n at radius √n and √n turns round, so the squares lie along one ray; a bead on the winding at every
+// prime, out to `rim` turns. x in its own units, w a pixel's width in them. Light, and how much it hides.
+fn winds(x: vec2f, w: f32, rim: f32) -> vec4f {
+  let r = length(x);
+  if (r > rim) { return vec4f(0.0); }
+  let a = fract(atan2(x.y, x.x) / TAU);
+  let s = max(round(r - a), 0.0) + a; // √n where the winding passes nearest
+  var c = vec4f(0.0);
+  for (var d = 0.0; d < 2.0; d += 1.0) {
+    let n = floor(s * s) + d;
+    if (!trial(u32(n))) { continue; }
+    let q = sqrt(n);
+    let k = sat((0.46 - length(vec2f(q - r, (q - s) * TAU * r))) / max(2.0 * w, 1e-3) + 0.5);
+    c = max(c, vec4f(select(select(AZ, AU, u32(n) % 4u == 1u), WHITE, n == 2.0) * 5.0, 1.0) * k);
+  }
+  // the winding itself, a thread; and from far the beads' mean: a prime to every ln n integers, each integer π of the plane
+  let th = max(0.05, 0.7 * w);
+  c += (1.0 - c.a) * vec4f(WHITE * 0.02 / th * exp(-pow((r - s) / th, 2.0)), 0.0);
+  return mix(vec4f(2.5 * (AU + AZ), 1.0) * 0.2116 / log(max(r * r, 3.0)), c, exp(-1.5 * w));
+}
+// Across the well it is wound 32 turns, to 1024, turning once in under three minutes; from too far to tell those
+// beads apart, 8 turns, to 64, the same spiral four times the size. x in the finer's units.
+fn sacks(x0: vec2f, w: f32) -> vec4f {
+  let turn = 0.006 * TAU * u.p[5].w;
+  let x = vec2f(x0.x * cos(turn) + x0.y * sin(turn), x0.y * cos(turn) - x0.x * sin(turn));
+  let far = smoothstep(0.45, 0.9, w);
+  var c = vec4f(0.0);
+  if (far < 1.0) { c = (1.0 - far) * winds(x, w, 32.0); }
+  if (far > 0.0) { c += far * winds(0.25 * x, 0.25 * w, 8.0); }
+  return c;
+}
+
+// The wheels: Pritchard's sieve as clockwork. Ring k is the wheel of the k-th primorial (2, 6, 30, 210, 2310), a cell
+// to each residue, lit where the residue is coprime to it: 1 spoke, 2, 8, 48, 480. Each is the one inside it rolled out
+// p times, less p's multiples, which are struck in p's colour. They roll along the integers together, two a second, so
+// along the pointer every ring reads the same integer N, each mod its own size; N's own light is on the pointer when it
+// is prime. x in radii from the hub, w a pixel's width.
+const WHEEL = array<f32, 5>(2.0, 6.0, 30.0, 210.0, 2310.0);
+const RIM = array<f32, 6>(0.01, 0.023, 0.039, 0.058, 0.078, 0.1);
+// Ring k's cell at `pos` residues round and fy across: its light, and how much it hides.
+fn spoke(k: i32, pos: f32, fy: f32, wide: vec2f, pix: vec2f, out: vec2f) -> vec4f {
+  let res = u32(pos);
+  var j = -1; // which of the wheel's primes strikes this residue, if any
+  for (var i = k; i >= 0; i--) { if (res % PRIMES[i] == 0u) { j = i; } }
+  // its number, along whichever way the cell is longer, and whichever way up the eye reads it (out: outward, as the eye's right and up have it)
+  let f = vec2f(fract(pos), fy);
+  let g = select(vec2f(f.y - 0.5, f.x - 0.5) * vec2f(wide.y / wide.x, 1.0) * sign(out.x), vec2f(0.5 - f.x, f.y - 0.5) * vec2f(wide.x / wide.y, 1.0) * sign(out.y), wide.x > wide.y);
+  var ink = 0.0;
+  if (max(pix.x, pix.y) < 0.12) { ink = numeral(res, g, max(wide.x, wide.y) / min(wide.x, wide.y), 0.13) * smoothstep(0.12, 0.04, max(pix.x, pix.y)); }
+  var cell = vec4f(WHITE * (1.0 - 0.9 * ink), 1.0);
+  if (j >= 0) { cell = select(vec4f(strike(j) * (0.1 + 0.3 * ink), 0.3), vec4f(strike(j) * (0.8 + ink), 0.85), j == k); }
+  return cell * face(f, pix, select(0.035, 0.1, k > 3));
+}
+fn wheels(x: vec2f, w: f32) -> vec4f {
+  let r = length(x);
+  if (r < RIM[0] || r > RIM[5] + 0.03) { return vec4f(0.0); }
+  let N = fract(u.p[5].w / 1155.0) * 2310.0;
+  let n = u32(N);
+  // the pointer, and the integer under it written past its tip
+  var c = vec4f(0.0);
+  if (x.x > 0.0) {
+    let lit = select(vec3f(0.5, 0.55, 0.7), 4.0 * AU, trial(n));
+    let line = exp(-pow(x.y / max(4e-4, w), 2.0)) * step(r, RIM[5] + 0.006) * min(1.0, 4e-4 / max(w, 1e-6));
+    var ink = 0.0;
+    if (w < 8e-4 && r > RIM[5]) { ink = numeral(n, (x - vec2f(RIM[5] + 0.018, 0.0)) / 0.009, 2.2, 0.16) * smoothstep(8e-4, 2.5e-4, w); }
+    c = vec4f(lit * (line + ink), 0.0);
+  }
+  if (r >= RIM[5]) { return c; }
+  var k = 0;
+  for (var i = 1; i < 5; i++) { if (r >= RIM[i]) { k = i; } }
+  let size = WHEEL[k];
+  let wide = vec2f(TAU * r / size, RIM[k + 1] - RIM[k]); // a cell: along the rim, and across it
+  let pix = w / wide;
+  let fy = (r - RIM[k]) / wide.y;
+  let out = vec2f(dot(x, vec2f(-u.p[1].x, u.p[1].z)), dot(x, vec2f(-u.p[2].x, u.p[2].z)));
+  let turn = atan2(x.y, x.x) / TAU + N / size;
+  // where a pixel covers several cells it is their mean, six of them; and from far, a ring's own: its spokes are Π(1 − 1/p) of it
+  let taps = select(1.0, 6.0, pix.x > 0.3);
+  var cells = vec4f(0.0);
+  for (var i = 0.5; i < taps; i += 1.0) { cells += spoke(k, fract(turn + (i / taps - 0.5) * pix.x / size) * size, fy, wide, pix / vec2f(taps, 1.0), out); }
+  var spokes = 1.0;
+  for (var i = 0; i <= k; i++) { spokes *= 1.0 - 1.0 / f32(PRIMES[i]); }
+  return c + mix(vec4f(WHITE, 1.0) * spokes * 0.7, cells / taps, exp(-0.15 * pix.x));
+}
+
+// Eratosthenes' sieve as the floor runs it: every 26 s the floor is every integer again, and a wave goes out from its
+// middle for each prime in turn, 2, 3, 5 … 47, striking that prime's multiples; a sixteenth is the proof of what is left
+// (within 47², nothing is: past it, Miller and Rabin's test). How many waves have passed radius rho: under 1, none yet.
+fn waves(rho: f32) -> f32 {
+  let a = (fract(u.p[5].w / 26.0) * 26.0 - rho / 0.11) / 0.9;
+  return select(a, 99.0, a < 0.0); // (before the floor is made new, it is as the last round left it)
+}
+// A cell the j-th prime strikes, s waves after it did: its colour, hot, then cooling to an ember of it.
+fn struck(j: i32, s: f32) -> vec3f { return mix(ALIVE, strike(j) * (0.1 + 1.6 * exp(-2.5 * max(s, 0.0))), sat(s / 0.12)); }
+// The floor's mean light at P, t along the ray: each prime's share of the integers, struck or not yet.
+fn lower(P: vec3f, t: f32, rd: vec3f) -> vec3f {
+  let a = waves(length(P.xz));
+  var c = vec3f(0.0);
+  var left = 1.0;
+  for (var j = 0; j < 15; j++) {
+    c += left / f32(PRIMES[j]) * struck(j, a - 1.0 - f32(j));
+    left *= 1.0 - 1.0 / f32(PRIMES[j]);
+  }
+  c += left * mix(ALIVE, 0.6 * (AU + AZ), sat((a - 16.0) / 0.12));
+  return c * 0.74 * exp(-0.7 * t);
+}
+// The dome's: candidates not yet tried, thinly.
+fn vault(P: vec3f, t: f32) -> vec3f { return vec3f(0.1, 0.12, 0.34) * 0.12 * exp(-0.7 * t); }
+
+// What a ray sees of the hollow, from ro (in the well's mouth, or anywhere under the ground) along rd, t0 after it
+// left the eye. The hollow is the dome's half ball and the well's cylinder; the ray's light is where it leaves them.
+fn within(ro: vec3f, rd: vec3f, t0: f32) -> vec3f {
+  let up = rd.y > 0.0;
+  let iy = 1.0 / select(rd.y, select(-1e-6, 1e-6, up), abs(rd.y) < 1e-6);
+  let oc = ro - vec3f(0.0, WF, 0.0);
+  let sb = dot(oc, rd);
+  let sh = sb * sb - dot(oc, oc) + WC * WC;
+  let far = -sb + sqrt(max(sh, 0.0));
+  let tf = -oc.y * iy; // the floor
+  let h0 = max(select(-1e9, tf, up), -sb - sqrt(max(sh, 0.0)));
+  let h1 = min(select(tf, 1e9, up), far);
+  let inH = sh > 0.0 && h1 > max(h0, 0.0);
+  let ca = max(dot(rd.xz, rd.xz), 1e-9);
+  let cb = dot(ro.xz, rd.xz);
+  let ch = cb * cb - ca * (dot(ro.xz, ro.xz) - WA * WA);
+  let ya = (WN - 0.004 - ro.y) * iy; // the well's foot, and its mouth
+  let yb = (1.0 - ro.y) * iy;
+  let c1 = (-cb + sqrt(max(ch, 0.0))) / ca;
+  let out = max(ya, yb);
+  let n1 = min(c1, out);
+  let inN = ch > 0.0 && n1 > max(max((-cb - sqrt(max(ch, 0.0))) / ca, min(ya, yb)), 0.0);
+  var kind = 0; // 1 the dome, 2 the floor, 3 the well's wall, 4 the sky up it; 0 rock
+  var t = 0.0;
+  let PH = ro + rd * h1;
+  if (!up && inN && c1 < out) { kind = 3; t = n1; }
+  else if (inH && !(up && dot(PH.xz, PH.xz) < WA * WA)) { kind = select(1, 2, !up && tf < far); t = h1; }
+  else if (up && inN) { kind = select(4, 3, c1 < out); t = n1; }
+  deep = t;
+  let px = cone() / max(abs(rd.y), 0.15);
+  // the spiral and the wheels, each a level the ray crosses once
+  let ts = (WS - ro.y) * iy;
+  let tw = (WW - ro.y) * iy;
+  var S = vec4f(0.0);
+  var Wh = vec4f(0.0);
+  if (ts > 0.0 && ts < t) {
+    let x = plan(ro + rd * ts) * (32.0 / WA);
+    S = sacks(x, (t0 + ts) * px * 32.0 / WA);
+    // and the light that comes up the well, thinning as the eye goes down into it
+    S += (1.0 - S.a) * vec4f(AU * 0.5 * smoothstep(0.6, 2.5, t0 + ts), 0.9 * smoothstep(0.1, 0.4, t0 + ts)) * sat(6.0 - dot(x, x) / 171.0) * step(rd.y, 0.0);
+    if (S.a > 0.5) { deep = ts; }
+  }
+  if (tw > 0.0 && tw < t) {
+    Wh = wheels(plan(ro + rd * tw), (t0 + tw) * px);
+    if (Wh.a > 0.5 && (S.a <= 0.5 || tw < ts)) { deep = tw; }
+  }
+  var c = vec3f(0.0);
+  let P = ro + rd * t;
+  if (kind == 1) { c = vault(P, t0 + t); }
+  if (kind == 2) { c = lower(P, t0 + t, rd); }
+  if (kind == 3) { let f = sat((1.0 - P.y) / (1.0 - WN)); c = vec3f(1.0, 0.6, 0.22) * (0.03 + 0.4 * f * f) + WHITE * 0.5 * exp(-f * 60.0); } // rock, lit from under; the waterline
+  if (kind == 4) { c = vec3f(0.2, 0.34, 0.6) * sat(0.3 + 4.0 * u.p[5].y); } // day, from down a well
+  let first = select(Wh, S, ts < tw);
+  let then = select(S, Wh, ts < tw);
+  return first.rgb + (1.0 - first.a) * (then.rgb + (1.0 - then.a) * c);
+}
+
 // The ground at p, where the ray rd met it t along; `near`: how much of its relief stands there (stood).
 fn ground(p: vec3f, rd: vec3f, L: vec3f, t: f32, near: f32) -> vec3f {
   let m = normalize(p);
@@ -759,12 +990,11 @@ fn ground(p: vec3f, rd: vec3f, L: vec3f, t: f32, near: f32) -> vec3f {
     alb = mix(alb, vec3f(0.6), min(2.95e-6 * pow(U, 3.52), 0.4));
     let Fv = 0.02 + 0.98 * pow(1.0 - cv, 5.0);
     col = alb * (sun * max(mu, 0.0) + sky) / PI + sun * glint + Fv * sky / PI;
-    // at the pole, in the storm's eye, the bore down to the core (sites/core.ts): the light of the hunt inside coming
-    // up it, amber, brightest at its depth, and lying on the water round its mouth
-    let bore = acos(clamp(m.y, -1.0, 1.0)) / 0.045;
+    // at the pole, in the storm's eye, the well (above): what is down it, and its light lying on the water round its mouth
+    let bore = length(p.xz) / WA;
     if (bore < 3.0) {
-      let deep = sat(1.0 - bore * bore);
-      col = mix(col, vec3f(1.0, 0.62, 0.2) * (1.5 + 6.0 * deep * deep), smoothstep(1.03, 0.97, bore)) + vec3f(1.0, 0.55, 0.15) * 0.8 * exp(-max(bore - 1.0, 0.0) * 3.0) * step(1.0, bore);
+      if (bore < 1.03) { col = mix(col, within(p, rd, t) / u.p[8].x, smoothstep(1.03, 0.97, bore)); }
+      col += vec3f(1.0, 0.6, 0.2) * 2.2 * exp(-max(bore - 1.0, 0.0) * 5.0) * step(1.0, bore);
     }
   } else {
     let slope = ZS * length(gt);

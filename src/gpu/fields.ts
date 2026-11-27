@@ -31,9 +31,11 @@ export const ARRIVE = FIELDS.push({ code: camera + cosmos + planet + arrive, dat
   for (let i = 0; i < 1 << 16; i++) px[4 * i] = px[4 * (((((i >> 8) + 17) & 255) << 8) | ((i + 37) & 255)) + 1]
   for (const shader of [PLANET, ARRIVE]) createImageBitmap(new ImageData(px, 256)).then((img) => pictures.push({ shader, img, x: 0, y: 0, mip: 0 }))
 }
-// Inside the planet (world/sites/core.ts): the integers, sieved, factored and proven prime where they stand.
+// Inside the planet (world/sites/core.ts): the planet's own field, with the hollow under its well in full. The well's
+// floor and dome are planet.wgsl's mean light (lower, vault) under another name here, and core.wgsl's take theirs. Its
+// data is the planet's noise with the search's own numbers beside it (core.ts sends both).
 import core from './fields/core.wgsl?raw'
-export const CORE = FIELDS.push({ code: camera + core, data: [1024, 2, 4] }) - 1
+export const CORE = FIELDS.push({ code: camera + cosmos + planet.replace('fn lower(', 'fn lower0(').replace('fn vault(', 'fn vault0(') + core, data: [256, 256, 4] }) - 1
 // The dive (acts/dive.ts): down the drain's throat through a mountain of worlds to a black hole, the sky lensed round it.
 import dive from './fields/dive.wgsl?raw'
 export const DIVE = FIELDS.push({ code: camera + cosmos + dive }) - 1

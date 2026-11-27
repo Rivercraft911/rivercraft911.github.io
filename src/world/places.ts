@@ -6,7 +6,7 @@ import { draw as launch, where as rocket } from './sites/launch'
 import { about as rxAbout, draw as receiver, steer as rxSteer } from './sites/receiver'
 import { ABOUT as SAMWISE, NORMAL as SSO, VIEW as SAT, draw as station, steer as detumble, where as bus } from './sites/station'
 import { NORMAL as BLEPS, draw as bleps, where as cube } from './sites/bleps'
-import { core } from './sites/core'
+import { about as primes, core, steer as descend, where as well } from './sites/core'
 import { RISE as BROW, about as strobe, draw as glasses, steer as look } from './sites/glasses'
 import { draw as hearts } from './sites/hearts'
 import { about as r01, draw as lighthouse, steer as projector } from './sites/lighthouse'
@@ -50,5 +50,5 @@ export const PLACES: Place[] = [
   { id: 'glasses', slugs: ['strobeglasses'], lat: -20, lon: 18, monuments: [], view: [0.36, 0.1, 0.05], ink: [0.95, 0.95, 0.55], draw: glasses, rise: BROW, steer: look, about: strobe },
   { id: 'hearts', slugs: ['rava-heart'], lat: 46, lon: 28, monuments: [], view: [0.22, 0.55, -1.05], ink: [1, 0.4, 0.55], draw: hearts },
   { id: 'station', slugs: ['samwise'], lat: -30, lon: -70, monuments: [], view: SAT, ink: [0.75, 0.6, 1], draw: station, where: bus, orbit: SSO, steer: detumble, about: SAMWISE },
-  { id: 'core', slugs: ['primesf', 'autoprime'], lat: 89, lon: 0, monuments: [], view: [0.5, 1.2, 0], ink: [1, 0.85, 0.4], draw: core },
+  { id: 'core', slugs: ['primesf', 'autoprime'], lat: 89, lon: 0, monuments: [], view: [0.5, 1.2, 0], ink: [1, 0.85, 0.4], draw: core, where: well, steer: descend, about: primes },
 ]
