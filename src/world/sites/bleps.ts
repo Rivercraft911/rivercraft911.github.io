@@ -36,7 +36,7 @@ export const sight = [0, 0, 0, 0, 0] // where the main camera looks, on the grou
 // Where the spacecraft is now: what a camera that rides with it looks at.
 // (At planet time t: the camera asks before draw() has moved it on, so it is carried forward to when it is asked,
 // or the two would stand a frame apart and it would shake as the frames' lengths do.)
-export const where = (o: V, t = tu) => orbit(A, RAAN, INC, u + rate * ((t - tu) || 0), o)
+export const where = (o: V, t = tu) => orbit(A, RAAN, INC, u + rate * (clamp(t - tu, 0, 0.1) || 0), o)
 
 export function draw(k: number) {
   const dt = ctx.dt, here = ctx.focus === k

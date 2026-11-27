@@ -49,7 +49,11 @@ export const ctx = {
   blur: 0, // the lens: its blur at infinity (px), the distance it is focused at, and px a radian
   fd: 1,
   ppr: 1,
-  models: {} as Record<string, Model>,
+  // River's hardware, as it comes in. Asked for before it has, by the place looked at, it is wanted, and the loader
+  // (planet.ts) fetches what is wanted first: a place flown or linked to before the rest.
+  models: new Proxy({} as Record<string, Model>, { get: (o, id: string) => o[id] ?? void (ctx.wanting && ctx.want.add(id)) }),
+  want: new Set<string>(),
+  wanting: false, // while the place looked at draws
   items: [] as Placed[], // this frame's solids
   since: -1, // seconds since the camera came to rest at the place, −1 while it flies or is above the planet
   picked: '', // the part of the place last clicked (part()), '' for none

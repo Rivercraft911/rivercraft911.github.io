@@ -73,9 +73,9 @@ function step(u: number, h: number) {
 
 // Where the bus is now: what a camera that rides with it looks at. Its orbit's normal: the camera rides in its frame.
 let u = 0, rate = RATE, tu = NaN // its argument of latitude (at planet time tu, once drawn), and how fast that goes
-// (At planet time t: the camera asks before draw() has moved it on, so it is carried forward to when it is asked,
-// or the two would stand a frame apart and it would shake as the frames' lengths do.)
-export const where = (o: V, t = tu) => orbit(A, RAAN, INC, u + rate * ((t - tu) || 0), o)
+// (At planet time t: the camera asks before draw() has moved it on, so it is carried forward to when it is asked, as
+// draw() will carry it, a frame's time at most 0.1 s, or the two would stand apart and it would shake as frames vary.)
+export const where = (o: V, t = tu) => orbit(A, RAAN, INC, u + rate * (clamp(t - tu, 0, 0.1) || 0), o)
 export const NORMAL = cross(orbit(1, RAAN, INC, 0, [0, 0, 0]), orbit(1, RAAN, INC, Math.PI / 2, [0, 0, 0]))
 
 // ---- River's boards ------------------------------------------------------------------------------------------

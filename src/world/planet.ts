@@ -35,15 +35,32 @@ const dbg = new URLSearchParams(location.search)
 const DEBUG = ['d', 'pitch', 'yaw', 'at'].some((k) => dbg.has(k))
 
 // ---- models: River's hardware, as baked (scripts/bake-models.mjs) --------------------------------------------
+// They come in one at a time, in the list's order, but what the place looked at asks for (ctx.want) is fetched at once,
+// and the rest waits for it: so a place flown or linked to is never left waiting on all 40 MB of everything else.
 const models = ctx.models
 const LAMPS: Record<string, string> = { heart: 'mat_2' } // which of a model's materials are its LEDs (bvh.worker.ts)
+const queue = new Map<string, string>() // what list.json names that has not been fetched: id → url
+let device: GPUDevice, coming = 0, behind = false // wanted ones on their way; whether the list's own is
+function fetchModel(id: string) {
+  const url = queue.get(id)!
+  queue.delete(id)
+  return model(device, url).then((g) => (models[id] = g))
+}
+function background() {
+  const id = queue.keys().next().value
+  if (behind || coming || id === undefined) return
+  behind = true
+  fetchModel(id).finally(() => ((behind = false), background()))
+}
 export function attach(d: GPUDevice) {
   mount((k) => go(k, lastBuild), () => active) // the words: the index, a deep link's place, the history
   const base = `${import.meta.env.BASE_URL}media/models/`
+  device = d
   fetch(`${base}list.json?v=${__BUILD__}`) // (asked for as this build's, past any cache's older copy)
     .then((r) => (r.ok ? r.json() : []))
     .then((list: { id: string; file: string }[]) => {
-      for (const m of list) model(d, `${base}${m.file}?v=${__BUILD__}` + (LAMPS[m.id] ? `#lamp=${LAMPS[m.id]}` : '')).then((g) => (models[m.id] = g))
+      for (const m of list) queue.set(m.id, `${base}${m.file}?v=${__BUILD__}` + (LAMPS[m.id] ? `#lamp=${LAMPS[m.id]}` : ''))
+      background()
     })
     .catch(() => {})
   for (const [id, url] of made()) model(d, url).then((g) => (models[id] = g)) // and what is not in CAD yet (make.ts)
@@ -348,12 +365,15 @@ export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number
   // River's hardware, and the sun on it
   ctx.t = t, ctx.dt = dt, ctx.f = f, ctx.focus = focus
   ctx.L[0] = L[0], ctx.L[1] = L[1], ctx.L[2] = L[2]
-  ctx.items.length = 0, parts.n = 0, ctx.since = since
+  ctx.items.length = 0, parts.n = 0, ctx.since = since, ctx.want.clear()
   f.rate = 2.4e6, f.field = F, f.look = { tau: 0.025 } // a place may take the field over (the core, from inside)
   PLACES.forEach((P, k) => {
+    ctx.wanting = k === focus
     for (const m of P.monuments) stand(m.id, sites[k], m.size, m.at, m.turn, m.lift, m.flip)
     P.draw?.(k)
   })
+  ctx.wanting = false
+  for (const id of ctx.want) if (queue.has(id)) coming++, fetchModel(id).finally(() => (coming--, background()))
   if (DEBUG) stand('peep', PEEP, 0.08, undefined, 0.4, 0.002)
   // BLEPS's main camera's footprint on the ground (the arrival keeps its own numbers here)
   if (marked) p.set([Math.asin(sight[1]), Math.atan2(sight[0], sight[2]), sight[4], -sight[3] * HALF], 56)
