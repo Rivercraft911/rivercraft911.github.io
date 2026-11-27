@@ -1,7 +1,9 @@
 // Plucks: a few FM voices (Chowning, 1973), each a cosine bending its own phase, y = cos(θ + I cos θ), so its
 // spectrum is the harmonics of one pitch, as many as the index I reaches. I falls fast and the level slowly: each
 // note starts bright and woody and rings out pure, as a struck string does. A note may fall as it rings, at
-// the choir's rate. They go out through a ping-pong echo whose repeats darken and cross the head.
+// the choir's rate. They go out through a ping-pong echo whose repeats darken and cross the head. Notes are tuned
+// at the speakers' own sample rate (heard.sr); sr only sizes the echo.
+import { heard } from '../audio/audio'
 const TABLE = 4096
 const COS = Float64Array.from({ length: TABLE + 1 }, (_, i) => Math.cos((2 * Math.PI * i) / TABLE))
 const cos = (p: number) => {
@@ -29,7 +31,7 @@ export class Plucks {
   private lpr = 0
   echo = 0.4 // feedback
   wet = 0.6
-  constructor(private sr = 48000, gap = 0.27) {
+  constructor(sr = 48000, gap = 0.27) {
     this.dl = new Float32Array(Math.ceil(gap * sr) + 1)
     this.dr = new Float32Array(this.dl.length)
   }
@@ -37,8 +39,8 @@ export class Plucks {
   // Strikes a note: f Hz, level a, pan ∈ [−1, 1], ringing for ring seconds (to −60 dB), bright the index it
   // starts at, falling at fall octaves a second.
   strike(f: number, a: number, pan = 0, ring = 1.2, bright = 2.5, fall = 0) {
-    if (!(f > 20 && f < 0.2 * this.sr && a > 0)) return
-    const i = (this.next = (this.next + 1) % N), sr = this.sr, p = (Math.PI / 4) * (1 + pan)
+    if (!(f > 20 && f < 0.2 * heard.sr && a > 0)) return
+    const i = (this.next = (this.next + 1) % N), sr = heard.sr, p = (Math.PI / 4) * (1 + pan)
     this.inc[i] = f / sr
     this.fall[i] = 2 ** (-fall / sr)
     this.amp[i] = a

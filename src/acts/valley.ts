@@ -11,12 +11,12 @@ import { screen, tune } from '../beam/scope'
 import { load, use } from '../beam/font'
 import { fft, hann } from '../dsp/fft'
 import { Field } from '../dsp/terrain'
-import { place, sing } from './choir'
+import { FALL, ahead, lag, place, sing } from './choir'
 import { VALLEY as DUR, SING } from './clock' // the choirs begin to sing at SING
 import { A0, GF, HF, M, RIM, TAU_RASTER, V as VR, join, loud, ride, sight, vortex as whirl } from './wrap'
 import { LOOK } from '../gpu/phosphor'
 import { Board, MORPH, say, type Place } from './say'
-import { TAU, cam, clamp, glide, hash, lock, mix, smooth, view, type Scene } from './scene'
+import { TAU, cam, clamp, glide, hash, lock, mix, smooth, space, view, type Scene } from './scene'
 
 use(await load('tech'))
 
@@ -487,10 +487,11 @@ function rimmed(w: number) {
   }
 }
 // The refresh rate, a bass line in A under the picture, which is its timbre: on A while the line opens,
-// walking as the land rises and the firs grow, and climbing the major chord as we run for the lip.
+// walking as the land rises and the firs grow, and climbing the major chord as we run for the lip, to A (110 Hz),
+// held: the note the choir takes up. Over the lip (OVER) the note falls with the choir (choir.lag).
 const A1 = 55, CS = 69.3, E1 = 41.2, B1 = 61.74, D2 = 73.42, E2 = 82.41, FS = 46.25
 const RIFF = [A1, A1, E1, A1, B1, CS, B1, E1, D2, CS, A1, E1, FS, A1, B1, CS, A1, E1, A1]
-const CLIMB = [CS, E2, 2 * A1, 2 * CS]
+const CLIMB = [CS, E2, 2 * A1], OVER = SING + FALL
 const NOTES: [number, number][] = [[0, A1], ...RIFF.map((n, i): [number, number] => [1.2 + ((RUN - 1.2) * i) / RIFF.length, n]), ...CLIMB.map((n, i): [number, number] => [RUN + 0.2 * i, n])]
 const CYCLES = tune(NOTES)
 let shift = NaN, was = NaN // the bass line's phase, set to go on from where the meander left the trace
@@ -717,6 +718,12 @@ export const valley: Scene = {
 
     f.rate = mix(2.4e6, 7.2e6, smooth(1, 8, t))
     if (t > SING) place(t - SING)
+    // the spatial voices on the shaft ahead: the choir's left and right on its rim, which opens round us as we
+    // run at it, and its middle (the sub, the roar) down in it
+    const half = 0.35 + 1.2 * smooth(6, OVER + 0.8, t)
+    ;(space[9] = -Math.sin(half)), (space[10] = 0), (space[11] = -Math.cos(half))
+    ;(space[12] = Math.sin(half)), (space[13] = 0), (space[14] = -Math.cos(half))
+    ;(space[15] = 0), (space[16] = -0.4), (space[17] = -0.9)
     // the speakers' picture: the land, then the line and contours while they last, the far peaks, the firs
     // nearest us, the banks, and the shaft's rim ahead (wrap.ts draws what is over it)
     if (fade > 0) {
@@ -739,18 +746,19 @@ export const valley: Scene = {
     was = t
     return (tt, o) => {
       // the speakers trace it forth and back at the bass line's note, going on from where the meander's trace
-      // was; hushed at the lip, where the scope ends
+      // was. Over the lip the scope rule ends: the note falls with the choir, the plates' low-pass closes with
+      // the choir's filter, and the trace gives way to the choir that grew out of it
       if (shift !== shift) shift = sc.u / 2 - (CYCLES(tt) % 1)
-      const c = CYCLES(tt) + shift, u = 2 * (c - Math.floor(c)), k = 1 - smooth(RUN + 0.8, RUN + 1, tt)
-      if (k > 0) sc.play(u < 1 ? u : 2 - u, tt, o, k)
-      // the falls are heard coming; at the lip everything holds its breath; over the edge the scope rule
-      // ends, and they roar
-      const hush = 1 - 0.9 * smooth(7.8, 8, tt) * (1 - smooth(8.25, 8.55, tt))
+      const c = CYCLES(tt) + 2 * A1 * lag(tt - SING) + shift, u = 2 * (c - Math.floor(c)), k = 1 - smooth(OVER, OVER + 1.4, tt)
+      if (k > 0) sc.play(u < 1 ? u : 2 - u, tt, o, k, 0.5 - 0.42 * smooth(OVER, OVER + 1.2, tt))
+      // the falls are heard coming, from the shaft ahead; at the lip they draw a breath; over the edge they are
+      // all round us, and roar
+      const hush = 1 - 0.35 * smooth(OVER - 0.2, OVER + 0.2, tt) * (1 - smooth(OVER + 0.4, OVER + 1, tt))
       if (tt > 3) { // on through the crossfade: the whirlpool takes the choir over smoothly (sing caches a repeated t)
         lp += (hash(tt * 48_000) - lp) * 0.04
-        const roar = 0.5 * lp * smooth(5.1, 6.9, tt) * hush * (1 - 0.6 * smooth(9.3, 13.3, tt)) * (1 - smooth(13.5, DUR, tt))
-        o.l += roar, o.r += roar
-        if (tt > SING) sing(tt - SING, o) // silent until we go over, then fading in; on past the end, as the speakers run ahead
+        const roar = 0.5 * lp * smooth(5.1, 6.9, tt) * hush * (1 - 0.6 * smooth(9.3, 13.3, tt)) * (1 - smooth(13.5, DUR, tt)), a = ahead(tt - SING)
+        ;(o.l += (1 - a) * roar), (o.r += (1 - a) * roar), (o.s[5] += a * roar)
+        if (tt > SING) sing(tt - SING, o) // silent until the run for the lip, then rising from the shaft; on past the end, as the speakers run ahead
       }
     }
   },

@@ -89,5 +89,5 @@ export function voice(t: number, dt: number) {
   const v = j < 8 ? 0 : j < 10 ? -1 : ((n * 2654435761 + j * 40503) >>> 7) % 128 / 128 // the symbol's start, or a down-chirp
   const f = v < 0 ? F + BW / 2 - BW * x : F - BW / 2 + BW * ((x + v) % 1)
   phase += f * dt, phase -= Math.floor(phase)
-  return 0.12 * Math.sin(2 * Math.PI * phase) * Math.min(1, 20 * x, 20 * (1 - x) + 0.5)
+  return 0.12 * Math.sin(2 * Math.PI * phase) * Math.min(1, 20 * x, 20 * (1 - x))
 }

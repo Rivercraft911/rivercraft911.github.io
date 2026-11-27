@@ -1,7 +1,13 @@
 // The choir that sings the fall, from the lip of the falls to the sky. One Shepard pad (dsp/shepard.ts), an open
 // fifth falling forever, in a hall whose tail climbs an octave each time round as the spray does (dsp/hall.ts),
 // and a few plucked strings that echo across the head (dsp/pluck.ts). T is time since the fall's clock began.
-// - Over the lip it swells out of the held breath and falls slowly, the hall wide, wind in it.
+// - It grows out of the scope. Running for the lip, the scope's bass line lands on A (110 Hz) and holds it, and the
+//   choir rises from the falls ahead on that same A, its filter as open as the scope's trace is bright, so its
+//   partials are the trace's own harmonics (1, 2, 4: A; 3, 6: E). Until the lip it sings only on the spatial
+//   voices, from the shaft, so the scope's pair still draws the screen. Over the lip it steps into the hall around
+//   us, and the held A tips over: the fall begins from rest, the scope's note falling with it as its trace fades
+//   and its plates' low-pass closes with the choir's filter, into the choir's own colour (valley.ts).
+// - Over the lip it falls slowly, the hall wide, wind in it.
 // - In the whirlpool it turns: its singers go round the head with the water, and an arpeggio of its own chord
 //   spins faster and faster down through it.
 // - When the text spreads, the glide is read out in steps, as text reads out the water: the continuous fall
@@ -20,7 +26,7 @@ import { Plucks } from '../dsp/pluck'
 import { END, LEAD, NOTHING, RA, RD, WRAP } from './clock'
 import { hash, mix, smooth } from './scene'
 
-const FALL = 9 // over the lip of the falls: silent before it
+export const FALL = 9 // over the lip of the falls
 const SPIN = LEAD // the whirlpool
 const TEXT = LEAD + WRAP // the text, and the drain under it
 const DIVE = RD // down the drain through the worlds,
@@ -40,21 +46,28 @@ const table = (A: Float64Array, r: (T: number) => number, T: number) => {
 }
 export const descent = (T: number) => table(S, rate, T)
 
-// The sung fall, far slower than the zoom until the drain, where the steps run, then three octaves a second by the
-// hole, then slowing to nothing at the sky. It is offset so that it stops just past a whole octave: on A.
-const sungRate = (T: number) =>
-  (0.07 + 0.08 * smooth(FALL, TEXT, T) + 0.5 * smooth(TEXT, DIVE, T) ** 2 + 2.4 * smooth(DIVE, HOLE, T) ** 2) * (1 - smooth(LAND - 0.4, SKY, T))
+// The sung fall: held on A until the lip, setting off from rest over it, far slower than the zoom until the drain,
+// where the steps run, then three octaves a second by the hole, then slowing to nothing at the sky. Its pace is
+// trimmed (by K, a few parts in a hundred) so that from the lip's A it falls a whole number of octaves and lands on
+// A again, just past it.
+const shape = (T: number) =>
+  (0.07 * smooth(FALL - 0.3, FALL + 2, T) + 0.08 * smooth(FALL, TEXT, T) + 0.5 * smooth(TEXT, DIVE, T) ** 2 + 2.4 * smooth(DIVE, HOLE, T) ** 2) * (1 - smooth(LAND - 0.4, SKY, T))
 // Read out in steps while the text is, and again in the cloud; a glide down the dive.
 const stepped = (T: number) => smooth(TEXT, TEXT + 0.6, T) * (1 - smooth(DIVE + 0.4, DIVE + 1.4, T)) + smooth(LAND - 0.3, LAND, T)
 // Past the horizon, nothing, until the cloud.
 const nothing = (T: number) => smooth(HOLE - 0.08, HOLE, T) * (1 - smooth(LAND, LAND + 0.8, T))
 const SUNG = new Float64Array(S.length)
-for (let i = 1; i < SUNG.length; i++) SUNG[i] = SUNG[i - 1] + sungRate(i * DT) * DT
-const OFF = (() => {
-  const s = table(SUNG, sungRate, SKY)
-  return Math.ceil(s) + 0.01 - s
-})()
-const sung = (T: number) => table(SUNG, sungRate, T) + OFF
+for (let i = 1; i < SUNG.length; i++) SUNG[i] = SUNG[i - 1] + shape(i * DT) * DT
+const K = (Math.round(table(SUNG, shape, SKY)) + 0.01) / table(SUNG, shape, SKY)
+const sungRate = (T: number) => K * shape(T)
+const sung = (T: number) => K * table(SUNG, shape, T)
+// How many turns a note held from the start falls behind, sung down with the choir: ∫ (2^−sung − 1) dT. The scope's
+// note follows the choir over the lip by it (valley.ts).
+const LAG = new Float64Array(S.length)
+for (let i = 1; i < LAG.length; i++) LAG[i] = LAG[i - 1] + (2 ** -sung(i * DT) - 1) * DT
+export const lag = (T: number) => table(LAG, () => 0, T)
+// How much of the choir sings from the shaft ahead (the spatial voices) rather than in the hall: all of it until the lip.
+export const ahead = (T: number) => 1 - smooth(FALL - 0.2, FALL + 1.6, T)
 // The scale it steps down, in semitones below A: A, G♯, F♯, E, D, C♯, B.
 const STEPS = [0, 1, 3, 5, 7, 8, 10], st = { s: 0, k: 0 }
 const stair = (s: number) => {
@@ -72,7 +85,8 @@ const pad = new Shepard()
 const strings = new Plucks()
 const sky = (T: number) => smooth(SKY - 0.3, SKY + 2.2, T) // the bloom
 const cloud = (T: number) => smooth(LAND - 0.5, LAND + 0.8, T) * (1 - smooth(SKY - 0.5, SKY + 0.5, T)) // inside it
-const fade = (T: number) => smooth(FALL - 0.2, FALL + 2.8, T) * (1 - smooth(SKY + 5, END - 0.5, T)) // in over the lip, out as we climb
+const fade = (T: number) => smooth(FALL - 1.6, FALL + 2.4, T) * (1 - smooth(SKY + 5, END - 0.5, T)) // in before the lip, out as we climb
+const open = (T: number) => 1 - smooth(FALL, FALL + 2.5, T) // as bright as the scope's trace, until it closes over the lip
 
 // The room, once a frame. A world's share w ∈ [0, 1] of it is left as the world set it.
 export function place(T: number, w = 0) {
@@ -95,11 +109,12 @@ function set(T: number) {
   sp = Math.abs(s - sp) > 0.5 ? s : sp + (s - sp) * 0.06
   pad.s = sp
   pad.turn = table(TURN, spin, T)
-  // the filter sweeps, slowly over the falls and with the water's turning in the whirlpool, and shuts in the cloud
-  const sweep = 2 ** ((0.7 - 0.5 * c) * Math.sin(0.8 * (T - FALL) + 0.5 * pad.turn))
-  pad.bright = (900 + 1600 * smooth(FALL, SPIN, T) + 1200 * smooth(SPIN, DIVE, T) + 3000 * dv) * (1 - 0.82 * c) * sweep + 3200 * b * (1 - 0.4 * smooth(SKY + 3, END, T))
-  pad.res = 0.9 * (1 - c) * (1 - 0.6 * b)
-  pad.tone = 0.5 + 0.35 * smooth(SPIN, TEXT, T) - 0.3 * c + 0.2 * b
+  // the filter: open as the scope until the lip, closing over it; then it sweeps, slowly over the falls and with the
+  // water's turning in the whirlpool, and shuts in the cloud
+  const sweep = 2 ** ((0.7 - 0.5 * c) * Math.sin(0.8 * Math.max(0, T - FALL) + 0.5 * pad.turn)), op = open(T)
+  pad.bright = (900 + 1600 * smooth(FALL, SPIN, T) + 1200 * smooth(SPIN, DIVE, T) + 3000 * dv) * (1 - 0.82 * c) * sweep * (1 + 3 * op) + 3200 * b * (1 - 0.4 * smooth(SKY + 3, END, T))
+  pad.res = 0.9 * (1 - c) * (1 - 0.6 * b) * (1 - 0.6 * op)
+  pad.tone = 0.5 + 0.35 * smooth(SPIN, TEXT, T) - 0.3 * c + 0.2 * b + 0.5 * op
   pad.bloom = b
   pad.fifth = 0.7 + 0.3 * b
   pad.beat = 0.1 + 0.2 * smooth(SPIN, LAND, T) * (1 - c)
@@ -141,9 +156,10 @@ function arpeggio(T: number) {
   if (T < SKY) lightN = 0
 }
 
-// Every sample: the pad and the strings into the bed, voices 0 and 1 its left and right, 2 the sub in the middle.
+// Every sample: the pad and the strings into the bed, voices 0 and 1 its left and right, 2 the sub in the middle; or,
+// before the lip, into the spatial voices 3, 4 and 5 that the valley places on the shaft ahead.
 // A second call at the same T (two scenes crossfading) sings the same sample.
-const part: Part = { l: 0, r: 0, m: 0 }, out = { l: 0, r: 0, m: 0 }
+const part: Part = { l: 0, r: 0, m: 0 }, out = { l: 0, r: 0, m: 0, a: 0 }
 let last = NaN
 export function sing(T: number, o: Stereo, gain = 1) {
   if (T !== last) {
@@ -159,9 +175,12 @@ export function sing(T: number, o: Stereo, gain = 1) {
       out.l = g * part.l
       out.r = g * part.r
       out.m = g * part.m
+      out.a = ahead(T)
     }
   }
-  o.s[0] += gain * out.l
-  o.s[1] += gain * out.r
-  o.s[2] += gain * out.m
+  const a = out.a, k = gain * (1 - a)
+  o.s[0] += k * out.l
+  o.s[1] += k * out.r
+  o.s[2] += k * out.m
+  if (a > 0) (o.s[3] += gain * a * out.l), (o.s[4] += gain * a * out.r), (o.s[5] += 0.5 * gain * a * out.m)
 }

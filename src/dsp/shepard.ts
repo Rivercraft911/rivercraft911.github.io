@@ -11,6 +11,8 @@
 // blooms into when it lands, in just intonation.
 // Under it, a sub: the same layers between 27 and 110 Hz, pure and in the middle. Around it, breath: noise in a
 // quarter-octave band two octaves over each layer, left and right from different noise, wind past the ear.
+// It is tuned at the speakers' own sample rate (heard.sr), whatever the device runs at.
+import { heard } from '../audio/audio'
 
 const L = 9 // octaves, A−1 (13.75 Hz) to A8: the bell puts the middle near 300 Hz
 export const F0 = 13.75
@@ -64,7 +66,7 @@ export class Shepard {
   private w = new Float64Array(H + 1)
 
   // pairs: singers to a tone, two to beat slowly against each other, or one alone
-  constructor(private sr = 48000, private pairs = 2) {
+  constructor(private pairs = 2) {
     for (let i = 0; i < this.ph.length; i++) this.ph[i] = this.rand()
     for (let i = 0; i < L; i++) this.sph[i] = this.rand()
   }
@@ -78,7 +80,7 @@ export class Shepard {
 
   // Sets every singer and band for the next block.
   private control() {
-    const { sr, w } = this, nyq = 0.45 * sr, b4 = this.bright ** 4
+    const { w } = this, sr = heard.sr, nyq = 0.45 * sr, b4 = this.bright ** 4
     this.live = this.nb = this.ns = 0
     for (let j = 0; j < L; j++) {
       const x = (((j - this.s) % L) + L) % L // this layer's place in the span, sliding down
