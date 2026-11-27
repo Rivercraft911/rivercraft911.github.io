@@ -132,6 +132,7 @@ try {
     console.log(m.id, `${(bytes / 1e6).toFixed(2)} MB`, `${s.tris} tris`, `${s.materials} materials`, `${mm.join(' × ')} mm`, log.match(/^RAW (.*)$/m)?.[1], JSON.stringify(s.ratios),
       missing.length ? `missing ${missing.length}: ${[...new Set(missing)].join(', ')}` : '', `${((Date.now() - t0) / 1e3).toFixed(0)} s`)
   }
+  for (const w of was) if (!MODELS.some((m) => m.id === w.id)) list.push(w) // models baked elsewhere (bleps, from its simulator) stay
   writeFileSync(new URL('list.json', MEDIA), JSON.stringify(list, null, 1))
 } finally {
   rmSync(tmp, { recursive: true, force: true })
