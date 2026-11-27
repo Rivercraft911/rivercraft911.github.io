@@ -86,7 +86,7 @@ export const ORDER: Entry[] = [
     see: 'Satellites rising over the board, each with its Doppler, −ṙ/c × 1575.42 MHz, within about ±5 kHz for a receiver on the ground; from cold, six of them lock one by one and the fix lands 55 s in.',
   },
   {
-    slug: 'r-01', status: 'built; the motor caught fire on demo day; R-02 planned', proof: 'a 1.83 MHz pixel clock off a 27 000 RPM polygon',
+    slug: 'r-01', status: 'not fully working; designing R-02', proof: 'a 1.83 MHz pixel clock off a 27 000 RPM polygon',
     see: 'Real light: 1800 lines a second off four facets, the galvo stepping odd lines down and even lines back up, each laser at 16 levels.',
   },
   {

@@ -310,10 +310,11 @@ export const PROJECTS: Project[] = [
       ['pixel loop', '637 kHz → 1.83 MHz'],
       ['colour', '12 iC-HG30 channels, 4 binary-weighted per laser'],
       ['build', '129 parts, 19 of them custom'],
+      ['status', 'not fully working; R-02 in design'],
     ],
     body: [
       'A raster laser projector. Red, green and blue lasers combine through two dichroic mirrors onto a polygon mirror spinning at 27 000 RPM; each facet sweeps one line, and a galvo steps between them, odd lines down and even lines back up.',
-      'An IR sensor catches each facet going by and arms a timer for the instant the beam reaches the screen; then 320 pixels go out the GPIO ports, each on its own timestamp so jitter never builds up. A pixel is one byte, precomputed into four port writes. We called it Icarus: the polygon motor caught fire on demo day. R-02 is planned.',
+      'An IR sensor catches each facet going by and arms a timer for the instant the beam reaches the screen; then 320 pixels go out the GPIO ports, each on its own timestamp so jitter never builds up. A pixel is one byte, precomputed into four port writes. R-01 never fully worked (its polygon motor caught fire on demo day, which earned it the name Icarus), so I’m designing R-02 now.',
     ],
     proof: [
       { src: `${MEDIA}r01/polyspin.mp4`, alt: 'The polygon mirror spinning up on the bench', video: true, size: [540, 960] },
