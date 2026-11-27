@@ -81,7 +81,7 @@ export const PROJECTS: Project[] = [
   {
     slug: 'samwise',
     title: 'SAMWISE',
-    remarkable: 'Stanford SSI’s CubeSat: my magnetorquer coil boards, etched through 6 layers, and its radio test bench',
+    remarkable: 'My 6-layer magnetorquer coils and radio test bench for Stanford SSI’s CubeSat',
     freq: ORBIT,
     span: 0.5,
     signature: 'A magnetorquer pushes against Earth’s field, which turns past it once an orbit: ≈0.18 mHz.',
