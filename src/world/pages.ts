@@ -161,15 +161,56 @@ function measure() {
 new ResizeObserver(measure).observe(root)
 
 // Called once by the planet: `go` flies the camera to place k (k < 0: home), `on` says whether the world is being
-// drawn, so its words show only while it is. A deep link sets off for its place at once.
+// drawn, so its words show only while it is (or while the arrival is laying the index). A deep link sets off for its
+// place at once.
 export function mount(go: (k: number) => void, on: () => boolean) {
   fly = go, live = on
   document.body.append(root)
   requestAnimationFrame(function watch() {
-    if (root.hidden === live()) (root.hidden = !live()), measure()
+    const laying = !live() && performance.now() - laid < 200, shows = live() || laying
+    if (root.hidden === shows) (root.hidden = !shows), measure()
+    if (root.classList.contains('arriving') !== laying) {
+      root.classList.toggle('arriving', laying)
+      if (!laying) for (const b of flyers) b.style.visibility = 'hidden'
+    }
     requestAnimationFrame(watch)
   })
   if (deep() >= 0) go(deep())
+}
+
+// ---- the arrival's names ---------------------------------------------------------------------------------------
+// As the arrival flies past each place it puts the place's name up, large, in the index's own letters, then lays it down
+// into that place's line of the index, where it stays: by the time the world takes over, the index has been made of
+// the names we passed, and only its heading is left to open. `since[k]`: seconds since place k was passed (negative,
+// not yet). The arrival calls this every frame; while it does, the index shows only the lines laid so far.
+const flyers = PLACES.map((_, k) => el('b', { class: 'pass', 'aria-hidden': 'true', style: `--c: ${ink(k)}` }, named(k)))
+root.append(...flyers)
+let laid = 0
+const UP = 0.12, SHOWN = 0.42, GO = 0.8, DOWN = 1.45 // (s after passing: its name starts up, is up, sets off, is laid)
+const ease = (a: number, b: number, x: number) => {
+  const k = Math.min(1, Math.max(0, (x - a) / (b - a)))
+  return k * k * k * (k * (6 * k - 15) + 10)
+}
+export function passed(since: ArrayLike<number>) {
+  laid = performance.now()
+  if (root.hidden) return // (the watch shows the words on its next frame)
+  let n = 0
+  entries.forEach((a, k) => {
+    const s = since[k], b = flyers[k], row = a.parentElement!, down = s >= (still.matches ? UP : DOWN)
+    row.classList.toggle('landed', down)
+    n += +down
+    if (still.matches || !(s >= UP) || down) return void (b.style.visibility = 'hidden')
+    // its line's own name: where it lies, how big, what colour
+    const name = a.querySelector('b')!, r = name.getBoundingClientRect(), cs = getComputedStyle(name), f0 = parseFloat(cs.fontSize)
+    const f1 = Math.min(76, Math.max(38, innerWidth * 0.05)), go = ease(GO, DOWN, s), f = Math.exp(Math.log(f1) + (Math.log(f0) - Math.log(f1)) * go)
+    const y1 = innerHeight * 0.6
+    b.style.visibility = 'visible'
+    b.style.fontSize = `${f}px`
+    b.style.transform = `translate(${r.left}px, ${y1 + (r.top - y1) * go}px)`
+    b.style.color = `color-mix(in srgb, ${cs.color} ${100 * go}%, #fff)`
+    b.style.clipPath = `inset(-1em ${100 * (1 - ease(UP, SHOWN, s))}% -1em -1em)` // it comes up as a readout does, left to right
+  })
+  root.style.setProperty('--land', String(n / entries.length))
 }
 // Where the name stands in the words, on the screen: the ident lands the beam's name there, and the words take over.
 export function title() {

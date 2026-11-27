@@ -30,6 +30,18 @@
 #w .index header p, #w .index li { animation: line 1.2s ease-out both; animation-delay: calc(1.2s + var(--i, 0) * 0.09s); }
 @media (prefers-reduced-motion: reduce) { #w .index * { animation: none !important; } }
 
+/* The arrival lays the index while it flies: each place's name goes up large as it is passed and down into its line
+   (pages.ts passed()), and only the lines laid so far show; the heading opens as the world takes over. */
+#w .pass { position: fixed; left: 0; top: 0; z-index: 1; visibility: hidden; font-weight: normal; line-height: 1.6; white-space: nowrap; letter-spacing: 0; text-shadow: 0 0 0.52em #000, 0 0 0.17em #000; pointer-events: none; }
+#w.arriving .index header, #w.arriving .index li:not(.landed) { visibility: hidden; }
+#w.arriving .index *, #w .index li.landed { animation: none; }
+#w.arriving .index::before { opacity: var(--land, 0); }
+#w.arriving a { pointer-events: none; }
+/* a line laid: its number and its proof open out from its name */
+@keyframes laid { from { clip-path: inset(-0.5em 100% -0.5em 0); } }
+#w .index li.landed a > :not(b) { animation: laid 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+#w.arriving .index li.landed a > :not(b) { animation: laid 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+
 /* ---- the index: bottom left, the whole portfolio in eight lines ---- */
 #w .index {
   position: absolute;

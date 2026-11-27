@@ -141,12 +141,12 @@ export function go(k: number, t: number, quiet = false) {
 // is only ever the sun. A place in orbit is given a dawn–dusk sun instead, along its orbit's normal on the camera's side
 // and 68° off its plane, so it is in sunlight all the way round, over the terminator, the ground under it at 15°. At a place the day goes on at a
 // quarter of its pace; going home, the year comes back to the arrival's and the day runs on.
-const DAY = 0.02, D0 = Math.asin(-0.2702), H0 = Math.atan2(0.9585, 0.091), OB = (24 * Math.PI) / 180
+export const DAY = 0.02, D0 = Math.asin(-0.2702), H0 = Math.atan2(0.9585, 0.091), OB = (24 * Math.PI) / 180
 let day = 0, tilt = 0
 const sky = [0, 0, 0, 0] // the flight's day and year, from and to
 const Ld: V = [0, 0, 0]
 // The sun at planet time pt, its day `d` seconds on and its declination `a` over the arrival's.
-function sunAt(pt: number, d: number, a: number, o: V) {
+export function sunAt(pt: number, d: number, a: number, o: V) {
   const de = D0 + a, h = H0 - DAY * (pt + d)
   o[0] = Math.cos(de) * Math.sin(h), o[1] = Math.sin(de), o[2] = Math.cos(de) * Math.cos(h)
   return o
@@ -306,7 +306,7 @@ function chapman(mu: number, H: number) {
   const x0 = x * Math.sqrt(Math.max(1 - mu * mu, 0))
   return 2 * Math.sqrt(0.5 * Math.PI * x0) * Math.exp(Math.min(1 / H - x0, 40)) - up
 }
-function tint(n: ArrayLike<number>, L: ArrayLike<number>, o: number[]) {
+export function tint(n: ArrayLike<number>, L: ArrayLike<number>, o: number[]) {
   const mu = dot(n, L), r = chapman(mu, HR) * HR, m = 1.1 * BM * HM * chapman(mu, HM)
   for (let i = 0; i < 3; i++) o[i] = WHITE[i] * Math.exp(-(BR[i] * r + m))
 }
@@ -315,6 +315,7 @@ function tint(n: ArrayLike<number>, L: ArrayLike<number>, o: number[]) {
 // its sun) and the lens open by `lens` (0 a pinhole, 1 a macro lens's). The world draws with it, and so does the
 // arrival, which flies its own camera through the same air, as wide as `fov` (radians) if it says.
 const fw: V = [0, 0, 0], side = [0, 0], E = ctx.E
+let framed = false
 export function paint(f: Frame, pose: Pose, t: number, dt: number, focus: number, lens: number, marked = false, wide = 0, since = -1) {
   const { eye, at } = pose, up_ = pose.up
   E[0] = eye[0], E[1] = eye[1], E[2] = eye[2]
@@ -409,7 +410,7 @@ export const planet: Scene = {
     else if (flight >= 0) fly(from, to, flight, now)
     else for (const key of ['eye', 'at', 'up'] as const) for (let i = 0; i < 3; i++) now[key][i] = to[key][i]
 
-    const c = covered(), fe = 1 - Math.exp(-4 * dt)
+    const c = covered(), fe = framed ? 1 - Math.exp(-4 * dt) : ((framed = true), 1) // (from the first frame as the arrival left it: clear of the index)
     side[0] += (c[0] - side[0]) * fe, side[1] += (c[1] - side[1]) * fe
     paint(f, now, t, dt, focus, DEBUG ? +(dbg.get('ap') ?? 0) : focus >= 0 && flight < 0 ? 1 : 0, true, 0, focus >= 0 && flight < 0 ? t - fstart - flen : -1)
     return sound()
