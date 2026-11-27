@@ -43,6 +43,8 @@ export const BOARDS = [
   { id: 'pigeon-carrier', title: 'Pigeon carrier', project: 'Pigeon Vision', file: PV + 'carrier/PigeonCarrier/PigeonCarrier.kicad_pcb' },
   { id: 'yapogee-s3', title: 'Yapogee S3', project: 'Pigeon Vision', file: PV + 'yapogee-s3/kicad/YapogeeS3.kicad_pcb' },
   { id: 'finertia', title: 'Finertia', project: 'BLEPS', file: SATS + 'Satellite-Avionics-rotor/project-janus/ADCS/rotor-controller/Rotor.kicad_pcb', skip: /2610T/ }, // (Faulhaber's motor model stays out)
+  { id: 'yapling', title: 'Yapling', project: 'BLEPS', file: SATS + 'Satellite-Avionics-TTC/project-janus/TTC/schematics/Yapling.kicad_pcb' }, // the TT&C board
+  { id: 'payload-carrier', title: 'Payload board', project: 'BLEPS', file: SATS + 'Satellite-Avionics-payload/project-janus/PAYLOAD/payload-carrier/payload-carrier.kicad_pcb' }, // the Jetson Orin NX's carrier
 ]
 
 const KICAD = '/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli', FFMPEG = '/opt/homebrew/bin/ffmpeg', CWEBP = '/opt/homebrew/bin/cwebp'
@@ -51,7 +53,7 @@ const PCM = join(homedir(), 'Documents/KiCad/10.0/3rdparty') // older boards nam
 // as STEP alone.
 const LIB = '/Applications/KiCad/KiCad.app/Contents/SharedSupport/3dmodels'
 const VARS = { KICAD8_3RD_PARTY: PCM, KICAD9_3RD_PARTY: PCM, KICAD10_3RD_PARTY: PCM, KICAD6_3DMODEL_DIR: LIB, KICAD7_3DMODEL_DIR: LIB, KICAD8_3DMODEL_DIR: LIB,
-  KICAD9_3DMODEL_DIR: LIB, KICAD10_3DMODEL_DIR: LIB, RIVERS_DIR: GH + 'RiversKicadLibrary', SAMWISE_AVIONICS: GH + 'samwise-avionics' }
+  KICAD9_3DMODEL_DIR: LIB, KICAD10_3DMODEL_DIR: LIB, RIVERS_DIR: GH + 'RiversKicadLibrary', SAMWISE_AVIONICS: GH + 'samwise-avionics', SSI_ICS: SATS + 'Satellite-Avionics-TTC/component_library/kicad-libraries/SSI_ICs' }
 const found = (p, home) => {
   const f = resolve(dirname(home), p.replace(/\$\{(\w+)\}/g, (v, k) => (k === 'KIPRJMOD' ? dirname(home) : VARS[k] ?? v)))
   return [f, f.replace(/\.wrl$/i, '.step')].find(existsSync)

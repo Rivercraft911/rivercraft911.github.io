@@ -12,7 +12,7 @@ import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 
 const GH = '/Users/river/Documents/github/', IREC = '/Users/river/Documents/stanford/SSI/IREC/', DL = '/Users/river/Downloads/'
-const SATS = '/Users/river/Documents/stanford/SSI/SATS/'
+const SATS = '/Users/river/Documents/stanford/SSI/SATS/', CAM = DL + 'SSI Payload Carrier/Camera assembly/'
 const PV = IREC + 'Pigeon_Vision/PigeonVision/hardware/'
 // Mask and silk, by stackup layer type, where the KiCad file names no colour and the board isn't green.
 const ink = (silk, mask) => ({ 'Top Silk Screen': silk, 'Bottom Silk Screen': silk, 'Top Solder Mask': mask, 'Bottom Solder Mask': mask })
@@ -21,7 +21,7 @@ const BLACK = ink('White', 'Black'), WHITE = ink('#101010FF', '#F6F6F1F4') // th
 const PETG = [0.035, 0.037, 0.04, 0, 0.6], PETG2 = [0.05, 0.052, 0.056, 0, 0.55]
 // A model is a `pcb`, with `skip` the parts' 3D models left out; a `step`, with `keep` the nodes kept and their
 // materials (bake-models.py), or `drop` the nodes left out, by a pattern of their names, and a `box` to cut by; or
-// `parts`, [file, material, place], place { yup: an Onshape STL exported y up, scale }.
+// `parts`, [file, material, place], place { yup: an Onshape STL exported y up, scale }. `budget` overrides BUDGET's.
 const has = (v, ...nodes) => Object.fromEntries(nodes.map((n) => [n, v]))
 // R-01, River's Onshape assembly of it, in the pieces that move: the box it stands on (base, fan, posts, switch and the
 // MangoPi), the acrylic air duct, the deck with its optics (lasers and dichroics, the polygon's motor and facet sensor,
@@ -73,6 +73,16 @@ const MODELS = [
       A_cil212_external_envelope: [0.015, 0.015, 0.017, 0.5, 0.35], A_p22_ffc_connector_envelope: [0.7, 0.66, 0.55, 0, 0.6], A_four_mm_purchased_spacers: [0.8, 0.6, 0.3, 1, 0.35] } },
   { id: 'pigeon-shell', project: 'Pigeon Vision', note: 'half the camera section’s 6 in tube, with one lens port and its cradle’s seats, painted as the airframe',
     step: IREC + '3dModels/pigeon-camera-section/output/tube.step', occt: { half: [1, 0, 0], paint: { '*': [0.8, 0.8, 0.79, 0, 0.3] } } },
+  // BLEPS's insides, River's: the TT&C board (Yapling) and the payload board with its Jetson Orin NX, as placed in KiCad;
+  // the two kinds of camera on it, each a FRAMOS IMX676C on its MC50A adapter, the main one behind a Commonlands CIL160
+  // (16 mm f/1.9) and the 360 pair behind CIL220 fisheyes; and the star tracker, a FRAMOS IMX900M behind an Edmund
+  // 16 mm f/1.8, and its baffle.
+  { id: 'yapling', project: 'BLEPS', note: 'Yapling, the TT&C board: S-band downlink from an ESP32-S3, UHF, an RP2350B, 80 × 80 mm', pcb: SATS + 'Satellite-Avionics-TTC/project-janus/TTC/schematics/Yapling.kicad_pcb', budget: { bytes: 3e6 } },
+  { id: 'payload-carrier', project: 'BLEPS', note: 'the payload board, 80 × 80 mm, carrying a Jetson Orin NX and the cameras’ links', pcb: SATS + 'Satellite-Avionics-payload/project-janus/PAYLOAD/payload-carrier/payload-carrier.kicad_pcb', budget: { bytes: 3e6 } },
+  { id: 'cam-main', project: 'BLEPS', note: 'the main camera: IMX676C, CIL160 16 mm f/1.9, MC50A', step: CAM + 'Main Camera Assembly - CIL160.step', budget: { tris: 15e3 } },
+  { id: 'cam-360', project: 'BLEPS', note: 'one of the 360 pair: IMX676C, CIL220 fisheye, MC50A', step: CAM + 'CIL220 camera with MC50A.step', budget: { tris: 15e3 } },
+  { id: 'star-tracker', project: 'BLEPS', note: 'the star tracker: IMX900M, Edmund #33-883 16 mm f/1.8, MC50A', step: CAM + 'Star Tracker Assembly.step', budget: { tris: 25e3 } },
+  { id: 'star-baffle', project: 'BLEPS', note: 'the star tracker’s baffle: aluminium, four vanes and an entrance stop', step: DL + 'Star Tracker Baffle/Star Tracker Baffle.step' },
 ]
 const BUDGET = { board: { tris: 150e3, bytes: 4e6 }, mesh: { tris: 150e3, bytes: 3e6 } }
 
@@ -81,7 +91,7 @@ const OCP = join(homedir(), '.cache/ssi-cad-venv/bin/python') // a Python with c
 const LIB = '/Applications/KiCad/KiCad.app/Contents/SharedSupport/3dmodels', PCM = join(homedir(), 'Documents/KiCad/10.0/3rdparty')
 // What boards name their 3D models by: older KiCads' variables and River's own libraries.
 const VARS = { KICAD8_3RD_PARTY: PCM, KICAD9_3RD_PARTY: PCM, KICAD10_3RD_PARTY: PCM, KICAD9_3DMODEL_DIR: LIB, KICAD10_3DMODEL_DIR: LIB,
-  RIVERS_DIR: GH + 'RiversKicadLibrary', SAMWISE_AVIONICS: GH + 'samwise-avionics' }
+  RIVERS_DIR: GH + 'RiversKicadLibrary', SAMWISE_AVIONICS: GH + 'samwise-avionics', SSI_ICS: SATS + 'Satellite-Avionics-TTC/component_library/kicad-libraries/SSI_ICs' }
 const RENAMED = { 'HTSOP-8-1EP_3.9x4.9mm_Pitch1.27mm': 'HTSOP-8-1EP_3.9x4.9mm_P1.27mm' } // KiCad 5's name
 const MEDIA = new URL('../public/media/models/', import.meta.url), PY = new URL('bake-models.py', import.meta.url).pathname
 
@@ -147,7 +157,7 @@ try {
     const raw = join(tmp, 'raw.glb'), out = new URL(`${m.id}.glb`, MEDIA).pathname, t0 = Date.now()
     const missing = m.pcb ? pcb(m, tmp, raw) : m.step ? step(m, tmp, raw) : []
     const parts = m.parts ? m.parts.map(([file, mat, place]) => ({ file, mat, ...place })) : [{ file: raw, keep: m.keep, drop: m.drop?.source, box: m.box }]
-    const job = { id: m.id, kind: m.pcb ? 'board' : 'mesh', parts, out, ...BUDGET[m.pcb ? 'board' : 'mesh'] }
+    const job = { id: m.id, kind: m.pcb ? 'board' : 'mesh', parts, out, ...BUDGET[m.pcb ? 'board' : 'mesh'], ...m.budget }
     const log = execFileSync(BLENDER, ['-b', '--factory-startup', '--python-exit-code', '1', '--python', PY, '--', JSON.stringify(job)], { maxBuffer: 1 << 28, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] })
     const s = JSON.parse(log.match(/^MODEL (.*)$/m)[1]), bytes = statSync(out).size
     list.push({ id: m.id, file: `${m.id}.glb`, bytes, tris: s.tris, bounds: s.bounds, up: 'y', materials: s.materials, project: m.project, note: m.note })

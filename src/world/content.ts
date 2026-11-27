@@ -25,6 +25,8 @@ export const BOARDS: Record<string, Board> = {
   coil: { name: 'Z coil panel', mm: [96.97, 97.33], layers: 6, as: ['coil-z'] },
   picohat: { name: 'Radio test bench', mm: [69.03, 54.7], layers: 4 },
   finertia: { name: 'Finertia', mm: [26, 26], layers: 6 },
+  yapling: { name: 'Yapling, the TT&C board', mm: [80, 80], layers: 4 },
+  'payload-carrier': { name: 'Payload board', mm: [80, 80], layers: 2 },
 }
 // The board a name means (an id here, one of its other names, or its picture's file), if it is one of River's.
 export const board = (name = '') => {
@@ -154,7 +156,7 @@ const NEW: Work[] = [
       { src: `${RAW}cubesat-imaging-sim/main/docs/media/space-over-the-bay.webp`, alt: 'A 1U above San Francisco Bay in the optical simulator, its 433 MHz tape antennas out and a lens’s field of view beyond the bus' },
       { src: `${SSI}Satellite-Avionics/feature/bleps-rotor-controller/project-janus/ADCS/rotor-controller/review/Reaction-Wheel-Controller-assembly.png`, alt: 'Finertia, the reaction wheel controller, on its Faulhaber 2610 motor, rendered from KiCad' },
     ],
-    boards: [],
+    boards: ['yapling', 'payload-carrier'],
     links: [
       ['Finertia', 'https://github.com/stanford-ssi/Satellite-Avionics/tree/feature/bleps-rotor-controller/project-janus/ADCS/rotor-controller'],
       ['optical simulator', 'https://rivercraft911.github.io/cubesat-imaging-sim/'],

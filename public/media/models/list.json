@@ -432,21 +432,237 @@
   "note": "half the camera section’s 6 in tube, with one lens port and its cradle’s seats, painted as the airframe"
  },
  {
-  "id": "bleps",
-  "file": "bleps.glb",
-  "bytes": 733736,
-  "tris": 27348,
+  "id": "yapling",
+  "file": "yapling.glb",
+  "bytes": 2977368,
+  "tris": 80857,
   "bounds": [
-   -0.151,
-   -0.06158,
-   -0.15775,
-   0.151,
-   0.20245,
-   0.15775
+   -0.03997,
+   -0.00243,
+   -0.04025,
+   0.04,
+   0.00681,
+   0.0425
   ],
   "up": "y",
   "materials": 12,
   "project": "BLEPS",
-  "note": "BLEPS's 1U as the optical simulator builds it (cubesat-imaging-sim src/render/spacecraft.ts, makeSpacecraft of its default scenario), turned so its deck and main camera face −y; textures as their mean colour"
+  "note": "Yapling, the TT&C board: S-band downlink from an ESP32-S3, UHF, an RP2350B, 80 × 80 mm"
+ },
+ {
+  "id": "payload-carrier",
+  "file": "payload-carrier.glb",
+  "bytes": 2928176,
+  "tris": 66112,
+  "bounds": [
+   -0.04005,
+   -0.00106,
+   -0.04025,
+   0.04005,
+   0.01369,
+   0.04005
+  ],
+  "up": "y",
+  "materials": 8,
+  "project": "BLEPS",
+  "note": "the payload board, 80 × 80 mm, carrying a Jetson Orin NX and the cameras’ links"
+ },
+ {
+  "id": "cam-main",
+  "file": "cam-main.glb",
+  "bytes": 608124,
+  "tris": 15000,
+  "bounds": [
+   -0.01348,
+   -0.01555,
+   -0.01325,
+   0.01348,
+   0.01555,
+   0.01323
+  ],
+  "up": "y",
+  "materials": 7,
+  "project": "BLEPS",
+  "note": "the main camera: IMX676C, CIL160 16 mm f/1.9, MC50A"
+ },
+ {
+  "id": "cam-360",
+  "file": "cam-360.glb",
+  "bytes": 606224,
+  "tris": 14998,
+  "bounds": [
+   -0.01348,
+   -0.01235,
+   -0.01325,
+   0.01348,
+   0.01235,
+   0.01323
+  ],
+  "up": "y",
+  "materials": 7,
+  "project": "BLEPS",
+  "note": "one of the 360 pair: IMX676C, CIL220 fisheye, MC50A"
+ },
+ {
+  "id": "star-tracker",
+  "file": "star-tracker.glb",
+  "bytes": 934268,
+  "tris": 24999,
+  "bounds": [
+   -0.01348,
+   -0.02,
+   -0.01325,
+   0.01348,
+   0.02,
+   0.01323
+  ],
+  "up": "y",
+  "materials": 7,
+  "project": "BLEPS",
+  "note": "the star tracker: IMX900M, Edmund #33-883 16 mm f/1.8, MC50A"
+ },
+ {
+  "id": "star-baffle",
+  "file": "star-baffle.glb",
+  "bytes": 217344,
+  "tris": 8362,
+  "bounds": [
+   -0.01864,
+   -0.011,
+   -0.01864,
+   0.01864,
+   0.011,
+   0.01864
+  ],
+  "up": "y",
+  "materials": 2,
+  "project": "BLEPS",
+  "note": "the star tracker’s baffle: aluminium, four vanes and an entrance stop"
+ },
+ {
+  "id": "bleps-frame",
+  "file": "bleps-frame.glb",
+  "bytes": 87764,
+  "tris": 3600,
+  "bounds": [
+   -0.05,
+   -0.05,
+   -0.05675,
+   0.05,
+   0.05,
+   0.05675
+  ],
+  "up": "y",
+  "materials": 1,
+  "project": "BLEPS",
+  "note": "BLEPS’s 1U frame: rails and shelves (its stand-in core left out), from River’s optical simulator (cubesat-imaging-sim makeSpacecraft), deck toward −y"
+ },
+ {
+  "id": "bleps-deck",
+  "file": "bleps-deck.glb",
+  "bytes": 36268,
+  "tris": 764,
+  "bounds": [
+   -0.0435,
+   -0.05243,
+   -0.04875,
+   0.0435,
+   -0.046,
+   0.04875
+  ],
+  "up": "y",
+  "materials": 5,
+  "project": "BLEPS",
+  "note": "BLEPS’s deck: the patch antenna, a cell, standoffs, from River’s optical simulator (cubesat-imaging-sim makeSpacecraft), deck toward −y"
+ },
+ {
+  "id": "bleps-rear",
+  "file": "bleps-rear.glb",
+  "bytes": 26836,
+  "tris": 684,
+  "bounds": [
+   -0.10661,
+   0.047,
+   -0.05075,
+   0.10661,
+   0.20245,
+   0.05075
+  ],
+  "up": "y",
+  "materials": 8,
+  "project": "BLEPS",
+  "note": "BLEPS’s rear face and its 433 MHz tape dipole, from River’s optical simulator (cubesat-imaging-sim makeSpacecraft), deck toward −y"
+ },
+ {
+  "id": "bleps-side-px",
+  "file": "bleps-side-px.glb",
+  "bytes": 88316,
+  "tris": 3112,
+  "bounds": [
+   0.047,
+   -0.05238,
+   -0.05075,
+   0.151,
+   0.044,
+   0.05075
+  ],
+  "up": "y",
+  "materials": 4,
+  "project": "BLEPS",
+  "note": "BLEPS’s +x side and its wing, from River’s optical simulator (cubesat-imaging-sim makeSpacecraft), deck toward −y"
+ },
+ {
+  "id": "bleps-side-nx",
+  "file": "bleps-side-nx.glb",
+  "bytes": 88124,
+  "tris": 3112,
+  "bounds": [
+   -0.151,
+   -0.05238,
+   -0.05075,
+   -0.047,
+   0.044,
+   0.05075
+  ],
+  "up": "y",
+  "materials": 4,
+  "project": "BLEPS",
+  "note": "BLEPS’s −x side and its wing, from River’s optical simulator (cubesat-imaging-sim makeSpacecraft), deck toward −y"
+ },
+ {
+  "id": "bleps-end-pz",
+  "file": "bleps-end-pz.glb",
+  "bytes": 88220,
+  "tris": 3112,
+  "bounds": [
+   -0.044,
+   -0.05238,
+   0.05375,
+   0.044,
+   0.044,
+   0.15775
+  ],
+  "up": "y",
+  "materials": 4,
+  "project": "BLEPS",
+  "note": "BLEPS’s +z end and its wing, from River’s optical simulator (cubesat-imaging-sim makeSpacecraft), deck toward −y"
+ },
+ {
+  "id": "bleps-end-nz",
+  "file": "bleps-end-nz.glb",
+  "bytes": 88412,
+  "tris": 3112,
+  "bounds": [
+   -0.044,
+   -0.05238,
+   -0.15775,
+   0.044,
+   0.044,
+   -0.05375
+  ],
+  "up": "y",
+  "materials": 4,
+  "project": "BLEPS",
+  "note": "BLEPS’s −z end and its wing, from River’s optical simulator (cubesat-imaging-sim makeSpacecraft), deck toward −y"
  }
 ]
