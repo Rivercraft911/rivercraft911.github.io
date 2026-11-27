@@ -21,7 +21,8 @@ const BLACK = ink('White', 'Black'), WHITE = ink('#101010FF', '#F6F6F1F4') // th
 const ACRYLIC = [0.8, 0.8, 0.78, 0, 0.25], SMOKED = [0.02, 0.02, 0.022, 0, 0.25], PLA = [0.75, 0.74, 0.7, 0, 0.6]
 const PETG = [0.035, 0.037, 0.04, 0, 0.6], PETG2 = [0.05, 0.052, 0.056, 0, 0.55]
 // A model is a `pcb`, with `skip` the parts' 3D models left out; a `step`, with `keep` the nodes kept and their
-// materials; or `parts`, [file, material, place], place { yup: an Onshape STL exported y up, scale }.
+// materials, or `drop` the nodes left out, by a pattern of their names; or `parts`, [file, material, place], place
+// { yup: an Onshape STL exported y up, scale }.
 const YUP = { scale: 0.001, yup: true }
 const MODELS = [
   { id: 'peep', project: 'PEEP', note: 'IR-triggered keystroke injector, 12.06 × 8 mm, STM32F042', pcb: GH + 'PEEP/PCB/peep/peep.kicad_pcb', stackup: BLACK },
@@ -45,6 +46,12 @@ const MODELS = [
   // Faulhaber lets its motor model go only whole and unaltered, and the bake decimates, so the motor stays out.
   { id: 'finertia', project: 'BLEPS', note: 'Finertia, BLEPS’s reaction wheel controller, 26 × 26 mm (its Faulhaber 2610 motor left out)',
     pcb: SATS + 'Satellite-Avionics-rotor/project-janus/ADCS/rotor-controller/Rotor.kicad_pcb', skip: /2610T/ },
+  // the team's whole 2U as assembled, arrays and tapes deployed. Out: River's coil boards (their own models), the stack
+  // and payload boards the panels hide, the fasteners, and the strays (a stowed copy of the tapes, a second Z panel and
+  // a coax cable left far off the bus).
+  { id: 'samwise', project: 'SAMWISE', note: 'the 2U as assembled, arrays deployed, River’s coil boards left out', step: DL + 'samwisesatstep.step',
+    drop: /Coil_Panel|universal_coil|Z_universal|Stowed Antenna|WPC_25A|^ZPlus_Panel_v2\.4_2025-04-22:2$|^(Pycubed|Battery Board|Reaction Wheel|ADCS) Assembly|Raspberry Pi 4|Camera Multiplexer|RPi_interface|Torx|Screw|Nut|Spacer|Standoff|ISO14581|HNN SCRIPT|^9\d{4}A\d/ },
+  { id: 'coil-xy', project: 'SAMWISE', note: 'XY magnetorquer coil board, 81.5 × 215.5 mm, five coil layers in series', pcb: GH + 'samwise-avionics/Universal_XY_MagTorq/Coil_Panel_XY.kicad_pcb' },
 ]
 const BUDGET = { board: { tris: 150e3, bytes: 4e6 }, mesh: { tris: 150e3, bytes: 3e6 } }
 
@@ -92,10 +99,13 @@ function pcb(m, tmp, out) {
   return missing
 }
 
+// OCCT copies a model into the board's assembly only if its labels are self-contained, and an instance's colour
+// overriding its part's is not: it would flatten the whole into one mesh, names and colours lost. The overrides go.
 function step(m, tmp, out) {
-  const f = join(tmp, 'step.kicad_pcb')
+  const f = join(tmp, 'step.kicad_pcb'), s = join(tmp, 'model.step')
+  writeFileSync(s, readFileSync(m.step, 'latin1').replace(/#\d+\s*=\s*CONTEXT_DEPENDENT_OVER_RIDING_STYLED_ITEM\([^;]*\);\s*/g, ''), 'latin1')
   writeFileSync(f, `(kicad_pcb (version 20240108) (generator "bake") (general (thickness 1.6)) (paper "A4") (layers (0 "F.Cu" signal) (31 "B.Cu" signal))
-  (footprint "step" (layer "F.Cu") (at 0 0) (model "${m.step}")))`)
+  (footprint "step" (layer "F.Cu") (at 0 0) (model "${s}")))`)
   glb(f, ['--no-board-body'], out)
   return []
 }
@@ -113,7 +123,7 @@ try {
     }
     const raw = join(tmp, 'raw.glb'), out = new URL(`${m.id}.glb`, MEDIA).pathname, t0 = Date.now()
     const missing = m.pcb ? pcb(m, tmp, raw) : m.step ? step(m, tmp, raw) : []
-    const parts = m.parts ? m.parts.map(([file, mat, place]) => ({ file, mat, ...place })) : [{ file: raw, keep: m.keep }]
+    const parts = m.parts ? m.parts.map(([file, mat, place]) => ({ file, mat, ...place })) : [{ file: raw, keep: m.keep, drop: m.drop?.source }]
     const job = { id: m.id, kind: m.pcb ? 'board' : 'mesh', parts, out, ...BUDGET[m.pcb ? 'board' : 'mesh'] }
     const log = execFileSync(BLENDER, ['-b', '--factory-startup', '--python-exit-code', '1', '--python', PY, '--', JSON.stringify(job)], { maxBuffer: 1 << 28, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] })
     const s = JSON.parse(log.match(/^MODEL (.*)$/m)[1]), bytes = statSync(out).size

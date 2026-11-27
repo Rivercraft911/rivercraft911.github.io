@@ -40,10 +40,11 @@ def load():
         else: bpy.ops.wm.obj_import(filepath=f, forward_axis='Y', up_axis='Z')  # Onshape's OBJ is z up, as Blender is
         place = Matrix.Scale(part.get('scale', 1), 4) @ (Matrix.Rotation(math.pi / 2, 4, 'X') if part.get('yup') else Matrix())
         keep = part.get('keep')  # {node name: material}, the only nodes kept; else mat paints the whole file
+        drop = re.compile(part['drop']) if part.get('drop') else None  # nodes left out, by a pattern of their names
         for o in [o for o in bpy.data.objects if o not in before and o.type == 'MESH']:
             names = [re.sub(r'\.\d+$', '', a.name) for a in chain(o)]
             hit = next((n for n in names if n in keep), None) if keep is not None else f.split('/')[-1]
-            if hit is None: continue
+            if hit is None or drop and any(drop.search(n) for n in names): continue
             mw = place @ o.matrix_world
             o.parent, o.matrix_world = None, Matrix()
             o.data = o.data.copy()
@@ -136,7 +137,8 @@ def far(m, r):
 
 
 # Heaviest first, a material joins the first it can't be told from; then, past the cap, the slightest opaque parts'
-# go to their nearest. The board's own layers and the manifest's materials stay.
+# go to their nearest. The board's own layers and the manifest's materials stay. A board's parts weigh by their
+# triangles (an LED's lens is small, and many); a mesh's by the area they cover (a solar cell is two triangles).
 def palette(objs, cap=12):
     grey, weight = material('plastic', [0.5, 0.5, 0.5, 1], 0, 0.55), {}
     for o in objs:
@@ -144,7 +146,7 @@ def palette(objs, cap=12):
         for i, m in enumerate(o.data.materials): o.data.materials[i] = m or grey
         for p in o.data.polygons:
             m = o.data.materials[p.material_index]
-            weight[m] = weight.get(m, 0) + 1
+            weight[m] = weight.get(m, 0) + (1 if board else p.area)
     given, layers = set(MADE.values()) - {grey}, {m for o in objs if o['class'] == 'board' for m in o.data.materials}
     reps, to = [], {}
     for m in sorted(weight, key=lambda m: -weight[m]):

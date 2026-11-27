@@ -304,5 +304,41 @@
   "materials": 12,
   "project": "BLEPS",
   "note": "BLEPS's 1U as the optical simulator builds it (cubesat-imaging-sim src/render/spacecraft.ts, makeSpacecraft of its default scenario), turned so its deck and main camera face −y; textures as their mean colour"
+ },
+ {
+  "id": "samwise",
+  "file": "samwise.glb",
+  "bytes": 2958888,
+  "tris": 74145,
+  "bounds": [
+   -0.16399,
+   -0.17385,
+   -0.16517,
+   0.16422,
+   0.1737,
+   0.16517
+  ],
+  "up": "y",
+  "materials": 12,
+  "project": "SAMWISE",
+  "note": "the 2U as assembled, arrays deployed, River’s coil boards left out"
+ },
+ {
+  "id": "coil-xy",
+  "file": "coil-xy.glb",
+  "bytes": 858336,
+  "tris": 28808,
+  "bounds": [
+   -0.04075,
+   -0.00344,
+   -0.10775,
+   0.04075,
+   0.00083,
+   0.10775
+  ],
+  "up": "y",
+  "materials": 6,
+  "project": "SAMWISE",
+  "note": "XY magnetorquer coil board, 81.5 × 215.5 mm, five coil layers in series"
  }
 ]
