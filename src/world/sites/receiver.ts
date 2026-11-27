@@ -12,7 +12,7 @@
 // (thirty bins a second here). Which one it is searching for goes to the sound.
 import { TAU, clamp, hash, smooth } from '../../acts/scene'
 import { CODES, L1 } from '../../dsp/gps'
-import { ball, box, make, pipe, slab, tube } from '../make'
+import { box, disc, line, make, pipe, quad, slab, text, tube } from '../make'
 import { ctx, cross, dot, frame, part, site, solid, unit, type V } from '../ctx'
 import { PLACES, type About } from '../places'
 import { C, DEG, RE, orbit } from './sky'
@@ -21,7 +21,6 @@ const RATE = 0.05, SHELL = 4.17, INC = 55 * DEG // the shell
 const LAPSE = RATE / (TAU / 43082) // real seconds a scene second: a GPS orbit is half a sidereal day
 const MASK = Math.sin(5 * DEG) // elevation mask
 const BIN = 2046 / 4.096, SPAN = 12000, BINS = 49, SWEEP = 40 // Hz a bin; the search's ±Hz, its bins; bins a second here
-type V3 = [number, number, number]
 
 // ---- the bench, in millimetres: x north, y up, z east, from the board's place on the ground --------------------------
 // The board is ephemeris.glb as places.ts used to stand it (0.07 radii across, its x north, its SMA facing south); the
@@ -64,16 +63,22 @@ make('gps-thread', () => tube({ col: [0.6, 0.9, 1, 1], metal: 0, rough: 1 }, [0,
 // into the frame every frame, an empty one where nothing is (none()), so nothing after them changes its slot in
 // ctx.items (the tracer follows things there by slot). Bench millimetres, as above.
 //
-// The search, in front of the patch and east of the board: a fine line for each Doppler bin (the 49 of them, front to
-// back), and along each the code phase (one 1023-chip period's 2046 half-chip lags, as 128 points, each the largest of
-// its 16), its height the power of four 1 ms correlations summed. Where nothing lines up it is what a correlator makes
-// of noise, χ² with eight degrees of freedom (one draw of it, kept), and the sweep raises the lines seven at a time.
+// They are drawn on one instrument, a dark glass panel in a bronze bezel standing on the ground in front of the patch,
+// tilted back to the camera's own rest: in warm white, the place's blue kept for what is live. Three panes, left to
+// right: the search, tracking, the fix; the whole one part. Panel millimetres: u across, v up its face, w out of it.
+const PW = 52, PH = 50, TILT = 0.21, PS = 0.72, PANEL = [-42, 4.5, 128] // its half-width and height (its own mm); its lean back; its size here; where its foot's middle is
+const WARM = { col: [1, 0.9, 0.78, 1], metal: 0, rough: 0.7 }, LIVE = { col: [0.62, 0.9, 1, 1], metal: 0, rough: 0.6 }
+const GLASS = { col: [0.014, 0.013, 0.012, 1], metal: 0, rough: 0.08 }, BRONZE = { col: [0.16, 0.13, 0.1, 1], metal: 0.85, rough: 0.38 }
+//
+// The search, left: a line for every other Doppler bin (of the 49, front, low, to back, high), across it the code phase
+// (one 1023-chip period's 2046 half-chip lags, as 128 points, each the largest of its 16), its height the power of
+// four 1 ms correlations summed, each line hiding those behind it. Where nothing lines up it is what a correlator makes
+// of noise, χ² with eight degrees of freedom (one draw of it, kept), and the sweep brings the lines up seven at a time.
 // Where the satellite's C/A code lines up, at its code phase (its range, mod a light-millisecond) and its Doppler, the
 // peak: as tall as its C/N0 makes it (38 dB-Hz low in the sky to 48 overhead, assumed), as wide across the lags as the
 // code's own correlation (gps.ts), and along Doppler the sinc² of a 1 ms dwell, a bin either side at 0.41.
-const COLS = 128, LAGS = 2046 / COLS, SURF = [8, 0, 62], DX = 1.3, DZ = 64 / (COLS - 1), PEAK = 24, LW = 0.16 // where; mm a bin, a lag column; the peak's height at 45 dB-Hz; a line's radius
-const glass = (r: number, g: number, b: number, a: number) => ({ col: [r, g, b, a], metal: 0, rough: 0.15 })
-const ink = { col: [0.6, 0.9, 1, 1], metal: 0, rough: 0.6 }
+const COLS = 128, LAGS = 2046 / COLS, A0 = -48, AW = 30, AV = 7, DV = 0.62, PEAK = 12 // the pane's left, width, first line's height, mm a bin; the peak at 45 dB-Hz
+const du = AW / (COLS - 1), lz = (r: number) => 0.2 + 0.012 * (BINS - 1 - r) // a line's u spacing; its depth out of the glass, the front nearest
 let seed = 0x2545f491
 const rand = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) + 0.5) / 4294967296
 const SNR0 = 10 ** 4.5 / 1000, FLOOR = 4 * (1 + SNR0) // a 1 ms dwell's SNR at 45 dB-Hz; the peak's power, summed over four
@@ -88,14 +93,18 @@ const H = Array.from({ length: BINS }, () =>
     return (PEAK * m) / FLOOR
   }),
 )
-// made as seven bands of seven bins; a search starts the noise at any band, so each satellite's looks its own
-const BANDS = 7
-for (let b = 0; b < BANDS; b++)
-  make(`acq-${b}`, () => {
-    for (let i = 0; i < 7; i++) pipe(ink, Array.from({ length: COLS }, (_, c): V3 => [i * DX, H[7 * b + i][c], c * DZ]), LW, 4)
-  })
-// the peak, 20 mm tall: across, the code's correlation at the half-chip lags round its own (R(0) = 1, R(±½) = ½, then
-// −1/1023), as power, at the columns' spacing it falls to the floor in one; along, sinc²(0.4995 k)
+// one line r at height v0, its profile h, and under it a mask of the glass down to its own foot
+function row(r: number, v0: number, h: (c: number) => number, c0 = 0, c1 = COLS - 1, m = WARM) {
+  const z = lz(r), pts: [number, number][] = []
+  for (let c = c0; c <= c1; c++) pts.push([A0 + c * du, v0 + h(c)])
+  for (let i = 0; i + 1 < pts.length; i++) quad(GLASS, [pts[i][0], v0 - 0.3, z - 0.006], [pts[i + 1][0], v0 - 0.3, z - 0.006], [pts[i + 1][0], pts[i + 1][1], z - 0.006], [pts[i][0], pts[i][1], z - 0.006], [0, 0, 1])
+  line(m, pts, z, 0.16)
+}
+// made as five bands of ten bins (five lines); a search starts the noise at any band, so each satellite's looks its own
+const BANDS = 5
+for (let b = 0; b < BANDS; b++) make(`acq-${b}`, () => { for (let i = 0; i < 10; i += 2) row(i, i * DV, (c) => H[10 * b + i][c]) })
+// the peak's line, 1 tall (it stands on its own bin's line and those either side): across, the code's correlation at the
+// half-chip lags round its own (R(0) = 1, R(±½) = ½, then −1/1023), as power; along, sinc²(0.4995 k)
 const R = (lag: number) => {
   const c = CODES[0]
   let s = 0
@@ -104,13 +113,15 @@ const R = (lag: number) => {
 }
 const SINC2 = (x: number) => (x ? (Math.sin(Math.PI * x) / (Math.PI * x)) ** 2 : 1)
 make('acq-peak', () => {
-  for (const k of [-1, 0, 1])
-    pipe({ ...ink, col: [0.8, 1, 1, 1] }, [-1, -1 / LAGS, 0, 1 / LAGS, 1].map((u): V3 => [k * DX, 20 * SINC2(0.4995 * k) * (u ? (Math.abs(u) < 1 ? R(1) ** 2 : 0) : R(0) ** 2), u * DZ]), LW * 1.2, 4)
+  const pts: [number, number][] = [-1, -1 / LAGS, 0, 1 / LAGS, 1].map((u) => [u * du, u ? (Math.abs(u) < 1 ? R(1) ** 2 : 0) : R(0) ** 2])
+  quad(GLASS, [-du, -0.3, -0.006], [du, -0.3, -0.006], [0, 1, -0.006], [0, 1, -0.006], [0, 0, 1])
+  line(LIVE, pts, 0, 0.18)
 })
-// Tracking, east of the patch, standing to face the camera's own rest: the code's correlation R(τ) over ±1.5 chips
-// (computed from the code, a triangle on its −1/1023 floor) as one fine line, and on it the early, prompt and late
-// correlators, half a chip apart, each on a stem; beside it the prompt's I and Q.
-const CHIP = 11, TALL = 22, TRK = [-18, 4, 128], IQ = 11 // mm a chip, R = 1's height, where (its middle at the foot), the I/Q circle's radius
+//
+// Tracking, middle: the code's correlation R(τ) over ±1.5 chips (computed from the code, a triangle on its −1/1023
+// floor), and on it the early, prompt and late correlators, half a chip apart, each on a stem; under it the prompt's I
+// and Q, the circle River liked.
+const CHIP = 8.5, T0 = 25, TALL = 16, IQV = 13, IQ = 9 // mm a chip, the curve's foot and R = 1's height; the I/Q circle's middle and radius
 // (of chips held for their whole width, R is straight between whole-chip lags, where it is the code's own)
 const Rk = (k: number) => {
   const c = CODES[0]
@@ -122,28 +133,14 @@ const Rc = (tau: number) => {
   const k = Math.floor(tau), f = tau - k
   return (1 - f) * Rk(k) + f * Rk(k + 1)
 }
-const TENT = Array.from({ length: 61 }, (_, i) => -1.5 + i / 20).map((tau) => Math.max(0, Rc(tau)))
-make('trk-tent', () => {
-  pipe(ink, TENT.map((r, i): V3 => [(i / 20 - 1.5) * CHIP, r * TALL, 0]), 0.2, 6)
-  pipe(glass(0.6, 0.9, 1, 0.45), [[-1.6 * CHIP, 0, 0], [1.6 * CHIP, 0, 0]], 0.12, 6)
-})
-make('trk-stem', () => pipe(glass(0.6, 0.9, 1, 0.5), [[0, 0, 0], [0, 1, 0]], 0.1, 6)) // a unit tall
-make('trk-p', () => ball({ ...ink, col: [0.75, 0.97, 1, 1] }, [0, 0, 0], 1.05, 12))
-const ringPts = (r: number, plane: 'xy' | 'xz'): V3[] => Array.from({ length: 65 }, (_, i) => {
-  const a = (i / 64) * TAU
-  return plane === 'xy' ? [r * Math.cos(a), r * Math.sin(a), 0] : [r * Math.cos(a), 0, r * Math.sin(a)]
-})
-make('trk-iq', () => {
-  pipe(glass(0.6, 0.9, 1, 0.5), ringPts(IQ, 'xy'), 0.3, 6)
-  box(ink, [-IQ - 3, -0.25, -0.25], [IQ + 3, 0.25, 0.25]) // I
-  box(glass(0.6, 0.9, 1, 0.35), [-0.2, -IQ - 2, -0.2], [0.2, IQ + 2, 0.2]) // Q
-})
-make('trk-bead', () => ball({ col: [0.85, 0.9, 0.95, 1], metal: 0, rough: 0.4 }, [0, 0, 0], 0.8, 12))
-make('trk-prompt', () => ball({ ...ink, col: [0.7, 0.95, 1, 1] }, [0, 0, 0], 1.5, 12))
-// The fix, over the patch: where the receiver put the antenna, fix by fix, five a second, against GNSS-SDR's fixes on the
-// same recording. These are the Pico's own 223 from the CTTC rooftop (docs/software/real-sky.md): half lie within
-// 2.56 m (the ring), 95 % within 5.8. 4 mm a metre.
-const FIX = [-40, 44, 62], M4 = 4, CHUNK = 32
+make('rx-dot', () => disc(WARM, 0, 0, 0, 0.55, 16))
+make('rx-live', () => disc(LIVE, 0, 0, 0, 0.8, 20))
+make('rx-stem', () => line(WARM, [[0, 0], [0, 1]], 0, 0.1)) // a unit tall
+//
+// The fix, right: where the receiver put the antenna, fix by fix, five a second, against GNSS-SDR's fixes on the same
+// recording, east across and north up, 2.2 mm a metre, ticked every metre: the Pico's own 223 from the CTTC rooftop
+// (docs/software/real-sky.md). Half lie within 2.56 m (the ring), 95 % within 5.8 (the faint one).
+const F0 = 34, FV = 25, M4 = 2.2, CHUNK = 32
 const FIXES = [
   '-6,6 -37,-21 -46,-6 -11,11 -6,9 -11,5 -23,-14 -26,-13 -12,-13 -30,9 11,17 19,31 15,9 -23,7 -30,-25',
   '17,8 9,25 -16,16 -13,5 0,-13 -29,-15 -7,-11 4,30 -30,-6 22,12 7,-19 10,2 -10,30 -19,-13 -5,9 -18,-3',
@@ -161,18 +158,34 @@ const FIXES = [
   '-18,9 -25,-5 -21,-30 -2,21 -13,-14 -25,-43 17,31 14,24 8,-12 4,-3 25,14 8,3 -13,-1 5,-9 1,-13 14,-19',
   '4,12 25,7 13,9 56,40 30,6 13,-14 36,14',
 ].join(' ').split(' ').map((p) => p.split(',').map((x) => +x / 10)) // the 223 fixes, metres east and north of GNSS-SDR's
-make('fix-disc', () => {
-  tube(glass(0.6, 0.9, 1, 0.08), [0, -0.15, 0], [0, 1, 0], 9 * M4, 9 * M4, 0.3, 64, true)
-  pipe(glass(0.7, 0.95, 1, 0.8), ringPts(2.563 * M4, 'xz'), 0.4, 6)
-})
 for (let j = 0; j * CHUNK < FIXES.length; j++)
-  make(`fix-${j}`, () => {
-    for (const [e, nn] of FIXES.slice(j * CHUNK, (j + 1) * CHUNK)) tube({ ...ink, col: [0.75, 0.95, 1, 1] }, [nn * M4, 0, e * M4], [0, 1, 0], 0.55, 0.55, 0.25, 8, true)
-  })
-make('fix-now', () => ball({ ...ink, col: [0.8, 1, 1, 1] }, [0, 0, 0], 0.9, 12))
+  make(`fix-${j}`, () => { for (const [e, nn] of FIXES.slice(j * CHUNK, (j + 1) * CHUNK)) disc(WARM, F0 + e * M4, FV + nn * M4, 0.25, 0.32, 10) })
 const CHUNKS = Math.ceil(FIXES.length / CHUNK)
-make('rx-none', () => box(ink, [0, 0, 0], [1e-3, 1e-3, 1e-3])) // nothing, holding a slot
-const GRAPHICS = ['rx-none', 'acq-peak', 'trk-tent', 'trk-stem', 'trk-p', 'trk-iq', 'trk-bead', 'trk-prompt', 'fix-disc', 'fix-now', ...Array.from({ length: BANDS }, (_, b) => `acq-${b}`), ...Array.from({ length: CHUNKS }, (_, j) => `fix-${j}`)]
+const circle = (x: number, y: number, r: number): [number, number][] => Array.from({ length: 73 }, (_, i) => [x + r * Math.cos((i / 72) * TAU), y + r * Math.sin((i / 72) * TAU)])
+// the instrument: bezel, glass, foot, and what on it stands still (the panes' rules, the correlation's curve, the I/Q
+// circle, the plot's axes, ticks and rings, and its one figure)
+make('rx-panel', () => {
+  box(BRONZE, [-PW - 2, -2, -5], [PW + 2, PH + 2, -0.6])
+  box(GLASS, [-PW, 0, -0.6], [PW, PH, 0])
+  for (const u of [-17, 17]) line(WARM, [[u, 4], [u, PH - 4]], 0.1, 0.06)
+  line(WARM, Array.from({ length: 61 }, (_, i): [number, number] => [(i / 20 - 1.5) * CHIP, T0 + Math.max(0, Rc(i / 20 - 1.5)) * TALL]), 0.15, 0.16)
+  line(WARM, [[-1.6 * CHIP, T0], [1.6 * CHIP, T0]], 0.15, 0.08)
+  line(WARM, circle(0, IQV, IQ), 0.15, 0.12)
+  line(WARM, [[-IQ - 2, IQV], [IQ + 2, IQV]], 0.15, 0.12) // I
+  line(WARM, [[0, IQV - IQ - 2], [0, IQV + IQ + 2]], 0.15, 0.06) // Q
+  line(WARM, [[F0 - 15.4, FV], [F0 + 15.4, FV]], 0.15, 0.06), line(WARM, [[F0, FV - 15.4], [F0, FV + 15.4]], 0.15, 0.06)
+  for (let k = -7; k <= 7; k++) {
+    if (!k) continue
+    const t = k % 5 ? 0.45 : 0.9
+    line(WARM, [[F0 + k * M4, FV - t], [F0 + k * M4, FV + t]], 0.15, 0.06), line(WARM, [[F0 - t, FV + k * M4], [F0 + t, FV + k * M4]], 0.15, 0.06)
+  }
+  line(LIVE, circle(F0, FV, 2.563 * M4), 0.16, 0.12)
+  line(WARM, circle(F0, FV, 5.8 * M4), 0.15, 0.05)
+  text(() => WARM, '2.56 m', F0 + 4.3, FV + 4.6, 0.16, 1.1, 0.09)
+})
+make('rx-foot', () => box(BRONZE, [-PW - 4, 0, -7], [PW + 4, 4, 7]))
+make('rx-none', () => box(WARM, [0, 0, 0], [1e-3, 1e-3, 1e-3])) // nothing, holding a slot
+const GRAPHICS = ['rx-none', 'rx-panel', 'rx-foot', 'acq-peak', 'rx-dot', 'rx-live', 'rx-stem', ...Array.from({ length: BANDS }, (_, b) => `acq-${b}`), ...Array.from({ length: CHUNKS }, (_, j) => `fix-${j}`)]
 
 // ---- the sky, each frame -------------------------------------------------------------------------------------------
 const n: V = [0, 0, 0], E: V = [0, 0, 0], N: V = [0, 0, 0], rx: V = [0, 0, 0], v: V = [0, 0, 0], S: V = [0, 0, 0]
@@ -241,7 +254,7 @@ let spin = 0, was = false
 const O: V = [0, 0, 0], w: V = [0, 0, 0], c: V = [0, 0, 0], ax: V = [0, 0, 0], ay: V = [0, 0, 0], az: V = [0, 0, 0]
 // bench point (x north, y up, z east, mm) to the world: the place's own point is in the middle of it all
 function world(x: number, y: number, z: number, o: V) {
-  ;(x -= 7), (z -= 64)
+  ;(x += 15), (z -= 74)
   const d = (x * x + z * z) * MM * 0.5 // the ground falls away from the tangent plane
   for (let i = 0; i < 3; i++) o[i] = O[i] * (1 + (y - d) * MM) + (N[i] * x + E[i] * z) * MM
   return o
@@ -349,60 +362,73 @@ export function draw(k: number) {
   graphics(ctx.t, dt, f, here)
 }
 
-// The search, tracking and the fix, drawn as they stand now (f: how much the place is shown).
+// The instrument, as it stands now (f: how much the place is shown).
+const PU: V = [0, 0, 0], PV: V = [0, 0, 0], PN: V = [0, 0, 0], at3: V = [0, 0, 0], b3 = [0, 0, 0]
+// panel point (u, v, w) to the bench
+function pp(u: number, v: number, w: number) {
+  for (let q = 0; q < 3; q++) at3[q] = (PU[q] * u + PV[q] * v + PN[q] * w) * PS
+  ;(b3[0] = PANEL[0] + dot(at3, N)), (b3[1] = PANEL[1] + dot(at3, O)), (b3[2] = PANEL[2] + dot(at3, E))
+  return b3
+}
+const SU: V = [0, 0, 0], SV2: V = [0, 0, 0], SN: V = [0, 0, 0]
+const onPanel = (id: string, u: number, v: number, w: number, sy: number, k: number, glow: number) => {
+  const b = pp(u, v, w)
+  for (let q = 0; q < 3; q++) (SU[q] = PU[q] * PS), (SV2[q] = PV[q] * PS), (SN[q] = PN[q] * PS)
+  lay(id, b[0], b[1], b[2], SU, SV2, SN, sy, k, glow)
+}
 function graphics(t: number, dt: number, f: number, here: boolean) {
-  for (let i = 0; i < 3; i++) (ax[i] = N[i]), (ay[i] = O[i]), (az[i] = E[i])
-  // the search: rows rise as the sweep passes them, and sink once it has locked, before the next begins
+  // the panel faces the camera's rest, leaning back
+  for (let i = 0; i < 3; i++) {
+    const fw = N[i] * Math.cos(yaw) + E[i] * Math.sin(yaw)
+    ;(fv[i] = fw), (PV[i] = O[i] * Math.cos(TILT) - fw * Math.sin(TILT)), (PN[i] = fw * Math.cos(TILT) + O[i] * Math.sin(TILT))
+  }
+  cross(fv, O, rv), (rv[0] = -rv[0]), (rv[1] = -rv[1]), (rv[2] = -rv[2]), (PU[0] = rv[0]), (PU[1] = rv[1]), (PU[2] = rv[2])
+  onPanel('rx-panel', 0, 0, 0, 1, 1, 2.5 * f)
+  for (let i = 0; i < 3; i++) (ax[i] = rv[i] * PS), (ay[i] = O[i] * PS), (az[i] = fv[i] * PS)
+  lay('rx-foot', PANEL[0], 0, PANEL[2], ax, ay, az, 1, 1, 0)
+  // the search: its lines come up as the sweep passes them, and fade once it has locked, before the next begins
   follow(sunk, cur >= 0 || rest > 0.35 || !more ? 1 : 0, 9, dt)
   const sweep = cur >= 0 ? bin : last >= 0 ? BINS : 0, s = f * clamp(sunk.x), sat = cur >= 0 ? cur : last, off = sat < 0 ? 0 : (sat * 3) % BANDS
   for (let b = 0; b < BANDS; b++) {
-    const h = s * smooth(0, 1, (sweep - 7 * b - 7) / 4)
-    h > 0.01 ? lay(`acq-${(b + off) % BANDS}`, SURF[0] + 7 * b * DX, SURF[1], SURF[2], ax, ay, az, h, 0.2, 2.2 * f) : none()
+    const h = s * smooth(0, 1, (sweep - 10 * b - 9) / 5)
+    h > 0.01 ? onPanel(`acq-${(b + off) % BANDS}`, 0, AV + 10 * b * DV, -0.12 * b, 1, 0.15, 2.4 * h) : none()
   }
-  const hp = sat >= 0 ? s * smooth(0, 1, (sweep - prow) / 2) * ph : 0
-  hp > 0.05 ? lay('acq-peak', SURF[0] + prow * DX, SURF[1], SURF[2] + pcol * DZ, ax, ay, az, hp / 20, 0.2, 9 * f) : none()
+  for (let k = -1; k <= 1; k++) {
+    const r = prow + k, hp = sat >= 0 && r >= 0 && r < BINS ? s * smooth(0, 1, (sweep - r) / 2) * ph * SINC2(0.4995 * k) : 0
+    hp > 0.05 ? onPanel('acq-peak', A0 + pcol * du, AV + r * DV, lz(r) + 0.004, hp, 0.15, 6 * s) : none()
+  }
   // tracking the satellite last locked: the code loop (DLL) takes up the half-lag the search left, the carrier loop the
   // Doppler left in the bin (shown slowed), both settling in a second; then the navigation bits, 25× slow
   follow(trk, here && last >= 0 ? 1 : 0, 4, dt)
   const g = f * clamp(trk.x)
-  if (g <= 0.01) for (let i = 0; i < 9; i++) none()
+  if (g <= 0.01) for (let i = 0; i < 7; i++) none()
   else {
-    for (let i = 0; i < 3; i++) fv[i] = N[i] * Math.cos(yaw) + E[i] * Math.sin(yaw)
-    cross(fv, O, rv), (rv[0] = -rv[0]), (rv[1] = -rv[1]), (rv[2] = -rv[2]) // the camera's right, at its rest
-    const x = TRK[0], y = TRK[1], z = TRK[2], tl = Math.max(0, t - lastT), d0 = perr / 2, wd = 6
+    const tl = Math.max(0, t - lastT), d0 = perr / 2, wd = 6
     const dly = d0 * (1 + wd * tl) * Math.exp(-wd * tl) // chips
     const phi = (Math.PI * hash(last * 3.7) + TAU * 0.7 * (pres / 250) * tl) * Math.exp(-tl / 0.6)
     const nb = Math.floor(tl * 2) + ((last * 37) % 300), u = tl * 2 - Math.floor(tl * 2)
     const sg = bit(last, nb - 1) + (bit(last, nb) - bit(last, nb - 1)) * smooth(0, 1, u / 0.25)
-    lay('trk-tent', x, y, z, rv, O, fv, 1, 0.2, 3 * g)
     for (let j = -1; j <= 1; j++) {
       const tau = j * 0.5 - dly, r = Math.max(0, 1 - Math.abs(tau))
-      for (let q = 0; q < 3; q++) c[q] = rv[q] * tau * CHIP
-      lay('trk-stem', x + dot(c, N), y + dot(c, O), z + dot(c, E), ax, ay, az, Math.max(r * TALL, 0.01), 0.2, 2 * g)
-      for (let q = 0; q < 3; q++) c[q] += O[q] * r * TALL
-      lay(j ? 'trk-bead' : 'trk-p', x + dot(c, N), y + dot(c, O), z + dot(c, E), ax, ay, az, 1, 0.4, (j ? 3 : 8) * g)
+      onPanel('rx-stem', tau * CHIP, T0, 0.2, Math.max(r * TALL, 0.01), 0.15, 1.6 * g)
+      onPanel(j ? 'rx-dot' : 'rx-live', tau * CHIP, T0 + r * TALL, 0.3, 1, 0.15, (j ? 3 : 7) * g)
     }
-    // the prompt's I and Q, beside it
-    const ix = x + dot(rv, N) * (1.5 * CHIP + IQ + 4), iz = z + dot(rv, E) * (1.5 * CHIP + IQ + 4), iy = y + IQ + 2
-    lay('trk-iq', ix, iy, iz, rv, O, fv, 1, 0.4, 2 * g)
     const m = sg * Math.max(0, 1 - Math.abs(dly)) * IQ
-    for (let q = 0; q < 3; q++) c[q] = rv[q] * m * Math.cos(phi) + O[q] * m * Math.sin(phi)
-    lay('trk-prompt', ix + dot(c, N), iy + dot(c, O), iz + dot(c, E), ax, ay, az, 1, 0.4, 9 * g)
+    onPanel('rx-live', m * Math.cos(phi), IQV + m * Math.sin(phi), 0.3, 1, 0.15, 7 * g)
   }
   // the fix: the Pico's own, from the recording, five a second from the first
   follow(fixd, here && fixT >= 0 && t >= fixT ? 1 : 0, 3, dt)
   const q = f * clamp(fixd.x)
-  if (q <= 0.01) for (let i = 0; i < CHUNKS + 2; i++) none()
+  if (q <= 0.01) for (let i = 0; i < CHUNKS + 1; i++) none()
   else {
     const n = Math.max(0, Math.floor((t - fixT) * 5)), [e, nn] = FIXES[n % FIXES.length]
-    lay('fix-disc', FIX[0], FIX[1], FIX[2], ax, ay, az, 1, 0.3, 2 * q)
-    for (let j = 0; j < CHUNKS; j++) j * CHUNK <= n ? lay(`fix-${j}`, FIX[0], FIX[1] + 0.2, FIX[2], ax, ay, az, 1, 0.3, 4 * q * smooth(0, 1, (n - j * CHUNK) / 6)) : none()
-    lay('fix-now', FIX[0] + nn * M4, FIX[1] + 1, FIX[2] + e * M4, ax, ay, az, 1, 0.3, 12 * q)
+    for (let j = 0; j < CHUNKS; j++) j * CHUNK <= n ? onPanel(`fix-${j}`, 0, 0, 0, 1, 0.15, 2.4 * q * smooth(0, 1, (n - j * CHUNK) / 6)) : none()
+    onPanel('rx-live', F0 + e * M4, FV + nn * M4, 0.35, 1, 0.15, 7 * q)
   }
+  // each pane is a part
   if (here) {
-    world(SURF[0] + 24 * DX, 6, SURF[2] + 32, c), part('search', c, 34 * MM)
-    if (g > 0.5) world(TRK[0] + dot(rv, N) * 12.5, TRK[1] + 12, TRK[2] + dot(rv, E) * 12.5, c), part('tracking', c, 30 * MM)
-    if (q > 0.5) world(FIX[0], FIX[1], FIX[2], c), part('fix', c, 36 * MM)
+    const b = pp(0, PH / 2, 0)
+    world(b[0], b[1], b[2], c), part('display', c, (PW + 2) * PS * MM)
   }
 }
 
@@ -410,9 +436,7 @@ function graphics(t: number, dt: number, f: number, here: boolean) {
 export const about: Record<string, About> = {
   ephemeris: { name: 'Ephemeris 1', does: 'A MAX2769B takes GPS L1 in through the SMA and hands raw I/Q, on a four-bit bus at 16.368 MHz, to an RP2350 that acquires, tracks and fixes at 5 Hz. $32.96 of parts.', board: 'gnss' },
   antenna: { name: 'L1 patch', does: 'A passive L1 patch: a 25 mm ceramic square on its ground plate, cut at two corners for right-hand circular polarisation. Rev 1 sends no antenna bias, so it takes a passive one.' },
-  search: { name: 'acquisition', does: 'Acquisition: every code phase of a satellite’s C/A code (1023 chips, as 2046 half-chip lags) against every Doppler bin from −12 to +12 kHz, 499.5 Hz apart (a 1 ms dwell, its FFT zero-padded to 4096), four 1 ms correlations summed. Noise everywhere but one cell: where the code lines up, the peak. The Pico finds a strong satellite across ±70 kHz in 5.7 s.' },
-  tracking: { name: 'tracking', does: 'Early, prompt and late correlators, half a chip apart, slide along the code’s correlation until early and late are equal; the prompt’s I and Q settle onto the I axis as the carrier loop locks, then flip with each navigation bit, 50 a second (here 25× slow). Eight channels on the Pico at 150 MHz.' },
-  fix: { name: 'fix', does: 'The Pico’s own 223 position fixes, five a second, from a real rooftop recording (CTTC, Spain, 2013), each drawn where it fell from GNSS-SDR’s fix at the same instant: half within 2.56 m (the ring), 95 % within 5.8. Cold, its first fix came 55 s in.' },
+  display: { name: 'the receiver, live', does: 'Left, the search: a satellite’s C/A code tried at every code phase (1023 chips, as 2046 half-chip lags) and every Doppler bin from −12 to +12 kHz, 499.5 Hz apart, four 1 ms correlations summed; noise but for one peak, where the code lines up. Middle, tracking: early, prompt and late correlators half a chip apart, settling until early equals late; below, the prompt’s I and Q coming onto the I axis as the carrier loop locks, then flipping with each 50 bit/s navigation bit (25× slow). Right, the fix: the Pico’s own 223 fixes from a real rooftop recording (CTTC, 2013), five a second, against GNSS-SDR’s on the same data: half within 2.56 m, 95 % within 5.8.' },
 }
 
 // What it sounds like: every satellite in view as its carrier is once its code is wiped off, a pure tone, a chord of

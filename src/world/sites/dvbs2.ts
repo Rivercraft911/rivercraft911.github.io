@@ -120,32 +120,58 @@ make('picture', () => {
 // ---- the bench, in millimetres from the pool's middle at the water: x east, y up, z north -------------------------
 // Where each thing stands, the ground under it (the pool's banks there, as planet.wgsl raises them: found by looking),
 // and its turn (its own x along bench (cos, ·, sin) of the angle from east, its y up).
-const TX = [0, 1.5, 95, Math.PI / 2], RX = [0, 2, -102, Math.PI / 2], CAM = [50, 1.5, 98, -Math.PI / 2], ETH = [36, 2.5, -102, -Math.PI / 2], SCR = [-2, 4, -165, -0.9]
+const TX = [0, 1.5, 95, Math.PI / 2], RX = [0, 2, -102, Math.PI / 2], CAM = [50, 1.5, 98, -Math.PI / 2], ETH = [36, 2.5, -102, -Math.PI / 2], SCR = [6, 4, -190, -0.9]
 // a model's point, from its own millimetres to the bench's
 const at = (p: number[], x: number, y: number, z: number): V3 => {
   const c = Math.cos(p[3]), s = Math.sin(p[3])
   return [p[0] + x * c + z * s, p[1] + y, p[2] + x * s - z * c]
 }
-// The coax: from the transmitter's U.FL, over the rim and down over the water, up onto the south rim and through the
-// attenuator (a 30 dB SMA barrel, 20 mm), and a thin pigtail round to the receiver's U.FL.
-const UTX = at(TX, -8.8, 2.4, -4.9), URX = at(RX, -8.8, 2.4, -4.9), ATT: V3 = [-16, RX[1] + 4.6, -72], ATT1: V3 = [-16, RX[1] + 4.6, -92]
-const SAG: V3[] = []
-for (let i = 0; i <= 12; i++) {
-  const s = i / 12
-  SAG.push([-6 - 10 * s, 3 + 3 * (2 * s - 1) ** 2, 76 - 144 * s])
+// The link, at true size, as it lay on the bench. At each S3's U.FL a pigtail of 1.13 mm micro-coax to an SMA jack,
+// heat-shrunk at its back; the transmitter's jack takes a jumper of RG316 (2.5 mm, its FEP jacket tan), an SMA plug at
+// each end (a hex nut 8 mm across flats, its body, a crimp ferrule and heat-shrink for strain relief), which crosses the
+// pool hanging under its own weight and runs along the south bank into the 30 dB attenuator, an SMA jack-to-plug
+// barrel, its gold body banded, whose plug takes the receiver's pigtail. The connectors lie along the banks; the cables
+// bend round to them (Catmull–Rom through the points they pass).
+const UTX = at(TX, -8.8, 2.4, -4.9), URX = at(RX, -8.8, 2.4, -4.9), HEX = 8 / Math.sqrt(3) // the U.FLs; an SMA nut's corner radius
+const YN = TX[1] + HEX, YS = RX[1] + HEX, XN = -25, XS = -16 // the north and south runs of connectors: their height and line
+const spline = (q: V3[], n = 6): V3[] => {
+  const out: V3[] = [q[0]]
+  for (let i = 0; i + 1 < q.length; i++) {
+    const a = q[Math.max(i - 1, 0)], b = q[i], c = q[i + 1], d = q[Math.min(i + 2, q.length - 1)]
+    for (let k = 1; k <= n; k++) {
+      const t = k / n, t2 = t * t, t3 = t2 * t
+      out.push([0, 1, 2].map((j) => 0.5 * (2 * b[j] + (c[j] - a[j]) * t + (2 * a[j] - 5 * b[j] + 4 * c[j] - d[j]) * t2 + (3 * b[j] - a[j] - 3 * c[j] + d[j]) * t3)) as V3)
+    }
+  }
+  return out
 }
-const PATH: V3[] = [[UTX[0], UTX[1] + 1.2, UTX[2]], [UTX[0] - 0.3, UTX[1] + 1.6, UTX[2] - 4], [-6, UTX[1] + 2, 80], ...SAG, ATT, ATT1, [-15.5, ATT1[1] - 1, -98], [-11, URX[1] + 1.5, -106], [-7.5, URX[1] + 1.6, URX[2] + 0.3], [URX[0], URX[1] + 1.2, URX[2]]]
-const NP = PATH.length, ATT_AT = SAG.length + 3 // where the attenuator begins, in PATH
+const RG316 = mat(0.55, 0.36, 0.22, 0, 0.45), NICKEL = mat(0.75, 0.75, 0.74, 1, 0.3), BAND = mat(0.05, 0.05, 0.06, 0, 0.5)
+// connector pieces along z, from z0, s the way (+1 north, −1 south): [r at start, r at end, length, sides, finish]
+type Piece = [number, number, number, number, ReturnType<typeof mat>]
+const JACK: Piece[] = [[1.5, 1.5, 12, 16, BLACK], [2, 2, 5, 16, GOLD], [HEX, HEX, 3, 6, GOLD], [3.15, 3.15, 6, 24, GOLD]] // back to front
+const PLUG: Piece[] = [[HEX, HEX, 7, 6, NICKEL], [3, 3, 3, 24, GOLD], [2.2, 2.2, 5, 16, GOLD], [1.8, 1.45, 14, 16, BLACK]] // front to back
+const ATTEN: Piece[] = [[3.15, 3.15, 6, 24, GOLD], [4.3, 4.3, 5, 32, GOLD], [4.34, 4.34, 4, 32, BAND], [4.3, 4.3, 7, 32, GOLD], [HEX, HEX, 3, 6, GOLD], [HEX, HEX, 7, 6, NICKEL]]
+const run = (x: number, y: number, z: number, s: number, ps: Piece[]) => {
+  for (const [r0, r1, l, n, m] of ps) tube(m, [x, y, z], [0, 0, s], r0, r1, l, n, true), (z += s * l)
+  return z
+}
+const flip = (ps: Piece[]) => ps.map(([r0, r1, l, n, m]): Piece => [r1, r0, l, n, m]).reverse()
+// the north run, south from the transmitter's jack's back: the jack, then the jumper's plug on it (its nut over the
+// jack's thread); the south run, south from where the jumper comes ashore: its other plug, the attenuator (its jack's
+// thread under that nut), the receiver's jack (its thread under the attenuator's plug)
+const N0 = 112, N1 = N0 - 26 + 2, NE = N1 - 29, S0 = -58, S1 = S0 - 29 + 2, S2 = S1 - 32 + 2, SE = S2 - 26
+const PIG_N = spline([[UTX[0], UTX[1] + 0.8, UTX[2]], [-8, 4.4, 87.5], [-12, 3, 94], [-15.5, 2.3, 104], [-19.5, 3, 114], [-23.5, 4.8, 118.5], [XN, YN, N0 + 4], [XN, YN, N0]])
+const SPAN = spline([[XN, YN, NE], [XN, YN - 0.6, NE - 7], [-24, 3.6, 36], [-22, 2.3, 10], [-20, 2.3, -15], [-18, 3.4, -38], [-16.5, YS - 0.6, S0 + 6], [XS, YS, S0]], 8)
+const PIG_S = spline([[XS, YS, SE], [XS, YS - 0.5, SE - 4], [-14.5, 4.4, SE - 9], [-10, 3.2, SE - 10], [-6.5, 3.4, SE - 2], [-5, 4.3, -128], [-4.8, 4.9, -117], [URX[0], URX[1] + 0.8, URX[2]]])
+// the beads' way, and where it is hidden in a connector
+const WAY: V3[] = [...PIG_N, [XN, YN, NE], ...SPAN.slice(1), [XS, YS, SE], ...PIG_S.slice(1)]
+const HIDE = [PIG_N.length - 1, PIG_N.length, PIG_N.length + SPAN.length - 1, PIG_N.length + SPAN.length] // [from, to) a vertex range twice
 make('coax', () => {
-  pipe(mat(0.62, 0.42, 0.3, 0, 0.55), PATH.slice(0, ATT_AT + 1), 1.25, 10) // RG316
-  pipe(BLACK, PATH.slice(ATT_AT + 1), 0.7, 8) // the U.FL pigtail
-  for (const u of [UTX, URX]) tube(TIN, [u[0], u[1] - 0.6, u[2]], [0, 1, 0], 1.3, 1.3, 1.3, 16, true) // its plugs
-  // the attenuator: SMA male nut, barrel, female end, along z
-  tube(GOLD, [ATT[0], ATT[1], ATT[2]], [0, 0, -1], 4.6, 4.6, 5, 6, true)
-  tube(GOLD, [ATT[0], ATT[1], ATT[2] - 5], [0, 0, -1], 4.2, 4.2, 9, 24, true)
-  tube(GOLD, [ATT[0], ATT[1], ATT[2] - 14], [0, 0, -1], 3.2, 3.2, 2, 6, true)
-  tube(GOLD, [ATT[0], ATT[1], ATT[2] - 16], [0, 0, -1], 3.0, 3.0, 4, 6, true)
-  for (const z of [-2, -18]) box(BLACK, [ATT[0] - 1, ATT[1] - 6, ATT[2] + z - 1], [ATT[0] + 1, ATT[1] - 2, ATT[2] + z + 1]) // its feet
+  pipe(BLACK, PIG_N, 0.57, 8), pipe(BLACK, PIG_S, 0.57, 8) // the pigtails
+  pipe(RG316, SPAN, 1.25, 12)
+  for (const u of [UTX, URX]) tube(NICKEL, [u[0], u[1], u[2]], [0, 1, 0], 1, 1, 1.25, 16, true) // the U.FL plugs on their jacks
+  run(XN, YN, N0, -1, JACK), run(XN, YN, N1, -1, PLUG)
+  run(XS, YS, S0, -1, flip(PLUG)), run(XS, YS, S1, -1, ATTEN), run(XS, YS, S2, -1, flip(JACK))
 })
 // The jumpers: SPI from the camera to the transmitter (SCK, CS, MOSI, READY, GND), and from the receiver to the W5500
 // (SCLK, MOSI, MISO, CS, 3V3, GND); Ethernet on to the screen.
@@ -168,27 +194,28 @@ make('jumpers', () => {
   pipe(mat(0.08, 0.25, 0.75, 0, 0.45), [jack, [jack[0], jack[1] - 1, jack[2] - 8], [jack[0] - 1, g, jack[2] - 22], [back[0] + 22, g, back[2] + 8], [back[0] + 12, g + 8, back[2] + 2], [back[0] + 6, back[1] - 12, back[2]], back], 2.7, 12)
 })
 // A bead of light, a symbol: data, a header's, a pilot's.
-const BEAD = 0.9, RING = 4.5 // mm: a bead's radius, and the ring the constellation is set on round the cable
+const BEAD = 0.55, RING = 2.6 // mm: a bead's radius, and the ring the constellation is set on round the cable
 const KINDS = ['bead-h', 'bead-p', 'bead-d']
 make('bead-h', () => ball(mat(1, 0.72, 0.3), [0, 0, 0], BEAD, 10))
 make('bead-p', () => ball(mat(1, 1, 1), [0, 0, 0], BEAD, 10))
 make('bead-d', () => ball(mat(0.5, 0.78, 1), [0, 0, 0], BEAD, 10))
 
 // ---- the path's length, and its frame along it (a symbol's I across it and level, its Q over it) ------------------
-const LEN = new Float64Array(NP), SIDE: V3[] = [], LIFT: V3[] = []
+const PATH = WAY, NP = PATH.length, LEN = new Float64Array(NP), SIDE: V3[] = [], LIFT: V3[] = []
 for (let i = 0; i < NP; i++) {
   const a = PATH[Math.max(i - 1, 0)], b = PATH[Math.min(i + 1, NP - 1)], t = unit([b[0] - a[0], b[1] - a[1], b[2] - a[2]])
   const s = unit(cross(t, [0, 1, 0])), u = cross(s, t)
   SIDE.push(s as V3), LIFT.push(u as V3)
   if (i) LEN[i] = LEN[i - 1] + Math.hypot(PATH[i][0] - PATH[i - 1][0], PATH[i][1] - PATH[i - 1][1], PATH[i][2] - PATH[i - 1][2])
 }
-const L = LEN[NP - 1], FROM_ATT = LEN[ATT_AT]
+// the beads are hidden in the connectors' runs; past the attenuator's plug they are the receiver's own
+const L = LEN[NP - 1], IN = [LEN[HIDE[0]], LEN[HIDE[1]], LEN[HIDE[2]], LEN[HIDE[3]]], FROM_ATT = IN[2] + (S0 - S2)
 
 // ---- the signal ----------------------------------------------------------------------------------------------------
 const PSK8 = rings('8PSK', '3/4', 14, [[8, 1, 0]])
 const tx = new Frames(1, () => PSK8)
 const FRAME = Frames.len(PSK8) // symbols a frame
-const RS = 12, SPEED = 48, GAP = SPEED / RS // symbols a second here; mm a second along the cable; mm between them
+const RS = 6, SPEED = 36, GAP = SPEED / RS // symbols a second here; mm a second along the cable; mm between them
 const LOCK = 0.4 // seconds into a visit the receiver has the whole header
 const s0 = { i: 0, q: 0 }, s1 = { i: 0, q: 0 }
 
@@ -275,7 +302,7 @@ export function draw(k: number) {
   put('coax', 0, 0, 0, E, O, N), put('jumpers', 0, 0, 0, E, O, N) // (made in the bench's own millimetres)
   if (here) {
     world(CAM[0], CAM[1] + 43, CAM[2], c), part('camera', c, 43 * MM)
-    world(ATT[0], ATT[1], ATT[2] - 10, c), part('coax', c, 14 * MM)
+    world(XS, YS, S1 - 16, c), part('coax', c, 16 * MM)
     world(ETH[0], ETH[1] + 5, ETH[2], c), part('w5500', c, 19 * MM)
     world(SCR[0], SCR[1] + SY, SCR[2], c), part('screen', c, 52 * MM)
   }
@@ -292,6 +319,7 @@ export function draw(k: number) {
   for (let j = 0; ; j++) {
     const s = (u - k0 + j) * GAP // how far along the cable symbol k0 − j has come
     if (s > L) break
+    if ((s > IN[0] && s < IN[1]) || (s > IN[2] && s < IN[3])) continue // in a connector
     const sym = first + k0 - j, kind = tx.sym(sym, s0)
     // past the attenuator: the receiver's own view of it, its carrier and timing as found so far, and its noise
     let I = s0.i, Q = s0.q
@@ -315,7 +343,7 @@ export function draw(k: number) {
     const y = P[1] + (R[1] - P[1]) * g + r * (I * SIDE[i][1] + Q * LIFT[i][1])
     const z = P[2] + (R[2] - P[2]) * g + r * (I * SIDE[i][2] + Q * LIFT[i][2])
     world(x, y, z, c)
-    solid(KINDS[kind], c, E, O, N, 2 * BEAD * MM * f, 0.3, 14 * f)
+    solid(KINDS[kind], c, E, O, N, 2 * BEAD * MM * f, 0.3, 9 * f)
   }
 
   // the picture, once the frames are found

@@ -179,6 +179,20 @@ export function slab(m: Mat, q: [number, number][], y0: number, y1: number) {
   prism(m, q, y0, y1)
   for (let i = o; i < p.P.length; i += 3) [p.P[i + 1], p.P[i + 2], p.N[i + 1], p.N[i + 2]] = [p.P[i + 2], p.P[i + 1], p.N[i + 2], p.N[i + 1]]
 }
+// a line w wide through the points (x, y) on the plane z, facing +z, each piece squared off w/2 past its ends so the
+// joints close; and a disc of radius r round (x, y) on that plane
+export function line(m: Mat, pts: [number, number][], z: number, w: number) {
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const [ax, ay] = pts[i], [bx, by] = pts[i + 1], h = w / 2
+    let dx = bx - ax, dy = by - ay
+    const l = Math.hypot(dx, dy)
+    l < 1e-9 ? ((dx = h), (dy = 0)) : ((dx *= h / l), (dy *= h / l))
+    quad(m, [ax - dx + dy, ay - dy - dx, z], [bx + dx + dy, by + dy - dx, z], [bx + dx - dy, by + dy + dx, z], [ax - dx - dy, ay - dy + dx, z], [0, 0, 1])
+  }
+}
+export function disc(m: Mat, x: number, y: number, z: number, r: number, n = 16) {
+  face(m, Array.from({ length: n }, (_, i): V3 => [x + r * Math.cos((i / n) * 2 * Math.PI), y + r * Math.sin((i / n) * 2 * Math.PI), z]), [0, 0, 1])
+}
 
 // ---- for Pigeon Vision (sites/launch.ts): two more ways to make a thing ------------------------------------------
 // A smooth surface through rows × cols of points, at(i, j) for i ≤ rows, j ≤ cols, each vertex's normal from its
