@@ -51,7 +51,7 @@ export const BEST: Record<string, string> = {
   launch: 'live rocket video from a hacked $5 ESP32; 0 of 5.7 M frames failed',
   lighthouse: 'RGB laser raster off a 27 000 RPM polygon',
   bench: 'three bursts of 38 kHz infrared make it type; a USB keyboard 12.06 × 8 mm',
-  glasses: 'open strobe glasses, 2 – 20 frames/s, released as MK1',
+  glasses: 'open strobe glasses, built and working: 2 – 20 frames/s',
   hearts: '144 LEDs; twin hearts beat as one over ESP-NOW',
   receiver: 'a $33 GPS front end; cold fixes on recorded sky',
   station: 'SAMWISE CubeSat: its magnetorquer coils, etched in 6-layer boards',
@@ -94,7 +94,7 @@ export const ORDER: Entry[] = [
     see: 'A fingertip of a board in a USB-A port; three 38 kHz IR bursts arrive from across the room and it types.',
   },
   {
-    slug: 'strobeglasses', status: 'MK1 released 19 Nov 2026; being built', proof: '2 – 20 frames/s, 20 – 80 % dark, from one ATtiny402',
+    slug: 'strobeglasses', status: 'MK1 built and working', proof: '2 – 20 frames/s, 20 – 80 % dark, from one ATtiny402',
     see: 'Two lenses blinking. At Balanced, 5 frames/s and 50 % dark, each lens is dark 100 ms of every 200, and inside every dark window the drive flips ±3.3 V every 5 ms (balanced AC near 100 Hz), so a scope across a valve shows a burst of square wave, then flat. A double tap and the right eye runs half a frame behind the left. Anything turning seen through them strobes: at 20 frames/s and 80 % dark each valve is clear 10 ms in 50.',
   },
   {
@@ -288,12 +288,16 @@ const NEW: Work[] = [
       ['lenses', 'Adafruit 3627 LCD light valves, top-loaded into a printed frame'],
       ['board', '41.2 × 15.25 mm, 2 layers: ATtiny402 at 5 MHz, USB-C charging, a 40 mAh LiPo'],
       ['released', 'MK1, 19 Nov 2026: KiCad, firmware, STEP and STLs, MIT'],
+      ['status', 'the first pair built and working'],
     ],
     body: [
-      'Open-source strobe glasses for visual reaction training, to take on the expensive ones. An LCD light valve in each rim switches between clear and dark at 2 to 20 frames a second; one button cycles the presets, edits a custom one, or sets the eyes alternating half a frame apart.',
-      'Liquid crystal must never sit on DC, so the ATtiny402 cuts every dark window into balanced ±3.3 V pairs near 100 Hz and always finishes the pair. MK1 is released (board, firmware and a printable frame), and I’m building the first pair now.',
+      'Have you been seeing too much? Disappointed by the lack of stuttering in your reality? Open-source strobe glasses for visual reaction training, to take on the expensive ones. An LCD light valve in each rim switches between clear and dark at 2 to 20 frames a second; one button cycles the presets, edits a custom one, or sets the eyes alternating half a frame apart.',
+      'Liquid crystal must never sit on DC, so the ATtiny402 cuts every dark window into balanced ±3.3 V pairs near 100 Hz and always finishes the pair. MK1 is released (board, firmware and a printable frame), and the first pair is built and working.',
     ],
+    proof: [{ src: `${import.meta.env.BASE_URL}media/strobeglasses/demo.mp4`, poster: `${import.meta.env.BASE_URL}media/strobeglasses/demo.jpg`, video: true, size: [768, 432], alt: 'The assembled MK1 glasses on the bench, both lenses switching between clear and dark' }],
     media: [
+      { src: `${import.meta.env.BASE_URL}media/strobeglasses/mk1-clear.jpg`, alt: 'The assembled MK1, the bench seen through its clear lens', size: [1200, 760] },
+      { src: `${import.meta.env.BASE_URL}media/strobeglasses/mk1-dark.jpg`, alt: 'The same lens dark, its wires running along the frame to the board on the temple', size: [1200, 760] },
       { src: `${RAW}strobeGlasses/main/assets/strobe-glasses.gif`, alt: 'MK1, rendered, both lenses switching between dark and clear' },
       { src: `${RAW}strobeGlasses/main/mechanical/top-load-brow.png`, alt: 'The swept brow: a recessed screw, and the four lens wires through the shoulder guide' },
       { src: `${RAW}strobeGlasses/main/assets/lcd-5v-psu-off.png`, alt: 'Voltage across one LCD valve after the 5 V supply turns off: 477 ms from 90 % to 10 %' },
@@ -305,7 +309,6 @@ const NEW: Work[] = [
       ['print and assemble', `${GH}strobeGlasses/blob/main/mechanical/TOP_LOAD.md`],
     ],
     todo: [
-      'a photo of the real glasses once built (the GIF and the JPG are renders)',
       'optical numbers: how dark is dark, and how fast a driven valve clears (only the 477 ms floating decay is measured)',
     ],
   },
